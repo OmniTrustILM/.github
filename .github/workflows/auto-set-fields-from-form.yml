@@ -44,12 +44,13 @@ jobs:
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
         run: |
           # --- Extract form field values ---
-          # GitHub YAML forms render as: ### Field Label\n\nValue
-          # We grab the line after the heading. "_No response_" means user skipped it.
+          # GitHub YAML forms render as: ### Field Label\n\n(blank line)\nValue
+          # grep -A2 captures heading + blank line + value, tail -1 gets the value.
+          # "_No response_" means user skipped an optional field.
 
-          SEVERITY=$(echo "$ISSUE_BODY" | grep -A1 '### Severity' | tail -1 | xargs 2>/dev/null || echo "")
-          MODULE=$(echo "$ISSUE_BODY" | grep -A1 '### Module' | tail -1 | xargs 2>/dev/null || echo "")
-          VERSION=$(echo "$ISSUE_BODY" | grep -A1 '### Version Number' | tail -1 | xargs 2>/dev/null || echo "")
+          SEVERITY=$(echo "$ISSUE_BODY" | grep -A2 '### Severity' | tail -1 | xargs 2>/dev/null || echo "")
+          MODULE=$(echo "$ISSUE_BODY" | grep -A2 '### Module' | tail -1 | xargs 2>/dev/null || echo "")
+          VERSION=$(echo "$ISSUE_BODY" | grep -A2 '### Version Number' | tail -1 | xargs 2>/dev/null || echo "")
 
           # Clear "_No response_" placeholders (GitHub sets this when optional fields are skipped)
           [ "$SEVERITY" = "_No response_" ] && SEVERITY=""
@@ -123,7 +124,7 @@ jobs:
               } }" --jq '.data.organization.projectV2.field')
 
             local field_id=$(echo "$field_data" | jq -r '.id')
-            local option_id=$(echo "$field_data" | jq -r ".options[] | select(.name == \"$value\") | .id")
+            local option_id=$(echo "$field_data" | jq -r --arg name "$value" '.options[] | select(.name == $name) | .id')
 
             if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
               gh api graphql -f query="

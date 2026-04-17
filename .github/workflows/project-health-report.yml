@@ -151,7 +151,7 @@ jobs:
           ERRORS=0
           WARNINGS=0
 
-          echo "$OPEN_ITEMS" | jq -c '.[]' | while IFS= read -r item; do
+          while IFS= read -r item; do
             ISSUE_TYPE=$(echo "$item" | jq -r '.content.issueType.name // "unknown"')
             REPO=$(echo "$item" | jq -r '.content.repository.name // "?"')
             NUM=$(echo "$item" | jq -r '.content.number // "?"')
@@ -184,7 +184,7 @@ jobs:
                 ERRORS=$((ERRORS + 1))
               fi
             fi
-          done
+          done < <(echo "$OPEN_ITEMS" | jq -c '.[]')
 
           echo "" >> "$REPORT"
 
@@ -203,7 +203,7 @@ jobs:
 
           NOW=$(date -u +%s)
 
-          echo "$OPEN_ITEMS" | jq -c '.[]' | while IFS= read -r item; do
+          while IFS= read -r item; do
             REPO=$(echo "$item" | jq -r '.content.repository.name // "?"')
             NUM=$(echo "$item" | jq -r '.content.number // "?"')
             TITLE=$(echo "$item" | jq -r '.content.title // "?" | .[0:60]')
@@ -239,7 +239,7 @@ jobs:
               echo "- **$REPO#$NUM** — In $STATUS for ~${AGE_DAYS}d (threshold: ${THRESHOLD}d) — $TITLE" >> "$REPORT"
               WARNINGS=$((WARNINGS + 1))
             fi
-          done
+          done < <(echo "$OPEN_ITEMS" | jq -c '.[]')
 
           echo "" >> "$REPORT"
           echo "---" >> "$REPORT"

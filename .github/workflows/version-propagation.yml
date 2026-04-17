@@ -42,6 +42,9 @@ jobs:
           echo "Parent: $PARENT_URL"
           echo "Child: $CHILD_URL"
 
+          # Wait for auto-add-to-project to add the child to the project
+          sleep 5
+
           # --- Helper: get project item data for an issue ---
           get_project_item() {
             local url=$1
