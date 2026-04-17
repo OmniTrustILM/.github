@@ -51,15 +51,12 @@ jobs:
             --json assignees --jq '.assignees[].login' | tr '\n' ', ' | sed 's/,$//')
 
           # --- Post audit comment ---
-          read -r -d '' COMMENT <<COMMENT_EOF || true
-**Issue reopened** by @${ACTOR}
-Previously assigned to: ${ASSIGNEES:-none}
-Reopened at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          COMMENT="**Issue reopened** by @${ACTOR}"
+          COMMENT="${COMMENT}\nPreviously assigned to: ${ASSIGNEES:-none}"
+          COMMENT="${COMMENT}\nReopened at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          COMMENT="${COMMENT}\n\nPlease set the **Reopen Reason** field (Regression, Incomplete Implementation, Edge Case, Other)."
 
-Please set the **Reopen Reason** field (Regression, Incomplete Implementation, Edge Case, Other).
-COMMENT_EOF
-
-          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$COMMENT"
+          echo -e "$COMMENT" | gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file -
           echo "Posted reopen comment on $REPO#$ISSUE_NUMBER"
 
           # --- Clear Reopen Reason field on the project item ---
