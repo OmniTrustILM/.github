@@ -71,7 +71,7 @@ jobs:
                 echo "::warning::Failed to sync label '$name' to $repo"
                 REPO_FAILED=$((REPO_FAILED + 1))
               fi
-            done < <(yq eval '.[]' -o=json labels.yml)
+            done < <(yq eval '.[]' -o=json -I=0 labels.yml)
 
             if [ "$REPO_FAILED" -gt 0 ]; then
               FAILED=$((FAILED + REPO_FAILED))

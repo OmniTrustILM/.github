@@ -1,0 +1,257 @@
+name: Project Health Report
+
+# Generates a project health report as a GHA artifact.
+# Evaluates open issues in Project #5 against triage rules:
+# - Missing required fields (Severity, AC, etc.)
+# - Staleness (issues stuck in a status past threshold)
+# - Status distribution per Version
+#
+# Report only — does not auto-fix anything.
+# The /project-triage skill provides the interactive version
+# with auto-fix offers.
+#
+# Output: Markdown report uploaded as GHA artifact.
+#
+# Authentication: GitHub App (ilm-project-bot)
+# Trigger: weekly Monday 5:00 UTC, or manual dispatch
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'  # Monday 5:00 UTC
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Generate a short-lived token from the GitHub App
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+
+      # Install yq for parsing triage rules config
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # Fetch project data and generate health report
+      - name: Generate health report
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          REPORT="report.md"
+          echo "# Project Health Report — $(date -u +%Y-%m-%d)" > "$REPORT"
+          echo "" >> "$REPORT"
+          echo "Generated at: $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # --- Fetch all open project items (paginated) ---
+          echo "Fetching project items..."
+          ALL_ITEMS="[]"
+          HAS_NEXT=true
+          CURSOR=""
+
+          while [ "$HAS_NEXT" = "true" ]; do
+            if [ -n "$CURSOR" ]; then
+              AFTER="after: \"$CURSOR\","
+            else
+              AFTER=""
+            fi
+
+            RESULT=$(gh api graphql -f query="
+              { organization(login: \"OmnitrustILM\") {
+                projectV2(number: 5) {
+                  items(first: 100, $AFTER) {
+                    nodes {
+                      content {
+                        ... on Issue {
+                          number title url state
+                          repository { name }
+                          createdAt
+                          assignees(first: 3) { nodes { login } }
+                          issueType { name }
+                        }
+                      }
+                      fieldValues(first: 20) {
+                        nodes {
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            field { ... on ProjectV2SingleSelectField { name } }
+                            name
+                          }
+                          ... on ProjectV2ItemFieldNumberValue {
+                            field { ... on ProjectV2Field { name } }
+                            number
+                          }
+                        }
+                      }
+                    }
+                    pageInfo { hasNextPage endCursor }
+                  }
+                }
+              } }")
+
+            # Extract items and merge
+            PAGE_ITEMS=$(echo "$RESULT" | jq '.data.organization.projectV2.items.nodes')
+            ALL_ITEMS=$(echo "$ALL_ITEMS $PAGE_ITEMS" | jq -s 'add')
+
+            HAS_NEXT=$(echo "$RESULT" | jq -r '.data.organization.projectV2.items.pageInfo.hasNextPage')
+            CURSOR=$(echo "$RESULT" | jq -r '.data.organization.projectV2.items.pageInfo.endCursor')
+          done
+
+          # --- Filter to open issues only ---
+          OPEN_ITEMS=$(echo "$ALL_ITEMS" | jq '[.[] | select(.content.state == "OPEN")]')
+          TOTAL=$(echo "$OPEN_ITEMS" | jq 'length')
+          echo "Total open issues: $TOTAL"
+
+          echo "## Summary" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "Total open issues in Project #5: **$TOTAL**" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # --- Status distribution ---
+          echo "## Status Distribution" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "| Status | Count |" >> "$REPORT"
+          echo "|---|---|" >> "$REPORT"
+          echo "$OPEN_ITEMS" | jq -r '
+            [.[] | .fieldValues.nodes[] | select(.field.name == "Status") | .name]
+            | group_by(.) | map({status: .[0], count: length})
+            | sort_by(.status)
+            | .[] | "| \(.status) | \(.count) |"' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # --- Version distribution ---
+          echo "## Version Distribution" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "| Version | Count |" >> "$REPORT"
+          echo "|---|---|" >> "$REPORT"
+          echo "$OPEN_ITEMS" | jq -r '
+            [.[] | (.fieldValues.nodes[] | select(.field.name == "Version") | .name) // "Unversioned"]
+            | group_by(.) | map({version: .[0], count: length})
+            | sort_by(.version)
+            | .[] | "| \(.version) | \(.count) |"' >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # --- Missing required fields ---
+          echo "## Missing Required Fields (Errors)" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # Helper: get field value for an item
+          get_field() {
+            echo "$1" | jq -r ".fieldValues.nodes[] | select(.field.name == \"$2\") | .name // empty"
+          }
+
+          ERRORS=0
+          WARNINGS=0
+
+          while IFS= read -r item; do
+            ISSUE_TYPE=$(echo "$item" | jq -r '.content.issueType.name // "unknown"')
+            REPO=$(echo "$item" | jq -r '.content.repository.name // "?"')
+            NUM=$(echo "$item" | jq -r '.content.number // "?"')
+            TITLE=$(echo "$item" | jq -r '.content.title // "?" | .[0:60]')
+            STATUS=$(get_field "$item" "Status")
+
+            # Bug: requires Severity
+            if [ "$ISSUE_TYPE" = "Bug" ]; then
+              SEVERITY=$(get_field "$item" "Severity")
+              if [ -z "$SEVERITY" ]; then
+                echo "- **$REPO#$NUM** — Bug missing Severity — $TITLE" >> "$REPORT"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+
+            # Release: requires Version
+            if [ "$ISSUE_TYPE" = "Release" ]; then
+              VERSION=$(get_field "$item" "Version")
+              if [ -z "$VERSION" ]; then
+                echo "- **$REPO#$NUM** — Release missing Version — $TITLE" >> "$REPORT"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+
+            # Epic past Planning: requires Complexity, Estimate, Start/End Date
+            if [ "$ISSUE_TYPE" = "Epic" ] && [ "$STATUS" != "Planning" ]; then
+              COMPLEXITY=$(get_field "$item" "Complexity")
+              if [ -z "$COMPLEXITY" ]; then
+                echo "- **$REPO#$NUM** — Epic past Planning missing Complexity — $TITLE" >> "$REPORT"
+                ERRORS=$((ERRORS + 1))
+              fi
+            fi
+          done < <(echo "$OPEN_ITEMS" | jq -c '.[]')
+
+          echo "" >> "$REPORT"
+
+          # --- Staleness check ---
+          echo "## Staleness Warnings" >> "$REPORT"
+          echo "" >> "$REPORT"
+
+          # Read thresholds from config
+          PLANNING_DAYS=$(yq eval '.staleness_thresholds.planning_days' project-triage-rules.yml)
+          ANALYSIS_DAYS=$(yq eval '.staleness_thresholds.analysis_days' project-triage-rules.yml)
+          OPEN_ASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_assigned_days' project-triage-rules.yml)
+          OPEN_UNASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_unassigned_days' project-triage-rules.yml)
+          IN_PROGRESS_DAYS=$(yq eval '.staleness_thresholds.in_progress_days' project-triage-rules.yml)
+          REVIEW_DAYS=$(yq eval '.staleness_thresholds.review_days' project-triage-rules.yml)
+          TESTING_DAYS=$(yq eval '.staleness_thresholds.testing_days' project-triage-rules.yml)
+
+          NOW=$(date -u +%s)
+
+          while IFS= read -r item; do
+            REPO=$(echo "$item" | jq -r '.content.repository.name // "?"')
+            NUM=$(echo "$item" | jq -r '.content.number // "?"')
+            TITLE=$(echo "$item" | jq -r '.content.title // "?" | .[0:60]')
+            CREATED=$(echo "$item" | jq -r '.content.createdAt // empty')
+            STATUS=$(get_field "$item" "Status")
+            ASSIGNEES=$(echo "$item" | jq -r '.content.assignees.nodes[].login // empty' 2>/dev/null)
+
+            if [ -z "$CREATED" ]; then
+              continue
+            fi
+
+            # Calculate age in days (uses createdAt as proxy for status entry)
+            CREATED_TS=$(date -u -d "$CREATED" +%s 2>/dev/null || echo "0")
+            AGE_DAYS=$(( (NOW - CREATED_TS) / 86400 ))
+
+            THRESHOLD=0
+            case "$STATUS" in
+              Planning) THRESHOLD=$PLANNING_DAYS ;;
+              Analysis) THRESHOLD=$ANALYSIS_DAYS ;;
+              Open)
+                if [ -n "$ASSIGNEES" ]; then
+                  THRESHOLD=$OPEN_ASSIGNED_DAYS
+                else
+                  THRESHOLD=$OPEN_UNASSIGNED_DAYS
+                fi
+                ;;
+              "In Progress") THRESHOLD=$IN_PROGRESS_DAYS ;;
+              Review) THRESHOLD=$REVIEW_DAYS ;;
+              Testing) THRESHOLD=$TESTING_DAYS ;;
+            esac
+
+            if [ "$THRESHOLD" -gt 0 ] && [ "$AGE_DAYS" -gt "$THRESHOLD" ]; then
+              echo "- **$REPO#$NUM** — In $STATUS for ~${AGE_DAYS}d (threshold: ${THRESHOLD}d) — $TITLE" >> "$REPORT"
+              WARNINGS=$((WARNINGS + 1))
+            fi
+          done < <(echo "$OPEN_ITEMS" | jq -c '.[]')
+
+          echo "" >> "$REPORT"
+          echo "---" >> "$REPORT"
+          echo "" >> "$REPORT"
+          echo "*Report generated by project-health-report.yml*" >> "$REPORT"
+
+          echo "Report generated: $(wc -l < "$REPORT") lines"
+
+      # Upload report as artifact (retained for 90 days)
+      - name: Upload report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-health-report-${{ github.run_number }}
+          path: report.md
+          retention-days: 90

@@ -1,0 +1,109 @@
+name: Reopen Tracking
+
+# Posts an audit comment and clears the Reopen Reason field when
+# a previously closed issue is reopened (post-merge reopen).
+#
+# This fires ONLY on the GitHub `issues.reopened` event — meaning
+# the issue was Closed/Done and is now being reopened because a
+# problem was found after delivery (regression, missed requirement, etc.).
+#
+# This does NOT fire on pre-merge QA rejection. That's a status
+# regression (Testing → In Progress) on a still-open issue — no
+# GitHub reopen event occurs. Pre-merge QA rejection is a normal
+# review cycle, not a quality metric event.
+#
+# The built-in project workflow "Item reopened → In Progress"
+# handles the status transition. This workflow adds:
+# - Audit trail comment (who, when, previous assignee)
+# - Clears Reopen Reason (user must set new reason per methodics Section 2.7)
+#
+# Authentication: GitHub App (ilm-project-bot)
+# Trigger: issue reopened in any org repo
+
+on:
+  issues:
+    types: [reopened]
+
+jobs:
+  track-reopen:
+    runs-on: ubuntu-latest
+    steps:
+      # Generate a short-lived token from the GitHub App
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+
+      # Post audit comment and clear Reopen Reason field
+      - name: Post reopen comment and clear Reopen Reason
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          # --- Get previous assignees for context ---
+          ASSIGNEES=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
+            --json assignees --jq '.assignees[].login' | tr '\n' ', ' | sed 's/,$//')
+
+          # --- Post audit comment ---
+          read -r -d '' COMMENT <<COMMENT_EOF || true
+**Issue reopened** by @${ACTOR}
+Previously assigned to: ${ASSIGNEES:-none}
+Reopened at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+Please set the **Reopen Reason** field (Regression, Incomplete Implementation, Edge Case, Other).
+COMMENT_EOF
+
+          gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body "$COMMENT"
+          echo "Posted reopen comment on $REPO#$ISSUE_NUMBER"
+
+          # --- Clear Reopen Reason field on the project item ---
+          # Forces user to set a new reason for this specific reopen event.
+          # Old reason (if any) is stale and should not carry over.
+
+          ITEM_ID=$(gh api graphql -f query="
+            query(\$url: URI!) {
+              resource(url: \$url) {
+                ... on Issue {
+                  projectItems(first: 10) {
+                    nodes {
+                      id
+                      project { id }
+                    }
+                  }
+                }
+              }
+            }" -f url="$ISSUE_URL" \
+            --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
+
+          if [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]; then
+            # Get the Reopen Reason field ID
+            FIELD_ID=$(gh api graphql -f query='
+              { organization(login: "OmnitrustILM") {
+                projectV2(number: 5) {
+                  field(name: "Reopen Reason") {
+                    ... on ProjectV2SingleSelectField { id }
+                  }
+                }
+              } }' --jq '.data.organization.projectV2.field.id')
+
+            # Clear the field value
+            gh api graphql -f query="
+              mutation {
+                clearProjectV2ItemFieldValue(input: {
+                  projectId: \"PVT_kwDOB4ppKM4AlVOh\"
+                  itemId: \"$ITEM_ID\"
+                  fieldId: \"$FIELD_ID\"
+                }) {
+                  projectV2Item { id }
+                }
+              }"
+            echo "Cleared Reopen Reason field"
+          else
+            echo "::warning::Issue not found in project — Reopen Reason not cleared."
+          fi
