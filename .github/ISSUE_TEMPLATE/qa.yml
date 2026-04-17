@@ -1,4 +1,4 @@
-name: QA
+name: QA Issue
 description: "Testing framework or automation work (QA team only)"
 type: Task
 labels: ["qa"]
