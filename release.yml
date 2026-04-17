@@ -3,19 +3,19 @@ changelog:
     labels:
       - ignore-for-release
   categories:
-    - title: "New Features"
+    - title: "✨ New Features"
       labels: [new-feature]
-    - title: "Enhancements"
+    - title: "🔧 Enhancements"
       labels: [enhancement]
-    - title: "Bug Fixes"
+    - title: "🐛 Bug Fixes"
       labels: [bug]
-    - title: "Security"
+    - title: "🔒 Security"
       labels: [vulnerability]
-    - title: "Performance"
+    - title: "⚡ Performance"
       labels: [performance]
-    - title: "Documentation"
-      labels: [documentation]
-    - title: "Dependencies"
+    - title: "🧪 QA & Testing"
+      labels: [qa]
+    - title: "📦 Dependencies"
       labels: [dependencies]
-    - title: "Other"
+    - title: "📋 Other"
       labels: ["*"]
