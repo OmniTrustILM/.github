@@ -250,7 +250,7 @@ jobs:
 
       # Upload report as artifact (retained for 90 days)
       - name: Upload report artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: project-health-report-${{ github.run_number }}
           path: report.md
