@@ -1,5 +1,13 @@
 name: Label Sync
 
+# Syncs standard labels from labels.yml to all non-archived repos in the org.
+# - Labels in labels.yml but missing in a repo → created
+# - Labels in labels.yml with different color/description → updated to match
+# - Labels in a repo but NOT in labels.yml → left untouched (not deleted)
+#
+# Authentication: GitHub App (ilm-project-bot)
+# Trigger: push to labels.yml on main, or manual dispatch
+
 on:
   push:
     branches: [main]
@@ -10,8 +18,10 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      # Checkout the repo to access labels.yml
       - uses: actions/checkout@v4
 
+      # Generate a short-lived token from the GitHub App
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -20,29 +30,61 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
+      # Install yq for parsing labels.yml (YAML → JSON per entry)
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # Iterate all org repos and create/update each label from labels.yml.
+      # Uses --force flag: creates if missing, updates color/description if exists.
+      # Does NOT delete any labels — additive only.
       - name: Sync labels to all org repos
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
-          # Install yq for YAML parsing
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
-          sudo chmod +x /usr/local/bin/yq
+          FAILED=0
+          SYNCED=0
 
-          # Get all non-archived repos
-          repos=$(gh api graphql --paginate -f query='
-            { organization(login: "OmnitrustILM") {
-              repositories(first: 100, isArchived: false) {
-                nodes { name }
-              }
-            } }' --jq '.data.organization.repositories.nodes[].name')
+          # List all non-archived repos in the org
+          repos=$(gh repo list OmnitrustILM --no-archived --limit 200 --json name --jq '.[].name')
 
-          # Sync labels from labels.yml to each repo
+          # For each repo, read labels.yml and create/update every label
           for repo in $repos; do
-            echo "Syncing labels to $repo..."
-            yq eval '.[] | .name + "|" + .color + "|" + .description' labels.yml | while IFS='|' read -r name color description; do
-              gh label create "$name" --repo "OmnitrustILM/$repo" \
-                --color "$color" --description "$description" --force 2>/dev/null || true
-            done
+            echo "::group::Syncing labels to $repo"
+            REPO_FAILED=0
+
+            # Read each label entry as a JSON object to safely handle special characters
+            while IFS= read -r line; do
+              name=$(echo "$line" | yq eval '.name' -)
+              color=$(echo "$line" | yq eval '.color' -)
+              description=$(echo "$line" | yq eval '.description' -)
+
+              # --force: update if exists, create if not
+              if gh label create "$name" \
+                --repo "OmnitrustILM/$repo" \
+                --color "$color" \
+                --description "$description" \
+                --force 2>&1; then
+                SYNCED=$((SYNCED + 1))
+              else
+                echo "::warning::Failed to sync label '$name' to $repo"
+                REPO_FAILED=$((REPO_FAILED + 1))
+              fi
+            done < <(yq eval '.[]' -o=json labels.yml)
+
+            if [ "$REPO_FAILED" -gt 0 ]; then
+              FAILED=$((FAILED + REPO_FAILED))
+            fi
+            echo "::endgroup::"
           done
 
-          echo "Label sync complete."
+          # Print summary
+          echo ""
+          echo "=== Label Sync Summary ==="
+          echo "Labels synced: $SYNCED"
+          echo "Failures: $FAILED"
+
+          if [ "$FAILED" -gt 0 ]; then
+            echo "::warning::$FAILED label sync operations failed. Check logs above."
+          fi
