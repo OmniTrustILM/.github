@@ -1,0 +1,40 @@
+name: Label Sync
+
+on:
+  push:
+    branches: [main]
+    paths: [labels.yml]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync labels to all org repos
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          # Install yq for YAML parsing
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+          # Get all non-archived repos
+          repos=$(gh api graphql --paginate -f query='
+            { organization(login: "OmnitrustILM") {
+              repositories(first: 100, isArchived: false) {
+                nodes { name }
+              }
+            } }' --jq '.data.organization.repositories.nodes[].name')
+
+          # Sync labels from labels.yml to each repo
+          for repo in $repos; do
+            echo "Syncing labels to $repo..."
+            yq eval '.[] | .name + "|" + .color + "|" + .description' labels.yml | while IFS='|' read -r name color description; do
+              gh label create "$name" --repo "OmnitrustILM/$repo" \
+                --color "$color" --description "$description" --force 2>/dev/null || true
+            done
+          done
+
+          echo "Label sync complete."
