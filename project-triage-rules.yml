@@ -1,0 +1,44 @@
+staleness_thresholds:
+  planning_days: 90
+  analysis_days: 14
+  open_assigned_days: 21
+  open_unassigned_days: 7
+  in_progress_days: 14
+  review_days: 7
+  testing_days: 7
+
+# Error-level required fields (block triage if missing)
+required_fields:
+  bug: [severity]
+  feature: [acceptance_criteria]
+  epic: [user_story, use_cases, acceptance_criteria]
+  release: [version]
+
+# Error-level fields required once Epic/Release moves past Planning status
+required_past_planning:
+  epic: [complexity, estimate, start_date, end_date]
+  release: [start_date, end_date]
+
+# Warning-level recommended fields (flagged but not blocking)
+recommended_fields:
+  bug: [module, priority, version, estimate, assignee]
+  feature: [module, priority, version, estimate, assignee]
+  epic: [version, assignee]
+  task: [module, version, estimate, assignee]
+
+# Special rules (evaluated by triage logic, not field presence)
+special_rules:
+  empty_epic_no_sub_issues: true       # Error: Epic with no sub-issues
+
+consistency_rules:
+  version_mismatch: true
+  orphaned_sub_issues: true
+  blocked_but_in_progress: true
+  done_but_open_state: true
+  closed_but_not_done: true            # Excludes "not planned" and "duplicate" closes
+  reopened_without_reason: true
+  release_epic_by_non_org_member: true
+  epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
+
+# Organization whose members are authorized to create Release and Epic issues
+authorized_org: OmnitrustILM

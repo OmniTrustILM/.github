@@ -1,0 +1,33 @@
+name: QA
+description: "Testing framework or automation work (QA team only)"
+type: Task
+labels: ["qa"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What testing work needs to be done?
+    validations:
+      required: true
+  - type: dropdown
+    id: test-approach
+    attributes:
+      label: Test Approach
+      options:
+        - Manual
+        - Automated
+        - Both
+    validations:
+      required: false
+  - type: textarea
+    id: test-scope
+    attributes:
+      label: Test Scope
+      description: What functionality or area does this cover?
+  - type: input
+    id: related-feature
+    attributes:
+      label: Related Feature
+      description: Link to related feature issue if applicable
+      placeholder: "#123 or URL"

@@ -1,0 +1,45 @@
+name: Release
+description: "Release milestone (PM only)"
+type: Release
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version Number
+      description: Semantic version for this release
+      placeholder: "2.19.0"
+    validations:
+      required: true
+  - type: input
+    id: target-date
+    attributes:
+      label: Target Date
+      description: Planned release date
+      placeholder: "2026-06-30"
+  - type: textarea
+    id: goals
+    attributes:
+      label: Release Goals
+      description: High-level goals for this release
+      placeholder: |
+        - ...
+        - ...
+  - type: checkboxes
+    id: qa-signoff
+    attributes:
+      label: QA Sign-off Checklist
+      description: Complete before publishing the release
+      options:
+        - label: Smoke tests passed
+        - label: Regression tests passed
+        - label: No open Blocker bugs
+        - label: Lead QA sign-off
+  - type: textarea
+    id: known-issues
+    attributes:
+      label: Known Issues
+      description: Bugs accepted and deferred to next release — include links and PM rationale
+      placeholder: |
+        | Bug | Severity | Rationale | Deferred to |
+        |---|---|---|---|
+        | #123 | Major | Workaround exists, low impact | 2.19.0 |

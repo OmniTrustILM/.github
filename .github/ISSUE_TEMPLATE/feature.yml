@@ -1,0 +1,33 @@
+name: Feature
+description: "Request new functionality or improve existing"
+type: Feature
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What do you want to add or change?
+    validations:
+      required: true
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: "Optional. For standalone features: As a [role], I want [capability] so that [benefit]"
+      placeholder: "As a certificate administrator, I want to..."
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: Describe how this feature would be used
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know this is done?
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true

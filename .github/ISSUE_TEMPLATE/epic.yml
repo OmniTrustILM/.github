@@ -1,0 +1,64 @@
+name: Epic
+description: "Large deliverable requiring multiple sub-issues (PM only)"
+type: Epic
+body:
+  - type: textarea
+    id: user-story
+    attributes:
+      label: User Story
+      description: "As a [role], I want [capability] so that [benefit]"
+      placeholder: "As a certificate administrator, I want to..."
+    validations:
+      required: true
+  - type: textarea
+    id: use-cases
+    attributes:
+      label: Use Cases
+      description: Concrete scenarios describing how this feature is used
+      placeholder: |
+        ### Use Case 1: [Name]
+        **Actor:** ...
+        **Precondition:** ...
+        **Flow:** ...
+        **Postcondition:** ...
+    validations:
+      required: true
+  - type: textarea
+    id: business-context
+    attributes:
+      label: Business Context
+      description: Why does this matter? Customer/market drivers, strategic alignment.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Security, performance, backwards compatibility, regulatory requirements
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of Scope
+      description: Explicitly what this Epic does NOT include
+  - type: markdown
+    attributes:
+      value: "## Testing Scope"
+  - type: checkboxes
+    id: testing-scope
+    attributes:
+      label: Testing Requirements
+      options:
+        - label: Manual testing required
+        - label: E2E automation required
+        - label: Existing tests need updating
+  - type: textarea
+    id: regression-risk
+    attributes:
+      label: Regression Risk
+      description: Describe what existing functionality might break
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        *The following sections will be filled by the `/epic-breakdown` skill:*
+        *Acceptance Criteria, Technical Analysis, Impact Assessment, enriched Testing Scope, Sub-issues*

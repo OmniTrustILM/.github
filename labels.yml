@@ -1,0 +1,45 @@
+- name: vulnerability
+  color: "e11d48"
+  description: "Security vulnerability or concern"
+- name: qa
+  color: "14b8a6"
+  description: "QA testing framework / automation work"
+- name: documentation
+  color: "06b6d4"
+  description: "Documentation work"
+- name: ignore-for-release
+  color: "6b7280"
+  description: "Exclude from auto-generated release notes"
+- name: new-feature
+  color: "22c55e"
+  description: "Wholly new functionality (for release notes categorization)"
+- name: enhancement
+  color: "3b82f6"
+  description: "Improvement to existing functionality"
+- name: bug
+  color: "ef4444"
+  description: "Bug fix"
+- name: refactoring
+  color: "8b5cf6"
+  description: "Code quality improvement"
+- name: dependencies
+  color: "a855f7"
+  description: "Dependency updates"
+- name: performance
+  color: "f97316"
+  description: "Performance related"
+- name: preview
+  color: "a78bfa"
+  description: "Triggers staged/preview environment deployment"
+- name: good first issue
+  color: "7dd3fc"
+  description: "Good for newcomers"
+- name: help wanted
+  color: "bfdbfe"
+  description: "Extra attention needed"
+- name: duplicate
+  color: "6b7280"
+  description: "Duplicate issue"
+- name: wontfix
+  color: "6b7280"
+  description: "Will not be addressed"

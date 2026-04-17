@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/orgs/OmnitrustILM/discussions
+    about: Ask questions, propose ideas, or discuss the platform
+  - name: Documentation
+    url: https://docs.otilm.com
+    about: Check the documentation before filing an issue

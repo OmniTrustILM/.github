@@ -1,0 +1,19 @@
+name: Task
+description: "Non-feature work: config, infra, cleanup"
+type: Task
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be done?
+    validations:
+      required: true
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: Definition of Done
+      description: How do we know this task is complete?
+      placeholder: |
+        - [ ] ...
+        - [ ] ...

@@ -1,0 +1,36 @@
+name: Documentation
+description: "Create or update documentation"
+type: Task
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What documentation needs to be created or updated?
+    validations:
+      required: true
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Documentation Type
+      options:
+        - Platform Documentation
+        - Contributors Guide
+        - Integration Guide
+        - API Documentation
+        - README or Repo Docs
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: related-feature
+    attributes:
+      label: Related Feature
+      description: Link to related feature issue if applicable
+      placeholder: "#123 or URL"
+  - type: textarea
+    id: pages-to-update
+    attributes:
+      label: Pages to Create or Update
+      description: List existing pages that need changes
