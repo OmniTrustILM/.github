@@ -84,7 +84,7 @@ body:
       description: Relevant log files, error output, stack traces, or HTTP request/response
     validations:
       required: false
-      accept: ".log,.txt,.zip,.gz,.tar.gz,.csv,.json"
+      accept: ".log,.txt,.zip,.gz,.csv,.json"
   - type: textarea
     id: environment
     attributes:
