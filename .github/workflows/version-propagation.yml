@@ -1,23 +1,23 @@
 name: Version and Module Propagation
 
-# When a sub-issue is added to a parent, copies Version and Module
-# from parent to child — but only if the child's fields are empty.
-# Never overrides existing child values.
+# When a new issue is created, checks if it has a parent issue.
+# If yes, copies Version and Module from parent to child — but only
+# if the child's fields are empty. Never overrides existing values.
+#
+# This covers the main use case: sub-issues created under Epics.
+# If an existing issue is linked as a sub-issue (not created new),
+# this won't fire — the /project-triage skill's "Version mismatch"
+# consistency rule catches those cases.
 #
 # Creation-time only: if the parent's Version/Module changes later,
-# children are NOT auto-updated. The "Version mismatch" consistency
-# rule (project-triage-rules.yml) catches drift for manual correction.
-#
-# Note: The sub_issues event is relatively new in GitHub. If not
-# available, version/module propagation must be done manually or
-# via the /epic-breakdown skill.
+# children are NOT auto-updated. The consistency rule flags drift.
 #
 # Authentication: GitHub App (ilm-project-bot)
-# Trigger: sub-issue added to a parent issue
+# Trigger: new issue opened in any org repo
 
 on:
-  sub_issues:
-    types: [sub_issue_added]
+  issues:
+    types: [opened]
 
 jobs:
   propagate:
@@ -32,18 +32,36 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Copy Version and Module from parent to child if child's are empty
+      # Check if issue has a parent and copy Version/Module from parent
       - name: Propagate fields from parent to child
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PARENT_URL: ${{ github.event.parent_issue.html_url }}
-          CHILD_URL: ${{ github.event.sub_issue.html_url }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
-          echo "Parent: $PARENT_URL"
-          echo "Child: $CHILD_URL"
+          echo "Issue: $ISSUE_URL"
 
-          # Wait for auto-add-to-project to add the child to the project
+          # Wait for auto-add-to-project to add this issue to the project
           sleep 5
+
+          # --- Check if the issue has a parent ---
+          PARENT_URL=$(gh api graphql -f query="
+            query(\$url: URI!) {
+              resource(url: \$url) {
+                ... on Issue {
+                  parent {
+                    url
+                  }
+                }
+              }
+            }" -f url="$ISSUE_URL" \
+            --jq '.data.resource.parent.url // empty')
+
+          if [ -z "$PARENT_URL" ]; then
+            echo "No parent issue — nothing to propagate."
+            exit 0
+          fi
+
+          echo "Parent: $PARENT_URL"
 
           # --- Helper: get project item data for an issue ---
           get_project_item() {
@@ -75,7 +93,7 @@ jobs:
 
           # Get project item data for parent and child
           PARENT_ITEM=$(get_project_item "$PARENT_URL")
-          CHILD_ITEM=$(get_project_item "$CHILD_URL")
+          CHILD_ITEM=$(get_project_item "$ISSUE_URL")
 
           CHILD_ITEM_ID=$(echo "$CHILD_ITEM" | jq -r '.id')
 
@@ -84,19 +102,25 @@ jobs:
             exit 0
           fi
 
+          if [ -z "$PARENT_ITEM" ]; then
+            echo "::warning::Parent issue not found in project."
+            exit 0
+          fi
+
           # --- For each field to propagate: Version, Module ---
           for field_name in "Version" "Module"; do
             # Get parent's option ID for this field
             parent_option_id=$(echo "$PARENT_ITEM" | jq -r \
-              ".fieldValues.nodes[] | select(.field.name == \"$field_name\") | .optionId" 2>/dev/null)
+              --arg fname "$field_name" \
+              '.fieldValues.nodes[] | select(.field.name == $fname) | .optionId // empty')
 
             # Get child's option ID for this field
             child_option_id=$(echo "$CHILD_ITEM" | jq -r \
-              ".fieldValues.nodes[] | select(.field.name == \"$field_name\") | .optionId" 2>/dev/null)
+              --arg fname "$field_name" \
+              '.fieldValues.nodes[] | select(.field.name == $fname) | .optionId // empty')
 
             # Only copy if parent has a value and child doesn't
-            if [ -n "$parent_option_id" ] && [ "$parent_option_id" != "null" ] && \
-               { [ -z "$child_option_id" ] || [ "$child_option_id" = "null" ]; }; then
+            if [ -n "$parent_option_id" ] && [ -z "$child_option_id" ]; then
 
               # Get the field ID to use in the mutation
               field_id=$(gh api graphql -f query="
@@ -122,7 +146,8 @@ jobs:
                 }"
 
               parent_value=$(echo "$PARENT_ITEM" | jq -r \
-                ".fieldValues.nodes[] | select(.field.name == \"$field_name\") | .name")
+                --arg fname "$field_name" \
+                '.fieldValues.nodes[] | select(.field.name == $fname) | .name')
               echo "Propagated $field_name: '$parent_value' from parent to child"
             else
               echo "$field_name: parent empty or child already set — skipping"
