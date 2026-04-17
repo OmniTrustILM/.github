@@ -1,10 +1,10 @@
 # Security Policy
 
-CZERTAINLY is committed to providing a secure platform for its users. We are continuously improving our security measures to protect the platform from potential threats. We encourage our users to report any security vulnerabilities they find in the platform.
+ILM is committed to providing a secure platform for its users. We are continuously improving our security measures to protect the platform from potential threats. We encourage our users to report any security vulnerabilities they find in the platform.
 
 ## Reporting a Vulnerability
 
-You can create an issue in case you believe that the vulnerability has been introduced in the platform. Our development process consists of automated vulnerability management, including dependency checks, static analysis of the code, and penetration testing. We are using the most common CVE databases and monitoring CVEs through the [CVE Radar](https://www.cveradar.com/) tool.
+You can create an issue in case you believe that the vulnerability has been introduced in the platform. Our development process consists of automated vulnerability management, including dependency checks, static analysis of the code, and penetration testing.
 
 When opening a new issue, please provide relevant information, such as:
 - A clear and concise description of the vulnerability or security issue.

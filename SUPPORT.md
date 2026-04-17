@@ -1,14 +1,12 @@
 # Support
 
-If you have any questions or need help, feel free to reach out to us at [Discussions](https://github.com/CZERTAINLY/CZERTAINLY/discussions).
+If you have any questions or need help, feel free to reach out to us at [Discussions](https://github.com/orgs/OmniTrustILM/discussions).
 
 For bug reports or feature requests, please open an issue, see the [Contributing](CONTRIBUTING.md) guide for more information.
 
 For security issues, please see the [Security](SECURITY.md) policy.
 
-You can also reach out to us at [Discord](https://discord.gg/XYsSZKjSt4).
-
-Documentation for CZERTAINLY is available at [CZERTAINLY Docs](https://docs.czertainly.com/docs/).
+Documentation for ILM is available at [ILM Docs](https://docs.otilm.com).
 
 ## Asking quality questions
 

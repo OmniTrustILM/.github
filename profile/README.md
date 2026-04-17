@@ -1,23 +1,53 @@
-## Hi there 👋
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/OmniTrustILM/ilm/main/logo/ot-white.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/OmniTrustILM/ilm/main/logo/ot-color.svg">
+  <img alt="ILM — Identity Lifecycle Management" src="https://raw.githubusercontent.com/OmniTrustILM/ilm/main/logo/ot-color.svg" width="400">
+</picture>
 
-CZERTAINLY is a open-source project for technology agnostic digital trust management and automation, including:
-- digital certificates
-- cryptographic keys
-- digital signature
-- secrets
+## Identity Lifecycle Management
 
-### 🦾 Contribution guidelines
+ILM is an open-source platform for managing the full lifecycle of digital identities — certificates, cryptographic keys, secrets, and digital signatures. Built as a microservices architecture with an extensible connector framework, it integrates with existing PKI infrastructure, certificate authorities, and key management systems.
 
-We encourage everyone to make contributions to CZERTAINLY platform. You can find more information in our contributing guidelines that are part of each repository.
+Released under the [MIT License](https://github.com/OmniTrustILM/ilm/blob/main/LICENSE.md) with additional features available under subscription plans.
 
-You can find instruction to setup your local environment here: [CZERTAINLY-Development-Environment](https://github.com/CZERTAINLY/CZERTAINLY-Development-Environment).
+### Key Capabilities
 
-### 📖 Useful resources
+- **Certificate Management** — issue, renew, and revoke certificates through RA Profiles and standard protocols
+- **Cryptographic Key Management** — generate, store, and manage keys through Token Profiles
+- **Secrets Management** — passwords, API keys, JWT tokens, and keystores through Vault Profiles with versioning and approval workflows
+- **CBOM Scanning** — scan filesystems, containers, and network ports for cryptographic assets and generate CycloneDX CBOMs
+- **Discovery** — find certificates across networks, CT logs, and third-party systems
+- **Compliance** — evaluate and enforce certificate policies across your inventory
 
-- Documentation for CZERTAINLY is available at [CZERTAINLY Docs](https://docs.czertainly.com/docs/).
-- Community discussions are available at [Discussions](https://github.com/CZERTAINLY/CZERTAINLY/discussions).
-- Discord channel is available at [Discord](https://discord.gg/XYsSZKjSt4).
+### Key Repositories
 
-### 🍿 Fun facts
+| Repository                                                           | Description                                                   |
+|----------------------------------------------------------------------|---------------------------------------------------------------|
+| [ilm](https://github.com/OmniTrustILM/ilm)                           | Platform overview, full repository catalog, and architecture  |
+| [core](https://github.com/OmniTrustILM/core)                         | Core service managing certificate lifecycle operations        |
+| [fe-administrator](https://github.com/OmniTrustILM/fe-administrator) | Administrator web interface                                   |
+| [helm-charts](https://github.com/OmniTrustILM/helm-charts)           | Helm charts for Kubernetes deployment                         |
+| [cbom-lens](https://github.com/OmniTrustILM/cbom-lens)               | CLI tool for cryptographic asset scanning and CBOM generation |
+| [interfaces](https://github.com/OmniTrustILM/interfaces)             | API definitions for building connectors and integrations      |
 
-- CZERTAINLY is a combination of the words "certainly" and "CZechia", which is the country where the project was started.
+See the [full repository catalog](https://github.com/OmniTrustILM/ilm#repositories) for all platform components, connectors, and integrations.
+
+### Contributing
+
+We welcome contributions from everyone. To get started:
+
+- Read the [Contributing Guide](https://github.com/OmniTrustILM/.github/blob/main/CONTRIBUTING.md) for workflow, commit conventions, and issue guidelines
+- Set up your local environment with the [Development Environment](https://github.com/OmniTrustILM/development-environment) repository
+- Look for issues labeled [`good first issue`](https://github.com/search?q=org%3AOmniTrustILM+label%3A%22good+first+issue%22+is%3Aopen&type=issues) to find a good starting point
+
+### Resources & Community
+
+- [Documentation](https://docs.otilm.com) — guides, API reference, and deployment instructions
+- [Discussions](https://github.com/orgs/OmniTrustILM/discussions) — ask questions, propose ideas, or discuss the platform
+- [Discord](https://discord.gg/XYsSZKjSt4) — chat with the community and the team
+- [OmniTrust](https://www.omnitrust.com) — company website and subscription plans
+- [Contact](mailto:ilm@omnitrust.com) — reach us directly
+
+### License
+
+ILM is released under the [MIT License](https://github.com/OmniTrustILM/ilm/blob/main/LICENSE.md).

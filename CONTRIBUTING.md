@@ -1,15 +1,13 @@
-# Contributing to CZERTAINLY
+# Contributing to ILM
 
-We encourage everyone to make contributions to CZERTAINLY platform. You can be a part of the community and improving the security of the internet. Your contribution is important to enhance the platform and make it more affordable and available for all of us using digital certificate.
+We encourage everyone to make contributions to the ILM platform. You can be a part of the community and improving the security of the internet. Your contribution is important to enhance the platform and make it more affordable and available for all of us using digital certificate.
 
-We use [GitHub](https://github.com/) to manage CZERTAINLY project and all source codes, including tracking issues.
+We use [GitHub](https://github.com/) to manage the ILM project and all source codes, including tracking issues.
 
 ## Source code management
 
 [GitHub](https://github.com/) is used as version control system.
-We are trying to use (where possible) the [Vincent Driessen’s "git flow" branching model](https://nvie.com/posts/a-successful-git-branching-model/). It is a git branching and release management workflow that helps us keep track of features, hotfixes and releases in CZERTAINLY projects.
-
-There might be some exceptions to the git flow model, but in general, we are trying to follow it when it makes sense.
+We use [GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow) as our branching strategy. Feature branches are created from `main`, and merged back via pull requests after review.
 
 ## Issues
 
@@ -44,11 +42,11 @@ Here are some notes on how to suggest a feature or improvement:
 
 ## Contributing for the first time
 
-If you are contributing to CZERTAINLY for the first time, you can learn how to create a pull request by following [Open Source Guide](https://opensource.guide/how-to-contribute/). This guide will help you to understand the process of contributing to open source projects.
+If you are contributing to ILM for the first time, you can learn how to create a pull request by following [Open Source Guide](https://opensource.guide/how-to-contribute/). This guide will help you to understand the process of contributing to open source projects.
 
 To help you get your feet wet and get you familiar with our contribution process, we have a list of good first issues that contain bugs that have a relatively limited scope. This is a great place to get started.
 
-If you decide to fix an issue, please be sure to check the comment thread in case somebody is already working on a fix. If nobody is working on it at the moment, please leave a comment stating that you intend to work on it so other people don’t accidentally duplicate your effort.
+If you decide to fix an issue, please be sure to check the comment thread in case somebody is already working on a fix. If nobody is working on it at the moment, please leave a comment stating that you intend to work on it so other people don't accidentally duplicate your effort.
 
 ## Commit guidelines
 
@@ -93,4 +91,4 @@ For all development tasks, we prefer:
 
 ## Semantic versioning
 
-We are using [Semantic Versioning](https://semver.org/) for CZERTAINLY platform.
+We are using [Semantic Versioning](https://semver.org/) for ILM platform.
