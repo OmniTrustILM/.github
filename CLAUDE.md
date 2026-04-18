@@ -9,24 +9,32 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 ## Repository Purpose and Contents
 
 - **Issue templates** (`.github/ISSUE_TEMPLATE/`): Bug, Feature, Epic, Release, Task, QA, Documentation, Vulnerability — each with structured YAML forms
-- **Labels** (`labels.yml`): Canonical label definitions synced to all org repos via the label-sync workflow
-- **Label sync workflow** (`.github/workflows/label-sync.yml`): Uses a GitHub App token to push labels from `labels.yml` to every non-archived repo in the org
-- **Project triage rules** (`project-triage-rules.yml`): Staleness thresholds, required/recommended fields per issue type, and consistency rules consumed by external triage automation
-- **Release notes config** (`release.yml`): Auto-generated changelog categories mapped to labels
+- **Labels** (`templates/labels.yml`): Canonical label definitions synced to all org repos via the label-sync workflow
+- **Label sync workflow** (`.github/workflows/label-sync.yml`): Uses a GitHub App token to push labels from `templates/labels.yml` to every non-archived repo in the org
+- **Project triage rules** (`config/project-triage-rules.yml`): Staleness thresholds, required/recommended fields per issue type, and consistency rules consumed by external triage automation
+- **Release notes template** (`templates/release.yml`): Auto-generated changelog categories mapped to labels; synced to `.github/release.yml` in every org repo by the release-yml-sync workflow
+- **Release.yml sync workflow** (`.github/workflows/release-yml-sync.yml`): Manually-dispatched workflow that opens PRs in target repos to adopt the shared `templates/release.yml`
 - **Renovate config** (`renovate.json`): Inherited dependency update settings
 - **Community health files**: CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md, FUNDING.yml
 - **Org profile** (`profile/README.md`): Org landing page at github.com/OmniTrustILM — uses dark/light responsive logo from the `ilm` repo via raw GitHub URLs, curated key repos table, and links to docs/community
 
 ## Key Conventions
 
-### Issue Types and Their Constraints (from `project-triage-rules.yml`)
+### Directory Layout
+
+- `templates/` — files synced OUT to every org repo (labels, release notes config)
+- `config/` — files consumed HERE or by external automation (triage rules)
+- `.github/workflows/` — GitHub Actions workflows (required path)
+- `.github/ISSUE_TEMPLATE/` — issue forms (required path)
+
+### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
 - **Bug**: requires `severity`. Recommended: module, priority, version, estimate, assignee.
 - **Feature**: requires `acceptance_criteria`. Recommended: module, priority, version, estimate, assignee.
 - **Epic**: requires `user_story`, `use_cases`, `acceptance_criteria`. Once past Planning status, also requires `complexity`, `estimate`, `start_date`, `end_date`. Epics without sub-issues or without a QA sub-issue are flagged.
 - **Release**: requires `version`. Past Planning: requires `start_date`, `end_date`.
 
 ### Labels
-Labels are the source of truth for release note categorization. The label set in `labels.yml` is synced org-wide. When adding/changing labels, edit `labels.yml` — the workflow propagates changes automatically on push to `main`.
+Labels are the source of truth for release note categorization. The label set in `templates/labels.yml` is synced org-wide. When adding/changing labels, edit `templates/labels.yml` — the workflow propagates changes automatically on push to `main`.
 
 ### Commit Format
 Imperative mood, capitalized, max 50-char summary, blank second line, optional body wrapped at 72 chars. Include a `Link:` line referencing the GitHub issue.
@@ -37,9 +45,30 @@ GitHub flow — feature branches from `main`, merged back via pull requests.
 ### Versioning
 Semantic Versioning (semver.org).
 
-## Workflow: Label Sync
+## Workflows
 
-The only CI workflow in this repo. Triggered on push to `main` when `labels.yml` changes, or manually via `workflow_dispatch`. Uses a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) to authenticate and sync labels across all org repos.
+All CI workflows in this repo use a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) for authentication. Each workflow's bash logic lives under `.github/scripts/<workflow-basename>/`.
+
+Sync / template distribution:
+
+- **Label Sync** (`label-sync.yml`) — push to `main` on `templates/labels.yml` changes, or manual. Syncs labels to all non-archived org repos.
+- **Release.yml Sync** (`release-yml-sync.yml`) — manual dispatch. Opens PRs in target repos to adopt `templates/release.yml`.
+
+Issue lifecycle automation (triggered on `issues` events across all org repos):
+
+- **Auto Add to Project** (`auto-add-to-project.yml`) — on issue open. Adds the issue to Project #5 and sets initial Status (Bug → Analysis, else → Planning).
+- **Auto Set Fields from Form** (`auto-set-fields-from-form.yml`) — on issue open. Parses structured form data (Severity, Module, Version Number) and applies project-field values. Sets vulnerability defaults.
+- **Version Propagation** (`version-propagation.yml`) — on issue open. If the new issue has a parent, copies empty Version/Module fields from parent to child.
+- **Reopen Tracking** (`reopen-tracking.yml`) — on issue reopen. Posts an audit comment and clears the Reopen Reason field.
+
+Release-time automation:
+
+- **Post-Release Version Stamping** (`post-release-stamping.yml`) — on GitHub Release publish. Stamps Version on closed Done issues that don't have one.
+
+Reporting and CI:
+
+- **Project Health Report** (`project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
+- **ShellCheck** (`shellcheck.yml`) — on PRs touching `.github/scripts/**`. Lints all extracted bash scripts.
 
 ## External References
 

@@ -1,0 +1,8 @@
+# Shell scripts must be LF — they run on Linux CI runners and CRLF
+# line endings break the shebang and heredoc terminators.
+*.sh text eol=lf
+
+# Workflow and config YAMLs are consumed by CI; keep them LF for
+# consistency across Windows/macOS/Linux contributors.
+*.yml text eol=lf
+*.yaml text eol=lf

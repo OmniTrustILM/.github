@@ -1,6 +1,6 @@
 name: Release.yml Sync
 
-# Syncs .github/release.yml across all non-archived org repos via PRs.
+# Syncs templates/release.yml across all non-archived org repos via PRs.
 # Manual trigger only. Uses matrix fan-out for parallel PR creation.
 #
 # Inputs:
@@ -11,8 +11,8 @@ name: Release.yml Sync
 # Per-repo opt-out: if a maintainer closes the sync PR without merging, the
 # workflow respects that decision and won't reopen on later runs.
 #
-# Branch name is stable (chore/sync-release-yml) for idempotency —
-# reuses existing branch/PR instead of spawning duplicates.
+# Script logic lives in .github/scripts/release-yml-sync/ — this workflow
+# just orchestrates checkouts, tokens, and matrix fan-out.
 
 on:
   workflow_dispatch:
@@ -42,6 +42,8 @@ jobs:
       repos: ${{ steps.resolve.outputs.repos }}
       count: ${{ steps.resolve.outputs.count }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -50,56 +52,12 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Resolve target list:
-      # 1. Start from "all non-archived org repos" or user-supplied list
-      # 2. Validate each name exists (fail fast on typos)
-      # 3. Drop the .github repo itself (self-reference)
-      # 4. Emit JSON array for matrix
       - name: Resolve target repos
         id: resolve
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TARGET_INPUT: ${{ inputs.target_repos }}
-        run: |
-          set -euo pipefail
-
-          # Hard cap detection: gh silently truncates at --limit. If the org
-          # grows past 500 non-archived repos, raise this.
-          LIMIT=500
-          all_repos=$(gh repo list OmnitrustILM --no-archived --limit "$LIMIT" --json name --jq '.[].name')
-          repo_count=$(echo "$all_repos" | grep -c . || true)
-          if [ "$repo_count" -ge "$LIMIT" ]; then
-            echo "::error::Reached --limit $LIMIT on gh repo list. Raise the limit."
-            exit 1
-          fi
-
-          if [ "$TARGET_INPUT" = "all" ]; then
-            candidates="$all_repos"
-          else
-            candidates=$(echo "$TARGET_INPUT" | tr ',' '\n' | sed 's/^ *//;s/ *$//' | grep -v '^$' || true)
-            for r in $candidates; do
-              if ! echo "$all_repos" | grep -qx "$r"; then
-                echo "::error::Repo '$r' not found in OmnitrustILM (or is archived)"
-                exit 1
-              fi
-            done
-          fi
-
-          # Drop self — the .github repo is the source of truth for the
-          # template; syncing to itself would nest the file under .github/.github/.
-          final=$(echo "$candidates" | grep -vx '.github' | grep -v '^$' || true)
-
-          count=$(printf '%s\n' "$final" | grep -c . || true)
-          if [ -z "$count" ] || [ "$count" -eq 0 ]; then
-            echo "::error::No target repos after filtering"
-            exit 1
-          fi
-
-          json=$(printf '%s\n' "$final" | jq -R . | jq -sc .)
-          echo "repos=$json" >> "$GITHUB_OUTPUT"
-          echo "count=$count" >> "$GITHUB_OUTPUT"
-          echo "Resolved $count target repos"
-          echo "$final"
+        run: .github/scripts/release-yml-sync/resolve-targets.sh
 
   sync:
     needs: plan
@@ -120,7 +78,7 @@ jobs:
           repositories: |
             ${{ matrix.repo }}
 
-      - name: Checkout .github (source of truth)
+      - name: Checkout .github (source of truth + scripts)
         uses: actions/checkout@v4
         with:
           path: source
@@ -133,108 +91,20 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
 
-      # Compare source release.yml against target .github/release.yml.
-      # Path asymmetry is intentional:
-      #   - In the .github repo, release.yml lives at the ROOT (org template).
-      #   - In every OTHER repo, release.yml lives under .github/ per the
-      #     standard GitHub convention for per-repo release-notes config.
-      # Three possible states: IDENTICAL (skip), WOULD UPDATE, MISSING.
       - name: Diff release.yml
         id: diff
-        run: |
-          set -euo pipefail
-          src=source/release.yml
-          dst=target/.github/release.yml
+        env:
+          REPO_NAME: ${{ matrix.repo }}
+        run: source/.github/scripts/release-yml-sync/diff-release.sh
 
-          if [ ! -f "$src" ]; then
-            echo "::error::Source release.yml missing at $src"
-            exit 1
-          fi
-
-          if [ ! -f "$dst" ]; then
-            echo "status=MISSING" >> "$GITHUB_OUTPUT"
-            echo "### ${{ matrix.repo }}: MISSING" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          if cmp -s "$src" "$dst"; then
-            echo "status=IDENTICAL" >> "$GITHUB_OUTPUT"
-            echo "### ${{ matrix.repo }}: IDENTICAL" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          echo "status=WOULD_UPDATE" >> "$GITHUB_OUTPUT"
-          {
-            echo "### ${{ matrix.repo }}: WOULD UPDATE"
-            echo '```diff'
-            diff -u "$dst" "$src" || true
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      # Idempotency: stable branch name. Uses --force-with-lease so concurrent
-      # reviewer commits on the same branch are not silently stomped.
       - name: Create/update sync branch and open PR
         if: ${{ !inputs.dry_run && steps.diff.outputs.status != 'IDENTICAL' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: OmnitrustILM/${{ matrix.repo }}
+          REPO_NAME: ${{ matrix.repo }}
           STATUS: ${{ steps.diff.outputs.status }}
-        run: |
-          set -euo pipefail
-          cd target
-          git config user.name "ilm-project-bot[bot]"
-          git config user.email "ilm-project-bot[bot]@users.noreply.github.com"
-
-          branch="chore/sync-release-yml"
-          base=$(gh repo view "$REPO" --json defaultBranchRef --jq .defaultBranchRef.name)
-
-          # If the bot opened a PR from this branch and a maintainer closed it
-          # without merging, don't reopen — that's the per-repo opt-out signal.
-          closed_unmerged=$(gh pr list --repo "$REPO" --head "$branch" --state closed --limit 100 --json number,merged \
-            --jq '[.[] | select(.merged == false)] | length')
-          if [ "$closed_unmerged" -gt 0 ]; then
-            echo "::notice::$REPO has a closed-unmerged sync PR on branch $branch — skipping (respecting maintainer decision)"
-            echo "### ${{ matrix.repo }}: SKIPPED (closed-unmerged PR exists)" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          git fetch origin "$base"
-          git checkout -B "$branch" "origin/$base"
-
-          mkdir -p .github
-          cp ../source/release.yml .github/release.yml
-
-          if git diff --quiet; then
-            echo "No changes after copy — skipping $REPO"
-            exit 0
-          fi
-
-          git add .github/release.yml
-          git commit -m "chore: sync .github/release.yml from org template"
-          git push --force-with-lease origin "$branch"
-
-          existing=$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq '.[0].number // empty')
-          if [ -n "$existing" ]; then
-            echo "::notice::Updated existing PR #$existing on $REPO"
-            echo "### ${{ matrix.repo }}: UPDATED PR #$existing" >> "$GITHUB_STEP_SUMMARY"
-          else
-            body_file=$(mktemp)
-            cat > "$body_file" <<EOF
-          Automated sync of \`.github/release.yml\` from the org template in OmnitrustILM/.github.
-
-          Source workflow: [Release.yml Sync](https://github.com/OmnitrustILM/.github/actions/workflows/release-yml-sync.yml)
-          Previous state: \`$STATUS\`
-
-          Merge to adopt the shared release-notes categories. To opt out of future syncs, close this PR without merging — the workflow will respect that decision on subsequent runs.
-          EOF
-            url=$(gh pr create --repo "$REPO" \
-              --head "$branch" \
-              --base "$base" \
-              --title "chore: sync .github/release.yml from org template" \
-              --body-file "$body_file")
-            echo "::notice::Opened $url"
-            echo "### ${{ matrix.repo }}: OPENED $url" >> "$GITHUB_STEP_SUMMARY"
-          fi
+        run: source/.github/scripts/release-yml-sync/open-sync-pr.sh
 
   summary:
     needs: [plan, sync]
@@ -242,13 +112,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Run summary
+        env:
+          TARGET_COUNT: ${{ needs.plan.outputs.count }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SYNC_RESULT: ${{ needs.sync.result }}
         run: |
           {
             echo "## Release.yml Sync — Final Summary"
             echo ""
-            echo "Target repos: ${{ needs.plan.outputs.count }}"
-            echo "Dry run: ${{ inputs.dry_run }}"
-            echo "Sync job aggregate: ${{ needs.sync.result }}"
+            echo "Target repos: $TARGET_COUNT"
+            echo "Dry run: $DRY_RUN"
+            echo "Sync job aggregate: $SYNC_RESULT"
             echo ""
             echo "_Note: with fail-fast disabled, individual repos may have succeeded even if aggregate is 'failure'. See per-repo sections above._"
           } >> "$GITHUB_STEP_SUMMARY"
