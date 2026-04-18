@@ -22,8 +22,10 @@ git config user.email "ilm-project-bot[bot]@users.noreply.github.com"
 branch="chore/sync-release-yml"
 base=$(gh repo view "$REPO" --json defaultBranchRef --jq .defaultBranchRef.name)
 
-closed_unmerged=$(gh pr list --repo "$REPO" --head "$branch" --state closed --limit 100 --json number,merged \
-  --jq '[.[] | select(.merged == false)] | length')
+# gh pr list doesn't expose a boolean `merged` field; use `mergedAt`
+# which is null for PRs that were closed without merging.
+closed_unmerged=$(gh pr list --repo "$REPO" --head "$branch" --state closed --limit 100 --json number,mergedAt \
+  --jq '[.[] | select(.mergedAt == null)] | length')
 if [ "$closed_unmerged" -gt 0 ]; then
   echo "::notice::$REPO has a closed-unmerged sync PR on branch $branch — skipping (respecting maintainer decision)"
   echo "### $REPO_NAME: SKIPPED (closed-unmerged PR exists)" >> "$GITHUB_STEP_SUMMARY"
