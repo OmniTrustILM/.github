@@ -45,4 +45,5 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           REPO: ${{ github.repository }}
           ACTOR: ${{ github.actor }}
+          PROJECT_ID: PVT_kwDOB4ppKM4AlVOh
         run: .github/scripts/reopen-tracking/post-comment-and-clear.sh

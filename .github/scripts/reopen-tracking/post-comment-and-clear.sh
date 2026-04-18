@@ -5,11 +5,11 @@
 # Does NOT fire on pre-merge QA rejection (that's a status regression
 # on a still-open issue — no reopen event).
 #
-# Reads: GH_TOKEN, ISSUE_URL, ISSUE_NUMBER, REPO, ACTOR
+# Reads: GH_TOKEN, ISSUE_URL, ISSUE_NUMBER, REPO, ACTOR, PROJECT_ID
 set -euo pipefail
 
 ASSIGNEES=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
-  --json assignees --jq '.assignees[].login' | tr '\n' ', ' | sed 's/,$//')
+  --json assignees --jq '.assignees | map(.login) | join(", ")')
 
 REOPENED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -26,7 +26,7 @@ gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file "$body_file"
 echo "Posted reopen comment on $REPO#$ISSUE_NUMBER"
 
 # Clear Reopen Reason on the project item so user must set a new one.
-ITEM_ID=$(gh api graphql -f query='
+ITEMS_JSON=$(gh api graphql -f query='
   query($url: URI!) {
     resource(url: $url) {
       ... on Issue {
@@ -38,8 +38,10 @@ ITEM_ID=$(gh api graphql -f query='
         }
       }
     }
-  }' -f url="$ISSUE_URL" \
-  --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
+  }' -f url="$ISSUE_URL")
+
+ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
+  '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
 
 if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
   echo "::warning::Issue not found in project — Reopen Reason not cleared."
@@ -65,7 +67,7 @@ gh api graphql -f query='
       projectV2Item { id }
     }
   }' \
-  -f projectId="PVT_kwDOB4ppKM4AlVOh" \
+  -f projectId="$PROJECT_ID" \
   -f itemId="$ITEM_ID" \
   -f fieldId="$FIELD_ID"
 

@@ -42,4 +42,5 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+          PROJECT_ID: PVT_kwDOB4ppKM4AlVOh
         run: .github/scripts/auto-set-fields-from-form/parse-and-set-fields.sh

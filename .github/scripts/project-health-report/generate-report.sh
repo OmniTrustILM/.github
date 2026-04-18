@@ -130,8 +130,11 @@ echo "Total open issues: $TOTAL"
   echo ""
   echo "| Version | Count |"
   echo "|---|---|"
+  # Collect one Version value per item. Wrapping the inner iteration
+  # in a sub-array makes the per-item fallback to "Unversioned"
+  # explicit — the bare `//` form is easy to misread.
   printf '%s' "$OPEN_ITEMS" | jq -r '
-    [.[] | (.fieldValues.nodes[] | select(.field.name == "Version") | .name) // "Unversioned"]
+    [.[] | ([.fieldValues.nodes[] | select(.field.name == "Version") | .name] | first // "Unversioned")]
     | group_by(.) | map({version: .[0], count: length})
     | sort_by(.version)
     | .[] | "| \(.version) | \(.count) |"'

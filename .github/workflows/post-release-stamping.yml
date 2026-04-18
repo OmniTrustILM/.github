@@ -39,4 +39,5 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           REPO: ${{ github.repository }}
+          PROJECT_ID: PVT_kwDOB4ppKM4AlVOh
         run: .github/scripts/post-release-stamping/stamp-versions.sh

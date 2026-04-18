@@ -37,4 +37,5 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
+          PROJECT_ID: PVT_kwDOB4ppKM4AlVOh
         run: .github/scripts/version-propagation/propagate-from-parent.sh

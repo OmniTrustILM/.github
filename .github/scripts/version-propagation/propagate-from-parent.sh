@@ -6,10 +6,8 @@
 # Creation-time only: if the parent's fields change later, children
 # are NOT auto-updated. The /project-triage skill catches drift.
 #
-# Reads: GH_TOKEN, ISSUE_URL
+# Reads: GH_TOKEN, ISSUE_URL, PROJECT_ID
 set -euo pipefail
-
-PROJECT_ID="PVT_kwDOB4ppKM4AlVOh"
 
 echo "Issue: $ISSUE_URL"
 
@@ -36,7 +34,8 @@ echo "Parent: $PARENT_URL"
 # Fetch project item data (id + field values) for a given issue URL.
 get_project_item() {
   local url=$1
-  gh api graphql -f query='
+  local json
+  json=$(gh api graphql -f query='
     query($url: URI!) {
       resource(url: $url) {
         ... on Issue {
@@ -57,8 +56,9 @@ get_project_item() {
           }
         }
       }
-    }' -f url="$url" \
-    --jq ".data.resource.projectItems.nodes[] | select(.project.id == \"$PROJECT_ID\")"
+    }' -f url="$url")
+  printf '%s' "$json" | jq --arg pid "$PROJECT_ID" \
+    '.data.resource.projectItems.nodes[] | select(.project.id == $pid)'
 }
 
 PARENT_ITEM=$(get_project_item "$PARENT_URL")

@@ -47,10 +47,28 @@ Semantic Versioning (semver.org).
 
 ## Workflows
 
-All CI workflows in this repo use a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) for authentication.
+All CI workflows in this repo use a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) for authentication. Each workflow's bash logic lives under `.github/scripts/<workflow-basename>/`.
+
+Sync / template distribution:
 
 - **Label Sync** (`label-sync.yml`) — push to `main` on `templates/labels.yml` changes, or manual. Syncs labels to all non-archived org repos.
 - **Release.yml Sync** (`release-yml-sync.yml`) — manual dispatch. Opens PRs in target repos to adopt `templates/release.yml`.
+
+Issue lifecycle automation (triggered on `issues` events across all org repos):
+
+- **Auto Add to Project** (`auto-add-to-project.yml`) — on issue open. Adds the issue to Project #5 and sets initial Status (Bug → Analysis, else → Planning).
+- **Auto Set Fields from Form** (`auto-set-fields-from-form.yml`) — on issue open. Parses structured form data (Severity, Module, Version Number) and applies project-field values. Sets vulnerability defaults.
+- **Version Propagation** (`version-propagation.yml`) — on issue open. If the new issue has a parent, copies empty Version/Module fields from parent to child.
+- **Reopen Tracking** (`reopen-tracking.yml`) — on issue reopen. Posts an audit comment and clears the Reopen Reason field.
+
+Release-time automation:
+
+- **Post-Release Version Stamping** (`post-release-stamping.yml`) — on GitHub Release publish. Stamps Version on closed Done issues that don't have one.
+
+Reporting and CI:
+
+- **Project Health Report** (`project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
+- **ShellCheck** (`shellcheck.yml`) — on PRs touching `.github/scripts/**`. Lints all extracted bash scripts.
 
 ## External References
 

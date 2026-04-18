@@ -6,7 +6,7 @@
 # The built-in project workflow "Item added → Planning" also fires;
 # this script overrides Bugs to Analysis after the add.
 #
-# Reads: GH_TOKEN, ISSUE_URL, ISSUE_TYPE
+# Reads: GH_TOKEN, ISSUE_URL, ISSUE_TYPE, PROJECT_ID
 set -euo pipefail
 
 if [ "$ISSUE_TYPE" = "Bug" ]; then
@@ -21,7 +21,7 @@ echo "Setting status to: $STATUS"
 # Wait briefly for the actions/add-to-project step to complete.
 sleep 3
 
-ITEM_ID=$(gh api graphql -f query='
+ITEMS_JSON=$(gh api graphql -f query='
   query($url: URI!) {
     resource(url: $url) {
       ... on Issue {
@@ -33,8 +33,10 @@ ITEM_ID=$(gh api graphql -f query='
         }
       }
     }
-  }' -f url="$ISSUE_URL" \
-  --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
+  }' -f url="$ISSUE_URL")
+
+ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
+  '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
 
 if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
   echo "::warning::Issue not found in project. It may not have been added yet."
@@ -72,7 +74,7 @@ gh api graphql -f query='
       projectV2Item { id }
     }
   }' \
-  -f projectId="PVT_kwDOB4ppKM4AlVOh" \
+  -f projectId="$PROJECT_ID" \
   -f itemId="$ITEM_ID" \
   -f fieldId="$FIELD_ID" \
   -f optionId="$OPTION_ID"

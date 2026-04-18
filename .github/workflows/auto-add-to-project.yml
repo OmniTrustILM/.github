@@ -39,4 +39,5 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_TYPE: ${{ github.event.issue.issue_type.name }}
+          PROJECT_ID: PVT_kwDOB4ppKM4AlVOh
         run: .github/scripts/auto-add-to-project/set-initial-status.sh

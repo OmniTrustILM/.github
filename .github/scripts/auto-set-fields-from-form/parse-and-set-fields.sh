@@ -14,7 +14,7 @@
 # Defensive: if extraction fails, fields are left empty. The triage
 # skill catches missing fields later.
 #
-# Reads: GH_TOKEN, ISSUE_BODY, ISSUE_URL, ISSUE_LABELS
+# Reads: GH_TOKEN, ISSUE_BODY, ISSUE_URL, ISSUE_LABELS, PROJECT_ID
 set -euo pipefail
 
 # GitHub YAML forms render as: ### Field Label\n\n(blank)\nValue.
@@ -28,9 +28,11 @@ VERSION=$(printf '%s\n' "$ISSUE_BODY" | grep -A2 '### Version Number' | tail -1 
 [ "$MODULE" = "_No response_" ] && MODULE=""
 [ "$VERSION" = "_No response_" ] && VERSION=""
 
-# Vulnerability defaults
+# Vulnerability defaults.
+# ISSUE_LABELS is comma-joined by the workflow; wrap the haystack and
+# needle in commas to avoid matching labels like "not-a-vulnerability".
 PRIORITY=""
-if printf '%s' "$ISSUE_LABELS" | grep -q "vulnerability"; then
+if printf '%s' ",$ISSUE_LABELS," | grep -q ",vulnerability,"; then
   if [ -z "$SEVERITY" ]; then
     SEVERITY="Critical"
     echo "Vulnerability without Severity — defaulting to Critical"
@@ -49,7 +51,7 @@ fi
 # Wait for auto-add-to-project to add this issue to the project.
 sleep 5
 
-ITEM_ID=$(gh api graphql -f query='
+ITEMS_JSON=$(gh api graphql -f query='
   query($url: URI!) {
     resource(url: $url) {
       ... on Issue {
@@ -61,8 +63,10 @@ ITEM_ID=$(gh api graphql -f query='
         }
       }
     }
-  }' -f url="$ISSUE_URL" \
-  --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
+  }' -f url="$ISSUE_URL")
+
+ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
+  '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
 
 if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
   echo "::warning::Issue not yet in project, skipping field set."
@@ -110,7 +114,7 @@ set_field() {
           projectV2Item { id }
         }
       }' \
-      -f projectId="PVT_kwDOB4ppKM4AlVOh" \
+      -f projectId="$PROJECT_ID" \
       -f itemId="$ITEM_ID" \
       -f fieldId="$field_id" \
       -f optionId="$option_id"

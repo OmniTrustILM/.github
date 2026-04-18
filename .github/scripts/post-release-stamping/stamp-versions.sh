@@ -8,7 +8,7 @@
 # Only stamps issues closed AFTER the previous release of the same
 # repo, so old unversioned issues don't get mis-attributed.
 #
-# Reads: GH_TOKEN, RELEASE_TAG, REPO
+# Reads: GH_TOKEN, RELEASE_TAG, REPO, PROJECT_ID
 set -euo pipefail
 
 VERSION="${RELEASE_TAG#v}"
@@ -52,7 +52,7 @@ STAMPED=0
 SKIPPED=0
 
 for issue_url in $ISSUES; do
-  ITEM_DATA=$(gh api graphql -f query='
+  ITEM_JSON=$(gh api graphql -f query='
     query($url: URI!) {
       resource(url: $url) {
         ... on Issue {
@@ -72,8 +72,10 @@ for issue_url in $ISSUES; do
           }
         }
       }
-    }' -f url="$issue_url" \
-    --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh")')
+    }' -f url="$issue_url")
+
+  ITEM_DATA=$(printf '%s' "$ITEM_JSON" | jq --arg pid "$PROJECT_ID" \
+    '.data.resource.projectItems.nodes[] | select(.project.id == $pid)')
 
   if [ -z "$ITEM_DATA" ]; then
     continue
@@ -96,7 +98,7 @@ for issue_url in $ISSUES; do
           projectV2Item { id }
         }
       }' \
-      -f projectId="PVT_kwDOB4ppKM4AlVOh" \
+      -f projectId="$PROJECT_ID" \
       -f itemId="$ITEM_ID" \
       -f fieldId="$FIELD_ID" \
       -f optionId="$OPTION_ID"
