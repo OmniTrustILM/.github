@@ -5,6 +5,15 @@ name: Issue Automation
 #
 # opened:   add issue to Project #5 → set form fields → propagate from parent
 # reopened: post audit comment, clear Reopen Reason field
+#
+# Step-failure semantics: if `Add to project` fails, GitHub's default
+# `success()` gate on subsequent steps still lets them run because
+# their `if:` checks only the event action, not the prior step's
+# outcome. set-fields and propagate each poll for the project item
+# with a 10s ceiling and exit 0 with a warning if the item isn't
+# found — so a failed add surfaces as quiet warnings rather than a
+# cascading failure. Intentional: the actions are independent from
+# the caller's perspective.
 
 on:
   issues:

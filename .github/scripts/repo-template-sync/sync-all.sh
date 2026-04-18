@@ -34,7 +34,10 @@ git fetch origin "$base"
 git checkout -B "$branch" "origin/$base"
 
 commits_made=0
-task_summary=""
+
+# Accumulate per-task status lines in a temp file so we can embed
+# real newlines without fragile shell escaping.
+summary_file=$(mktemp)
 
 # ---------- Task 1: release.yml ----------
 mkdir -p .github
@@ -43,9 +46,9 @@ git add .github/release.yml
 if ! git diff --cached --quiet; then
   git commit -m "chore: sync .github/release.yml from org template"
   commits_made=$((commits_made + 1))
-  task_summary="${task_summary}- release.yml: synced%0A"
+  echo "- release.yml: synced" >> "$summary_file"
 else
-  task_summary="${task_summary}- release.yml: no change%0A"
+  echo "- release.yml: no change" >> "$summary_file"
 fi
 
 # ---------- Task 2: caller workflows ----------
@@ -56,21 +59,25 @@ git add .github/workflows/issue-automation.yml .github/workflows/release-automat
 if ! git diff --cached --quiet; then
   git commit -m "chore: sync issue/release-automation workflows from org template"
   commits_made=$((commits_made + 1))
-  task_summary="${task_summary}- caller workflows: synced%0A"
+  echo "- caller workflows: synced" >> "$summary_file"
 else
-  task_summary="${task_summary}- caller workflows: no change%0A"
+  echo "- caller workflows: no change" >> "$summary_file"
 fi
 
 # ---------- Skip PR if no commits ----------
 if [ "$commits_made" -eq 0 ]; then
   {
     echo "### $REPO_NAME: fully aligned (no PR)"
-    echo "$task_summary" | tr '%0A' '\n'
+    cat "$summary_file"
   } >> "$GITHUB_STEP_SUMMARY"
   exit 0
 fi
 
-# Push the branch; force-with-lease so we don't stomp concurrent reviewer commits.
+# Push the branch; force-with-lease so we don't stomp concurrent
+# reviewer commits. If a reviewer has pushed fixups to this stable
+# branch, the lease check will fail — intended behavior, since the
+# bot owns this branch and reviewers should reject the PR by closing
+# it rather than editing in place.
 git push --force-with-lease origin "$branch"
 
 # Open or update the PR.
@@ -79,23 +86,22 @@ if [ -n "$existing" ]; then
   echo "::notice::Updated existing PR #$existing on $REPO ($commits_made commits)"
   {
     echo "### $REPO_NAME: UPDATED PR #$existing ($commits_made commits)"
-    echo "$task_summary" | tr '%0A' '\n'
+    cat "$summary_file"
   } >> "$GITHUB_STEP_SUMMARY"
   exit 0
 fi
 
 body_file=$(mktemp)
-cat > "$body_file" <<EOF
-Automated alignment of this repo with the org templates in OmnitrustILM/.github.
-
-Tasks this PR addresses:
-$(echo "$task_summary" | tr '%0A' '\n' | sed 's/^-/  -/')
-
-Source workflow: [Repo Template Sync](https://github.com/OmnitrustILM/.github/actions/workflows/repo-template-sync.yml)
-
-To opt out of future syncs, close this PR without merging — the
-workflow will respect that decision on subsequent runs.
-EOF
+{
+  echo "Automated alignment of this repo with the org templates in OmnitrustILM/.github."
+  echo ""
+  echo "Tasks this PR addresses:"
+  sed 's/^-/  -/' "$summary_file"
+  echo ""
+  echo "Source workflow: [Repo Template Sync](https://github.com/OmnitrustILM/.github/actions/workflows/repo-template-sync.yml)"
+  echo ""
+  echo "To opt out of future syncs, close this PR without merging — the workflow will respect that decision on subsequent runs."
+} > "$body_file"
 
 url=$(gh pr create --repo "$REPO" \
   --head "$branch" \
@@ -106,5 +112,5 @@ url=$(gh pr create --repo "$REPO" \
 echo "::notice::Opened $url"
 {
   echo "### $REPO_NAME: OPENED $url ($commits_made commits)"
-  echo "$task_summary" | tr '%0A' '\n'
+  cat "$summary_file"
 } >> "$GITHUB_STEP_SUMMARY"
