@@ -1,0 +1,24 @@
+name: Auto Set Fields from Form
+description: Parses Bug/Vulnerability/Release form fields from an issue body and sets project custom fields (Severity, Module, Version, Priority).
+
+inputs:
+  github-token:
+    description: GitHub App token with `contents:read` + installation-level `organization_projects:write`.
+    required: true
+  project-id:
+    description: Project V2 node ID.
+    required: false
+    default: PVT_kwDOB4ppKM4AlVOh
+
+runs:
+  using: composite
+  steps:
+    - name: Parse form fields and set project values
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_BODY: ${{ github.event.issue.body }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+        PROJECT_ID: ${{ inputs.project-id }}
+      run: bash "$GITHUB_ACTION_PATH/parse-and-set-fields.sh"

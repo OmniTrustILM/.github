@@ -22,9 +22,13 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 
 ### Directory Layout
 
-- `templates/` — files synced OUT to every org repo (labels, release notes config)
+- `templates/` — files synced OUT to every org repo
+  - `templates/labels.yml`, `templates/release.yml` — propagated via sync workflows
+  - `templates/caller-workflows/` — caller workflow files that land in each repo's `.github/workflows/` to invoke the composite actions below
 - `config/` — files consumed HERE or by external automation (triage rules)
-- `.github/workflows/` — GitHub Actions workflows (required path)
+- `.github/workflows/` — GitHub Actions workflows that run in THIS repo (required path)
+- `.github/actions/` — composite actions consumed by caller workflows in other org repos; each action is a directory with `action.yml` + its shell script
+- `.github/scripts/` — bash scripts called by workflows in this repo (label-sync, project-health-report, release-yml-sync, repo-template-sync)
 - `.github/ISSUE_TEMPLATE/` — issue forms (required path)
 
 ### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
@@ -45,30 +49,37 @@ GitHub flow — feature branches from `main`, merged back via pull requests.
 ### Versioning
 Semantic Versioning (semver.org).
 
-## Workflows
+## Workflows and actions
 
-All CI workflows in this repo use a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) for authentication. Each workflow's bash logic lives under `.github/scripts/<workflow-basename>/`.
+All automation uses a GitHub App (`ILM_PROJECT_BOT_APP_ID` / `ILM_PROJECT_BOT_PRIVATE_KEY` secrets) for authentication.
+
+### Workflows that run in THIS repo
 
 Sync / template distribution:
 
-- **Label Sync** (`label-sync.yml`) — push to `main` on `templates/labels.yml` changes, or manual. Syncs labels to all non-archived org repos.
-- **Release.yml Sync** (`release-yml-sync.yml`) — manual dispatch. Opens PRs in target repos to adopt `templates/release.yml`.
-
-Issue lifecycle automation (triggered on `issues` events across all org repos):
-
-- **Auto Add to Project** (`auto-add-to-project.yml`) — on issue open. Adds the issue to Project #5 and sets initial Status (Bug → Analysis, else → Planning).
-- **Auto Set Fields from Form** (`auto-set-fields-from-form.yml`) — on issue open. Parses structured form data (Severity, Module, Version Number) and applies project-field values. Sets vulnerability defaults.
-- **Version Propagation** (`version-propagation.yml`) — on issue open. If the new issue has a parent, copies empty Version/Module fields from parent to child.
-- **Reopen Tracking** (`reopen-tracking.yml`) — on issue reopen. Posts an audit comment and clears the Reopen Reason field.
-
-Release-time automation:
-
-- **Post-Release Version Stamping** (`post-release-stamping.yml`) — on GitHub Release publish. Stamps Version on closed Done issues that don't have one.
+- **Label Sync** (`.github/workflows/label-sync.yml`) — push to `main` on `templates/labels.yml` changes, or manual. Syncs labels to all non-archived org repos.
+- **Release.yml Sync** (`.github/workflows/release-yml-sync.yml`) — manual dispatch. Opens PRs in target repos to adopt `templates/release.yml`. Useful for release.yml-only hotfixes.
+- **Repo Template Sync** (`.github/workflows/repo-template-sync.yml`) — manual dispatch. Orchestrator that aligns each target repo with both `templates/release.yml` and `templates/caller-workflows/*.yml`, opening a single PR per repo with up to two commits (skipping tasks with no drift).
 
 Reporting and CI:
 
-- **Project Health Report** (`project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
-- **ShellCheck** (`shellcheck.yml`) — on PRs touching `.github/scripts/**`. Lints all extracted bash scripts.
+- **Project Health Report** (`.github/workflows/project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
+- **ShellCheck** (`.github/workflows/shellcheck.yml`) — on PRs touching `.github/scripts/**` or `.github/actions/**`. Lints all bash.
+
+### Composite actions (consumed by caller workflows in target repos)
+
+Each action lives under `.github/actions/<name>/` (directory containing `action.yml` + its shell script). Target repos invoke them via caller workflows deployed by Repo Template Sync. Pinned to moving tags `issue-automation-v1` and `release-automation-v1`.
+
+Issue lifecycle (called from `issue-automation.yml` on `issues.opened`/`issues.reopened`):
+
+- **auto-add-to-project** — adds issue to Project #5, sets initial Status (Bug → Analysis, else → Planning).
+- **auto-set-fields-from-form** — parses structured form data (Severity, Module, Version Number) and applies project field values. Vulnerability defaults included.
+- **version-propagation** — if the new issue has a parent, copies empty Version/Module fields from parent to child. Uses an org-wide token because the parent may live in a different repo.
+- **reopen-tracking** — posts audit comment and clears the Reopen Reason field.
+
+Release (called from `release-automation.yml` on `release.published`):
+
+- **post-release-stamping** — stamps Version on closed Done issues in the releasing repo. Skips prereleases.
 
 ## External References
 
