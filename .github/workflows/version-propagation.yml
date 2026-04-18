@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Token is intentionally org-wide (no `repositories:` filter).
+      # The parent issue may live in a different repo than the child
+      # (e.g., an Epic in czertainly-core with sub-issues in
+      # czertainly-frontend); scoping the token to the originating
+      # repo would prevent reading the parent.
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token

@@ -27,6 +27,8 @@ jobs:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
+          repositories: |
+            ${{ github.event.repository.name }}
 
       - name: Add issue to project
         uses: actions/add-to-project@v1
