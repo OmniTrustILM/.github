@@ -11,9 +11,7 @@ set -euo pipefail
 
 echo "Issue: $ISSUE_URL"
 
-# Wait for auto-add-to-project to add this issue to the project.
-sleep 5
-
+# Check the parent relationship first (doesn't depend on project membership).
 PARENT_URL=$(gh api graphql -f query='
   query($url: URI!) {
     resource(url: $url) {
@@ -61,13 +59,25 @@ get_project_item() {
     '.data.resource.projectItems.nodes[] | select(.project.id == $pid)'
 }
 
+# The parent issue is pre-existing and should already be in the project.
 PARENT_ITEM=$(get_project_item "$PARENT_URL")
-CHILD_ITEM=$(get_project_item "$ISSUE_URL")
 
-CHILD_ITEM_ID=$(printf '%s' "$CHILD_ITEM" | jq -r '.id')
+# The child was just created; poll until auto-add-to-project (running
+# in a separate workflow run) has added it to the project. 10s
+# ceiling (5 × 2s) accommodates scheduling lag.
+CHILD_ITEM=""
+CHILD_ITEM_ID=""
+for i in {1..5}; do
+  CHILD_ITEM=$(get_project_item "$ISSUE_URL")
+  CHILD_ITEM_ID=$(printf '%s' "$CHILD_ITEM" | jq -r '.id // empty')
+  if [ -n "$CHILD_ITEM_ID" ]; then
+    break
+  fi
+  [ "$i" -lt 5 ] && sleep 2
+done
 
-if [ -z "$CHILD_ITEM_ID" ] || [ "$CHILD_ITEM_ID" = "null" ]; then
-  echo "::warning::Child issue not found in project. It may not have been added yet."
+if [ -z "$CHILD_ITEM_ID" ]; then
+  echo "::warning::Child issue not found in project after polling. It may not have been added yet."
   exit 0
 fi
 

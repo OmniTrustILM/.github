@@ -18,28 +18,35 @@ fi
 echo "Issue type: ${ISSUE_TYPE:-unknown}"
 echo "Setting status to: $STATUS"
 
-# Wait briefly for the actions/add-to-project step to complete.
-sleep 3
-
-ITEMS_JSON=$(gh api graphql -f query='
-  query($url: URI!) {
-    resource(url: $url) {
-      ... on Issue {
-        projectItems(first: 10) {
-          nodes {
-            id
-            project { id }
+# Poll for the project item. The common hit case is ~2s; 10s ceiling
+# protects against eventual-consistency lag or a slow add.
+ITEM_ID=""
+for i in {1..5}; do
+  ITEMS_JSON=$(gh api graphql -f query='
+    query($url: URI!) {
+      resource(url: $url) {
+        ... on Issue {
+          projectItems(first: 10) {
+            nodes {
+              id
+              project { id }
+            }
           }
         }
       }
-    }
-  }' -f url="$ISSUE_URL")
+    }' -f url="$ISSUE_URL")
 
-ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
-  '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
+  ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
+    '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
+
+  if [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]; then
+    break
+  fi
+  [ "$i" -lt 5 ] && sleep 2
+done
 
 if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
-  echo "::warning::Issue not found in project. It may not have been added yet."
+  echo "::warning::Issue not found in project after polling. It may not have been added yet."
   exit 0
 fi
 

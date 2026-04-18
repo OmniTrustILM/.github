@@ -48,28 +48,35 @@ if [ -z "$SEVERITY" ] && [ -z "$MODULE" ] && [ -z "$PRIORITY" ] && [ -z "$VERSIO
   exit 0
 fi
 
-# Wait for auto-add-to-project to add this issue to the project.
-sleep 5
-
-ITEMS_JSON=$(gh api graphql -f query='
-  query($url: URI!) {
-    resource(url: $url) {
-      ... on Issue {
-        projectItems(first: 10) {
-          nodes {
-            id
-            project { id }
+# Poll for the project item. Races auto-add-to-project in a separate
+# workflow run; 10s ceiling (5 × 2s) accommodates scheduling lag.
+ITEM_ID=""
+for i in {1..5}; do
+  ITEMS_JSON=$(gh api graphql -f query='
+    query($url: URI!) {
+      resource(url: $url) {
+        ... on Issue {
+          projectItems(first: 10) {
+            nodes {
+              id
+              project { id }
+            }
           }
         }
       }
-    }
-  }' -f url="$ISSUE_URL")
+    }' -f url="$ISSUE_URL")
 
-ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
-  '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
+  ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
+    '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
+
+  if [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]; then
+    break
+  fi
+  [ "$i" -lt 5 ] && sleep 2
+done
 
 if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
-  echo "::warning::Issue not yet in project, skipping field set."
+  echo "::warning::Issue not yet in project after polling, skipping field set."
   exit 0
 fi
 
