@@ -1,24 +1,24 @@
 name: Label Sync
 
-# Syncs standard labels from labels.yml to all non-archived repos in the org.
-# - Labels in labels.yml but missing in a repo → created
-# - Labels in labels.yml with different color/description → updated to match
-# - Labels in a repo but NOT in labels.yml → left untouched (not deleted)
+# Syncs standard labels from templates/labels.yml to all non-archived repos.
+# - Labels in templates/labels.yml but missing in a repo → created
+# - Labels in templates/labels.yml with different color/description → updated to match
+# - Labels in a repo but NOT in templates/labels.yml → left untouched (not deleted)
 #
 # Authentication: GitHub App (ilm-project-bot)
-# Trigger: push to labels.yml on main, or manual dispatch
+# Trigger: push to templates/labels.yml on main, or manual dispatch
 
 on:
   push:
     branches: [main]
-    paths: [labels.yml]
+    paths: [templates/labels.yml]
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repo to access labels.yml
+      # Checkout the repo to access templates/labels.yml
       - uses: actions/checkout@v4
 
       # Generate a short-lived token from the GitHub App
@@ -30,13 +30,13 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Install yq for parsing labels.yml (YAML → JSON per entry)
+      # Install yq for parsing templates/labels.yml (YAML → JSON per entry)
       - name: Install yq
         run: |
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      # Iterate all org repos and create/update each label from labels.yml.
+      # Iterate all org repos and create/update each label from templates/labels.yml.
       # Uses --force flag: creates if missing, updates color/description if exists.
       # Does NOT delete any labels — additive only.
       - name: Sync labels to all org repos
@@ -49,7 +49,7 @@ jobs:
           # List all non-archived repos in the org
           repos=$(gh repo list OmnitrustILM --no-archived --limit 200 --json name --jq '.[].name')
 
-          # For each repo, read labels.yml and create/update every label
+          # For each repo, read templates/labels.yml and create/update every label
           for repo in $repos; do
             echo "::group::Syncing labels to $repo"
             REPO_FAILED=0
@@ -71,7 +71,7 @@ jobs:
                 echo "::warning::Failed to sync label '$name' to $repo"
                 REPO_FAILED=$((REPO_FAILED + 1))
               fi
-            done < <(yq eval '.[]' -o=json -I=0 labels.yml)
+            done < <(yq eval '.[]' -o=json -I=0 templates/labels.yml)
 
             if [ "$REPO_FAILED" -gt 0 ]; then
               FAILED=$((FAILED + REPO_FAILED))

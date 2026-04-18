@@ -135,9 +135,9 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
 
-      # Compare source release.yml against target .github/release.yml.
+      # Compare source template against target .github/release.yml.
       # Path asymmetry is intentional:
-      #   - In the .github repo, release.yml lives at the ROOT (org template).
+      #   - In the .github repo, the org template lives at templates/release.yml.
       #   - In every OTHER repo, release.yml lives under .github/ per the
       #     standard GitHub convention for per-repo release-notes config.
       # Three possible states: IDENTICAL (skip), WOULD UPDATE, MISSING.
@@ -145,7 +145,7 @@ jobs:
         id: diff
         run: |
           set -euo pipefail
-          src=source/release.yml
+          src=source/templates/release.yml
           dst=target/.github/release.yml
 
           if [ ! -f "$src" ]; then
@@ -204,7 +204,7 @@ jobs:
           git checkout -B "$branch" "origin/$base"
 
           mkdir -p .github
-          cp ../source/release.yml .github/release.yml
+          cp ../source/templates/release.yml .github/release.yml
 
           if git diff --quiet; then
             echo "No changes after copy — skipping $REPO"

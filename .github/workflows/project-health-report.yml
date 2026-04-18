@@ -193,13 +193,13 @@ jobs:
           echo "" >> "$REPORT"
 
           # Read thresholds from config (default to 0 if key missing to avoid bash -gt crash)
-          PLANNING_DAYS=$(yq eval '.staleness_thresholds.planning_days // 0' project-triage-rules.yml)
-          ANALYSIS_DAYS=$(yq eval '.staleness_thresholds.analysis_days // 0' project-triage-rules.yml)
-          OPEN_ASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_assigned_days // 0' project-triage-rules.yml)
-          OPEN_UNASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_unassigned_days // 0' project-triage-rules.yml)
-          IN_PROGRESS_DAYS=$(yq eval '.staleness_thresholds.in_progress_days // 0' project-triage-rules.yml)
-          REVIEW_DAYS=$(yq eval '.staleness_thresholds.review_days // 0' project-triage-rules.yml)
-          TESTING_DAYS=$(yq eval '.staleness_thresholds.testing_days // 0' project-triage-rules.yml)
+          PLANNING_DAYS=$(yq eval '.staleness_thresholds.planning_days // 0' config/project-triage-rules.yml)
+          ANALYSIS_DAYS=$(yq eval '.staleness_thresholds.analysis_days // 0' config/project-triage-rules.yml)
+          OPEN_ASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_assigned_days // 0' config/project-triage-rules.yml)
+          OPEN_UNASSIGNED_DAYS=$(yq eval '.staleness_thresholds.open_unassigned_days // 0' config/project-triage-rules.yml)
+          IN_PROGRESS_DAYS=$(yq eval '.staleness_thresholds.in_progress_days // 0' config/project-triage-rules.yml)
+          REVIEW_DAYS=$(yq eval '.staleness_thresholds.review_days // 0' config/project-triage-rules.yml)
+          TESTING_DAYS=$(yq eval '.staleness_thresholds.testing_days // 0' config/project-triage-rules.yml)
 
           NOW=$(date -u +%s)
 
