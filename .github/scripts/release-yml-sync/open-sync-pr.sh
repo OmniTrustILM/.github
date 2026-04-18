@@ -38,12 +38,16 @@ git checkout -B "$branch" "origin/$base"
 mkdir -p .github
 cp ../source/templates/release.yml .github/release.yml
 
-if git diff --quiet; then
+# `git diff --quiet` only considers tracked files, so a newly-created
+# .github/release.yml (MISSING case) would be treated as "no changes"
+# and cause us to exit early without opening the PR. Stage first, then
+# check the index diff so both new files and modifications are detected.
+git add .github/release.yml
+if git diff --cached --quiet; then
   echo "No changes after copy — skipping $REPO"
   exit 0
 fi
 
-git add .github/release.yml
 git commit -m "chore: sync .github/release.yml from org template"
 git push --force-with-lease origin "$branch"
 
