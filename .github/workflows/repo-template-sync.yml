@@ -1,0 +1,128 @@
+name: Repo Template Sync
+
+# Aligns each target repo with the org templates:
+#   Task 1: .github/release.yml            ← templates/release.yml
+#   Task 2: .github/workflows/
+#             issue-automation.yml         ← templates/caller-workflows/...
+#             release-automation.yml       ← templates/caller-workflows/...
+#
+# One PR per repo, up to 2 commits (one per task, skipped if no diff).
+# If both tasks are no-op for a repo, no PR is opened.
+#
+# Self-excludes the .github repo itself. Per-repo opt-out: close the
+# bot's sync PR without merging — the workflow respects that on later
+# runs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repos:
+        description: '"all" or comma-separated repo names (e.g. core,auth)'
+        required: true
+        default: "all"
+        type: string
+      dry_run:
+        description: "Dry run: report drift only, open no PRs"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-template-sync
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.resolve.outputs.repos }}
+      count: ${{ steps.resolve.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+
+      # Reuse resolve-targets.sh from release-yml-sync — same
+      # non-archived repo list, self-exclusion, validation logic.
+      - name: Resolve target repos
+        id: resolve
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_INPUT: ${{ inputs.target_repos }}
+        run: .github/scripts/release-yml-sync/resolve-targets.sh
+
+  sync:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        repo: ${{ fromJSON(needs.plan.outputs.repos) }}
+    steps:
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+          repositories: |
+            ${{ matrix.repo }}
+
+      - name: Checkout .github (source of truth)
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: OmnitrustILM/${{ matrix.repo }}
+          path: target
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 1
+
+      - name: Dry-run drift report
+        if: ${{ inputs.dry_run }}
+        env:
+          REPO_NAME: ${{ matrix.repo }}
+        run: source/.github/scripts/repo-template-sync/diff-all.sh
+
+      - name: Sync repo to org template
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: OmnitrustILM/${{ matrix.repo }}
+          REPO_NAME: ${{ matrix.repo }}
+        run: source/.github/scripts/repo-template-sync/sync-all.sh
+
+  summary:
+    needs: [plan, sync]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run summary
+        env:
+          TARGET_COUNT: ${{ needs.plan.outputs.count }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          SYNC_RESULT: ${{ needs.sync.result }}
+        run: |
+          {
+            echo "## Repo Template Sync — Final Summary"
+            echo ""
+            echo "Target repos: $TARGET_COUNT"
+            echo "Dry run: $DRY_RUN"
+            echo "Sync job aggregate: $SYNC_RESULT"
+            echo ""
+            echo "_Note: with fail-fast disabled, individual repos may have succeeded even if aggregate is 'failure'. See per-repo sections above._"
+          } >> "$GITHUB_STEP_SUMMARY"
