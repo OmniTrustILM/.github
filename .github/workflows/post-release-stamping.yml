@@ -24,7 +24,8 @@ jobs:
   stamp-version:
     runs-on: ubuntu-latest
     steps:
-      # Generate a short-lived token from the GitHub App
+      - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -33,120 +34,9 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Find Done issues without Version and stamp them
       - name: Stamp Version on un-tagged Done issues
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           REPO: ${{ github.repository }}
-        run: |
-          # --- Extract version from tag (strip 'v' prefix if present) ---
-          VERSION="${RELEASE_TAG#v}"
-          echo "Release version: $VERSION"
-          echo "Repository: $REPO"
-
-          # --- Get previous release date as lower bound ---
-          # Only stamp issues closed after this date to prevent
-          # attributing old issues to the wrong release.
-          PREV_RELEASE_DATE=$(gh api "repos/$REPO/releases" \
-            --jq '.[1].published_at // "2000-01-01T00:00:00Z"' 2>/dev/null)
-          echo "Previous release date: $PREV_RELEASE_DATE"
-
-          # --- Get Version field ID and target option ID ---
-          VERSION_FIELD=$(gh api graphql -f query='
-            { organization(login: "OmnitrustILM") {
-              projectV2(number: 5) {
-                field(name: "Version") {
-                  ... on ProjectV2SingleSelectField {
-                    id
-                    options { id name }
-                  }
-                }
-              }
-            } }' --jq '.data.organization.projectV2.field')
-
-          FIELD_ID=$(echo "$VERSION_FIELD" | jq -r '.id')
-          OPTION_ID=$(echo "$VERSION_FIELD" | jq -r ".options[] | select(.name == \"$VERSION\") | .id")
-
-          if [ -z "$OPTION_ID" ] || [ "$OPTION_ID" = "null" ]; then
-            echo "::warning::Version '$VERSION' not found in project field options. Add it to Project #5 settings first."
-            exit 0
-          fi
-
-          # --- Get closed issues in this repo, closed after previous release ---
-          ISSUES=$(gh issue list --repo "$REPO" --state closed \
-            --json number,url,closedAt --limit 200 \
-            --jq "[.[] | select(.closedAt > \"$PREV_RELEASE_DATE\")] | .[].url")
-
-          if [ -z "$ISSUES" ]; then
-            echo "No closed issues found after previous release."
-            exit 0
-          fi
-
-          STAMPED=0
-          SKIPPED=0
-
-          # --- Check each issue and stamp if Done + no Version ---
-          for issue_url in $ISSUES; do
-            # Get project item data
-            ITEM_DATA=$(gh api graphql -f query="
-              query(\$url: URI!) {
-                resource(url: \$url) {
-                  ... on Issue {
-                    projectItems(first: 5) {
-                      nodes {
-                        id
-                        project { id }
-                        fieldValues(first: 20) {
-                          nodes {
-                            ... on ProjectV2ItemFieldSingleSelectValue {
-                              field { ... on ProjectV2SingleSelectField { name } }
-                              name
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }" -f url="$issue_url" \
-              --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh")')
-
-            if [ -z "$ITEM_DATA" ]; then
-              continue  # Issue not in project
-            fi
-
-            # Check Status = Done and Version is empty
-            STATUS=$(echo "$ITEM_DATA" | jq -r \
-              '.fieldValues.nodes[] | select(.field.name == "Status") | .name')
-            EXISTING_VERSION=$(echo "$ITEM_DATA" | jq -r \
-              '.fieldValues.nodes[] | select(.field.name == "Version") | .name')
-
-            if [ "$STATUS" = "Done" ] && { [ -z "$EXISTING_VERSION" ] || [ "$EXISTING_VERSION" = "null" ]; }; then
-              ITEM_ID=$(echo "$ITEM_DATA" | jq -r '.id')
-
-              # Stamp the Version
-              gh api graphql -f query="
-                mutation {
-                  updateProjectV2ItemFieldValue(input: {
-                    projectId: \"PVT_kwDOB4ppKM4AlVOh\"
-                    itemId: \"$ITEM_ID\"
-                    fieldId: \"$FIELD_ID\"
-                    value: { singleSelectOptionId: \"$OPTION_ID\" }
-                  }) {
-                    projectV2Item { id }
-                  }
-                }"
-              echo "Stamped $issue_url with Version $VERSION"
-              STAMPED=$((STAMPED + 1))
-            else
-              SKIPPED=$((SKIPPED + 1))
-            fi
-          done
-
-          # --- Summary ---
-          echo ""
-          echo "=== Post-Release Stamping Summary ==="
-          echo "Version: $VERSION"
-          echo "Issues stamped: $STAMPED"
-          echo "Issues skipped (already versioned or not Done): $SKIPPED"
+        run: .github/scripts/post-release-stamping/stamp-versions.sh
