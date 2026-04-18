@@ -8,12 +8,22 @@
 # Only stamps issues closed AFTER the previous release of the same
 # repo, so old unversioned issues don't get mis-attributed.
 #
-# Reads: GH_TOKEN, RELEASE_TAG, REPO, PROJECT_ID
+# Reads: GH_TOKEN, RELEASE_TAG, REPO, PROJECT_ID, IS_PRERELEASE
 set -euo pipefail
 
 VERSION="${RELEASE_TAG#v}"
 echo "Release version: $VERSION"
 echo "Repository: $REPO"
+
+# Skip prereleases. Tags like v2.19.0-rc1 or v2.19.0-beta.2 won't
+# match a Version option in the project field, and stamping issues
+# with a prerelease version would mis-attribute them to the final
+# release later. Version-option stamping happens when the GA release
+# fires this workflow.
+if [ "$IS_PRERELEASE" = "true" ]; then
+  echo "Skipping — $RELEASE_TAG is a prerelease."
+  exit 0
+fi
 
 # Get the previous release's published_at as a lower bound. If there's
 # no previous release (this is the first one), fall back to epoch-0
