@@ -1,0 +1,25 @@
+name: Version and Module Propagation
+description: Copies Version and Module from a parent issue to a newly-created child issue when the child's fields are empty.
+
+inputs:
+  github-token:
+    description: |
+      GitHub App token that can READ the parent issue, which may live in
+      a different repo than the child. Pass an org-wide token (generated
+      without `repositories:` narrowing).
+    required: true
+  project-id:
+    description: Project V2 node ID.
+    required: false
+    default: PVT_kwDOB4ppKM4AlVOh
+
+runs:
+  using: composite
+  steps:
+    - name: Propagate fields from parent to child
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        PROJECT_ID: ${{ inputs.project-id }}
+      run: bash "$GITHUB_ACTION_PATH/propagate-from-parent.sh"

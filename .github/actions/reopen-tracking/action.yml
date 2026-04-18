@@ -1,0 +1,25 @@
+name: Reopen Tracking
+description: Posts an audit comment on a reopened issue and clears the Reopen Reason project field.
+
+inputs:
+  github-token:
+    description: GitHub App token with `issues:write` on the originating repo + installation-level `organization_projects:write`.
+    required: true
+  project-id:
+    description: Project V2 node ID.
+    required: false
+    default: PVT_kwDOB4ppKM4AlVOh
+
+runs:
+  using: composite
+  steps:
+    - name: Post reopen comment and clear Reopen Reason
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        REPO: ${{ github.repository }}
+        ACTOR: ${{ github.actor }}
+        PROJECT_ID: ${{ inputs.project-id }}
+      run: bash "$GITHUB_ACTION_PATH/post-comment-and-clear.sh"

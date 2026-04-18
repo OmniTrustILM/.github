@@ -1,18 +1,20 @@
 name: ShellCheck
 
-# Lints all bash scripts under .github/scripts/ on every PR and on
-# pushes to main. Catches quoting, word-splitting, and other common
-# shell bugs before they hit production workflows.
+# Lints all bash scripts in the repo on every PR and on pushes to main.
+# Covers both .github/scripts/ (used by workflows in this repo) and
+# .github/actions/ (composite actions consumed by org repos).
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/scripts/**"
+      - ".github/actions/**"
       - ".github/workflows/shellcheck.yml"
   pull_request:
     paths:
       - ".github/scripts/**"
+      - ".github/actions/**"
       - ".github/workflows/shellcheck.yml"
 
 permissions:
@@ -24,8 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run shellcheck
+      - name: Run shellcheck on scripts and actions
         uses: ludeeus/action-shellcheck@2.0.0
         with:
-          scandir: .github/scripts
+          scandir: .github
           severity: warning

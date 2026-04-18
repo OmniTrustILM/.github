@@ -1,0 +1,30 @@
+name: Auto Add to Project
+description: Adds the issue to Project #5 and sets initial Status based on issue type.
+
+inputs:
+  github-token:
+    description: GitHub App token with `contents:read` on the originating repo + installation-level `organization_projects:write`.
+    required: true
+  project-id:
+    description: Project V2 node ID.
+    required: false
+    default: PVT_kwDOB4ppKM4AlVOh
+
+runs:
+  using: composite
+  steps:
+    - name: Add to project
+      uses: actions/add-to-project@v1
+      with:
+        project-url: https://github.com/orgs/OmnitrustILM/projects/5
+        github-token: ${{ inputs.github-token }}
+
+    - name: Set initial status
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        # `|| ''` guards against repos without Issue Types configured.
+        ISSUE_TYPE: ${{ github.event.issue.issue_type.name || '' }}
+        PROJECT_ID: ${{ inputs.project-id }}
+      run: bash "$GITHUB_ACTION_PATH/set-initial-status.sh"

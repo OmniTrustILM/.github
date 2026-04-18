@@ -1,0 +1,24 @@
+name: Post-Release Version Stamping
+description: Stamps the Version field on closed Done issues in the releasing repo when a GitHub Release is published. Skips prereleases.
+
+inputs:
+  github-token:
+    description: GitHub App token with `contents:read` + `issues:write` on the releasing repo + installation-level `organization_projects:write`.
+    required: true
+  project-id:
+    description: Project V2 node ID.
+    required: false
+    default: PVT_kwDOB4ppKM4AlVOh
+
+runs:
+  using: composite
+  steps:
+    - name: Stamp Version on un-tagged Done issues
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        REPO: ${{ github.repository }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        IS_PRERELEASE: ${{ github.event.release.prerelease }}
+      run: bash "$GITHUB_ACTION_PATH/stamp-versions.sh"
