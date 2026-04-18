@@ -41,7 +41,7 @@ jobs:
       repos: ${{ steps.resolve.outputs.repos }}
       count: ${{ steps.resolve.outputs.count }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
@@ -80,12 +80,12 @@ jobs:
             ${{ matrix.repo }}
 
       - name: Checkout .github (source of truth)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: source
 
       - name: Checkout target repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: OmnitrustILM/${{ matrix.repo }}
           path: target
