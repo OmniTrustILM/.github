@@ -26,7 +26,8 @@ jobs:
   parse-and-set:
     runs-on: ubuntu-latest
     steps:
-      # Generate a short-lived token from the GitHub App
+      - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -35,118 +36,10 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Parse form fields from issue body and set project fields
       - name: Parse form fields and set project values
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_BODY: ${{ github.event.issue.body }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
-        run: |
-          # --- Extract form field values ---
-          # GitHub YAML forms render as: ### Field Label\n\n(blank line)\nValue
-          # grep -A2 captures heading + blank line + value, tail -1 gets the value.
-          # "_No response_" means user skipped an optional field.
-
-          SEVERITY=$(echo "$ISSUE_BODY" | grep -A2 '### Severity' | tail -1 | xargs 2>/dev/null || echo "")
-          MODULE=$(echo "$ISSUE_BODY" | grep -A2 '### Module' | tail -1 | xargs 2>/dev/null || echo "")
-          VERSION=$(echo "$ISSUE_BODY" | grep -A2 '### Version Number' | tail -1 | xargs 2>/dev/null || echo "")
-
-          # Clear "_No response_" placeholders (GitHub sets this when optional fields are skipped)
-          [ "$SEVERITY" = "_No response_" ] && SEVERITY=""
-          [ "$MODULE" = "_No response_" ] && MODULE=""
-          [ "$VERSION" = "_No response_" ] && VERSION=""
-
-          # --- Apply vulnerability defaults ---
-          # If vulnerability label is present, default Severity to Critical and Priority to High
-          PRIORITY=""
-          if echo "$ISSUE_LABELS" | grep -q "vulnerability"; then
-            if [ -z "$SEVERITY" ]; then
-              SEVERITY="Critical"
-              echo "Vulnerability without Severity — defaulting to Critical"
-            fi
-            PRIORITY="High"
-            echo "Vulnerability — defaulting Priority to High"
-          fi
-
-          echo "Parsed — Severity: ${SEVERITY:-empty}, Module: ${MODULE:-empty}, Version: ${VERSION:-empty}, Priority: ${PRIORITY:-empty}"
-
-          # Skip if nothing to set
-          if [ -z "$SEVERITY" ] && [ -z "$MODULE" ] && [ -z "$PRIORITY" ] && [ -z "$VERSION" ]; then
-            echo "No fields to set, exiting."
-            exit 0
-          fi
-
-          # --- Wait for add-to-project workflow to complete ---
-          sleep 5
-
-          # --- Get project item ID for this issue ---
-          ITEM_ID=$(gh api graphql -f query='
-            query($url: URI!) {
-              resource(url: $url) {
-                ... on Issue {
-                  projectItems(first: 10) {
-                    nodes {
-                      id
-                      project { id }
-                    }
-                  }
-                }
-              }
-            }' -f url="$ISSUE_URL" \
-            --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
-
-          if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
-            echo "::warning::Issue not yet in project, skipping field set."
-            exit 0
-          fi
-
-          # --- Helper function to set a single-select field ---
-          set_field() {
-            local field_name=$1
-            local value=$2
-
-            if [ -z "$value" ]; then
-              return
-            fi
-
-            # Get field ID and option ID
-            local field_data=$(gh api graphql -f query="
-              { organization(login: \"OmnitrustILM\") {
-                projectV2(number: 5) {
-                  field(name: \"$field_name\") {
-                    ... on ProjectV2SingleSelectField {
-                      id
-                      options { id name }
-                    }
-                  }
-                }
-              } }" --jq '.data.organization.projectV2.field')
-
-            local field_id=$(echo "$field_data" | jq -r '.id')
-            local option_id=$(echo "$field_data" | jq -r --arg name "$value" '.options[] | select(.name == $name) | .id')
-
-            if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
-              gh api graphql -f query="
-                mutation {
-                  updateProjectV2ItemFieldValue(input: {
-                    projectId: \"PVT_kwDOB4ppKM4AlVOh\"
-                    itemId: \"$ITEM_ID\"
-                    fieldId: \"$field_id\"
-                    value: { singleSelectOptionId: \"$option_id\" }
-                  }) {
-                    projectV2Item { id }
-                  }
-                }"
-              echo "Set $field_name to $value"
-            else
-              # Defensive: value not found in field options — skip silently
-              echo "::warning::Could not find option '$value' for field '$field_name' — skipping."
-            fi
-          }
-
-          # --- Set each field independently (one failure doesn't block others) ---
-          set_field "Severity" "$SEVERITY"
-          set_field "Module" "$MODULE"
-          set_field "Priority" "$PRIORITY"
-          set_field "Version" "$VERSION"
+        run: .github/scripts/auto-set-fields-from-form/parse-and-set-fields.sh
