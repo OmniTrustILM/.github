@@ -15,8 +15,16 @@ VERSION="${RELEASE_TAG#v}"
 echo "Release version: $VERSION"
 echo "Repository: $REPO"
 
-PREV_RELEASE_DATE=$(gh api "repos/$REPO/releases" \
-  --jq '.[1].published_at // "2000-01-01T00:00:00Z"' 2>/dev/null)
+# Get the previous release's published_at as a lower bound. If there's
+# no previous release (this is the first one), fall back to epoch-0
+# so every closed issue in the repo is eligible. On API failure bail
+# loudly rather than using a silent fallback that would mis-attribute
+# old issues to this release.
+if ! PREV_RELEASES=$(gh api "repos/$REPO/releases"); then
+  echo "::error::Failed to list releases for $REPO"
+  exit 1
+fi
+PREV_RELEASE_DATE=$(printf '%s' "$PREV_RELEASES" | jq -r '.[1].published_at // "1970-01-01T00:00:00Z"')
 echo "Previous release date: $PREV_RELEASE_DATE"
 
 VERSION_FIELD=$(gh api graphql -f query='
