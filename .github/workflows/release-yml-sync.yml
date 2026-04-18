@@ -87,7 +87,9 @@ jobs:
 
           # Drop self — the .github repo is the source of truth for the
           # template; syncing to itself would nest the file under .github/.github/.
-          final=$(echo "$candidates" | grep -vx '.github' | grep -v '^$' || true)
+          # -F treats the pattern as a fixed string so the '.' is literal,
+          # not a regex metachar that would also match "xgithub" etc.
+          final=$(echo "$candidates" | grep -Fvx '.github' | grep -v '^$' || true)
 
           count=$(printf '%s\n' "$final" | grep -c . || true)
           if [ -z "$count" ] || [ "$count" -eq 0 ]; then
