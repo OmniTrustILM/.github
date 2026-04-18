@@ -18,7 +18,8 @@ jobs:
   add-to-project:
     runs-on: ubuntu-latest
     steps:
-      # Generate a short-lived token from the GitHub App
+      - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -27,87 +28,15 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Add the issue to Project #5
       - name: Add issue to project
         uses: actions/add-to-project@v1
         with:
           project-url: https://github.com/orgs/OmnitrustILM/projects/5
           github-token: ${{ steps.app-token.outputs.token }}
 
-      # Set initial status based on issue type:
-      # Bugs → Analysis (needs triage), everything else → Planning (future work)
       - name: Set initial status
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
           ISSUE_TYPE: ${{ github.event.issue.issue_type.name }}
-        run: |
-          # Determine initial status
-          if [ "$ISSUE_TYPE" = "Bug" ]; then
-            STATUS="Analysis"
-          else
-            STATUS="Planning"
-          fi
-
-          echo "Issue type: ${ISSUE_TYPE:-unknown}"
-          echo "Setting status to: $STATUS"
-
-          # Wait briefly for add-to-project to complete
-          sleep 3
-
-          # Get the project item ID for this issue
-          ITEM_ID=$(gh api graphql -f query='
-            query($url: URI!) {
-              resource(url: $url) {
-                ... on Issue {
-                  projectItems(first: 10) {
-                    nodes {
-                      id
-                      project { id }
-                    }
-                  }
-                }
-              }
-            }' -f url="$ISSUE_URL" \
-            --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
-
-          if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
-            echo "::warning::Issue not found in project. It may not have been added yet."
-            exit 0
-          fi
-
-          # Get Status field ID and the target option ID
-          STATUS_FIELD=$(gh api graphql -f query='
-            { organization(login: "OmnitrustILM") {
-              projectV2(number: 5) {
-                field(name: "Status") {
-                  ... on ProjectV2SingleSelectField {
-                    id
-                    options { id name }
-                  }
-                }
-              }
-            } }' --jq '.data.organization.projectV2.field')
-
-          FIELD_ID=$(echo "$STATUS_FIELD" | jq -r '.id')
-          OPTION_ID=$(echo "$STATUS_FIELD" | jq -r ".options[] | select(.name == \"$STATUS\") | .id")
-
-          if [ -z "$OPTION_ID" ] || [ "$OPTION_ID" = "null" ]; then
-            echo "::warning::Status option '$STATUS' not found in project field."
-            exit 0
-          fi
-
-          # Set the status on the project item
-          gh api graphql -f query="
-            mutation {
-              updateProjectV2ItemFieldValue(input: {
-                projectId: \"PVT_kwDOB4ppKM4AlVOh\"
-                itemId: \"$ITEM_ID\"
-                fieldId: \"$FIELD_ID\"
-                value: { singleSelectOptionId: \"$OPTION_ID\" }
-              }) {
-                projectV2Item { id }
-              }
-            }"
-
-          echo "Status set to $STATUS for issue $ISSUE_URL"
+        run: .github/scripts/auto-add-to-project/set-initial-status.sh
