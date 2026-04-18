@@ -1,0 +1,72 @@
+name: Issue Automation
+
+# Org-wide issue automation — calls composite actions hosted in
+# OmnitrustILM/.github. Kept in sync by the repo-template-sync workflow.
+#
+# opened:   add issue to Project #5 → set form fields → propagate from parent
+# reopened: post audit comment, clear Reopen Reason field
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-automation-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Narrow token — scoped to this repo. Used for auto-add, set-fields,
+      # and reopen-tracking. Org-level permissions (organization_projects)
+      # survive the narrowing.
+      - name: Generate App token (narrow)
+        if: github.event.action == 'opened' || github.event.action == 'reopened'
+        uses: actions/create-github-app-token@v1
+        id: token-narrow
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+          repositories: ${{ github.event.repository.name }}
+
+      # Broad token — spans all installation repos. Only needed for
+      # version-propagation, which reads the PARENT issue (may live in
+      # a different repo than the child).
+      - name: Generate App token (broad, for version-propagation)
+        if: github.event.action == 'opened'
+        uses: actions/create-github-app-token@v1
+        id: token-broad
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmnitrustILM
+
+      - name: Add to project
+        if: github.event.action == 'opened'
+        uses: OmnitrustILM/.github/.github/actions/auto-add-to-project@issue-automation-v1
+        with:
+          github-token: ${{ steps.token-narrow.outputs.token }}
+
+      - name: Set fields from form
+        if: github.event.action == 'opened'
+        uses: OmnitrustILM/.github/.github/actions/auto-set-fields-from-form@issue-automation-v1
+        with:
+          github-token: ${{ steps.token-narrow.outputs.token }}
+
+      - name: Propagate fields from parent
+        if: github.event.action == 'opened'
+        uses: OmnitrustILM/.github/.github/actions/version-propagation@issue-automation-v1
+        with:
+          github-token: ${{ steps.token-broad.outputs.token }}
+
+      - name: Post reopen comment and clear Reopen Reason
+        if: github.event.action == 'reopened'
+        uses: OmnitrustILM/.github/.github/actions/reopen-tracking@issue-automation-v1
+        with:
+          github-token: ${{ steps.token-narrow.outputs.token }}
