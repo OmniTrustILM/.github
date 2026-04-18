@@ -14,7 +14,12 @@ set -euo pipefail
 # past LIMIT non-archived repos, raise this value.
 LIMIT=500
 
-all_repos=$(gh repo list OmnitrustILM --no-archived --limit "$LIMIT" --json name --jq '.[].name')
+# Filter out empty repos (zero commits — no default branch to check
+# out, so actions/checkout@v4 would fail with "couldn't find remote
+# ref refs/heads/<base>"). They're not meaningful sync targets until
+# they have at least one commit.
+all_repos=$(gh repo list OmnitrustILM --no-archived --limit "$LIMIT" --json name,isEmpty \
+  --jq '.[] | select(.isEmpty == false) | .name')
 repo_count=$(printf '%s\n' "$all_repos" | grep -c . || :)
 if [ "$repo_count" -ge "$LIMIT" ]; then
   echo "::error::Reached --limit $LIMIT on gh repo list. Raise the limit."
