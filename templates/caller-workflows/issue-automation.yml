@@ -6,14 +6,16 @@ name: Issue Automation
 # opened:   add issue to Project #5 → set form fields → propagate from parent
 # reopened: post audit comment, clear Reopen Reason field
 #
-# Step-failure semantics: if `Add to project` fails, GitHub's default
-# `success()` gate on subsequent steps still lets them run because
-# their `if:` checks only the event action, not the prior step's
-# outcome. set-fields and propagate each poll for the project item
-# with a 10s ceiling and exit 0 with a warning if the item isn't
-# found — so a failed add surfaces as quiet warnings rather than a
-# cascading failure. Intentional: the actions are independent from
-# the caller's perspective.
+# Step-failure semantics: each `opened`-path step is wrapped with
+# `!cancelled()` so a failure in one action does NOT cascade-skip
+# the others. Intentional — the actions are independent from the
+# caller's perspective:
+#   - set-fields and propagate each poll for the project item with
+#     a 10s ceiling and exit 0 with a warning if the item isn't
+#     found, so they work even if `Add to project` failed but the
+#     built-in Project V2 "Auto-add" workflow succeeded.
+#   - A failed step still surfaces in the workflow run (red step),
+#     it just doesn't block its siblings.
 
 on:
   issues:
@@ -63,13 +65,13 @@ jobs:
           github-token: ${{ steps.token-narrow.outputs.token }}
 
       - name: Set fields from form
-        if: github.event.action == 'opened'
+        if: ${{ !cancelled() && github.event.action == 'opened' }}
         uses: OmnitrustILM/.github/.github/actions/auto-set-fields-from-form@issue-automation-v1
         with:
           github-token: ${{ steps.token-narrow.outputs.token }}
 
       - name: Propagate fields from parent
-        if: github.event.action == 'opened'
+        if: ${{ !cancelled() && github.event.action == 'opened' }}
         uses: OmnitrustILM/.github/.github/actions/version-propagation@issue-automation-v1
         with:
           github-token: ${{ steps.token-broad.outputs.token }}
