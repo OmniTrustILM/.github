@@ -18,10 +18,8 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      # Checkout the repo to access templates/labels.yml
       - uses: actions/checkout@v4
 
-      # Generate a short-lived token from the GitHub App
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -30,61 +28,12 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Install yq for parsing templates/labels.yml (YAML → JSON per entry)
       - name: Install yq
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
-      # Iterate all org repos and create/update each label from templates/labels.yml.
-      # Uses --force flag: creates if missing, updates color/description if exists.
-      # Does NOT delete any labels — additive only.
       - name: Sync labels to all org repos
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          FAILED=0
-          SYNCED=0
-
-          # List all non-archived repos in the org
-          repos=$(gh repo list OmnitrustILM --no-archived --limit 200 --json name --jq '.[].name')
-
-          # For each repo, read templates/labels.yml and create/update every label
-          for repo in $repos; do
-            echo "::group::Syncing labels to $repo"
-            REPO_FAILED=0
-
-            # Read each label entry as a JSON object to safely handle special characters
-            while IFS= read -r line; do
-              name=$(echo "$line" | yq eval '.name' -)
-              color=$(echo "$line" | yq eval '.color' -)
-              description=$(echo "$line" | yq eval '.description' -)
-
-              # --force: update if exists, create if not
-              if gh label create "$name" \
-                --repo "OmnitrustILM/$repo" \
-                --color "$color" \
-                --description "$description" \
-                --force 2>&1; then
-                SYNCED=$((SYNCED + 1))
-              else
-                echo "::warning::Failed to sync label '$name' to $repo"
-                REPO_FAILED=$((REPO_FAILED + 1))
-              fi
-            done < <(yq eval '.[]' -o=json -I=0 templates/labels.yml)
-
-            if [ "$REPO_FAILED" -gt 0 ]; then
-              FAILED=$((FAILED + REPO_FAILED))
-            fi
-            echo "::endgroup::"
-          done
-
-          # Print summary
-          echo ""
-          echo "=== Label Sync Summary ==="
-          echo "Labels synced: $SYNCED"
-          echo "Failures: $FAILED"
-
-          if [ "$FAILED" -gt 0 ]; then
-            echo "::warning::$FAILED label sync operations failed. Check logs above."
-          fi
+        run: .github/scripts/label-sync/sync-labels.sh
