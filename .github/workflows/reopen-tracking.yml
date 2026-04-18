@@ -28,7 +28,8 @@ jobs:
   track-reopen:
     runs-on: ubuntu-latest
     steps:
-      # Generate a short-lived token from the GitHub App
+      - uses: actions/checkout@v4
+
       - name: Generate GitHub App token
         uses: actions/create-github-app-token@v1
         id: app-token
@@ -37,7 +38,6 @@ jobs:
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
           owner: OmnitrustILM
 
-      # Post audit comment and clear Reopen Reason field
       - name: Post reopen comment and clear Reopen Reason
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -45,62 +45,4 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           REPO: ${{ github.repository }}
           ACTOR: ${{ github.actor }}
-        run: |
-          # --- Get previous assignees for context ---
-          ASSIGNEES=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" \
-            --json assignees --jq '.assignees[].login' | tr '\n' ', ' | sed 's/,$//')
-
-          # --- Post audit comment ---
-          COMMENT="**Issue reopened** by @${ACTOR}"
-          COMMENT="${COMMENT}\nPreviously assigned to: ${ASSIGNEES:-none}"
-          COMMENT="${COMMENT}\nReopened at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          COMMENT="${COMMENT}\n\nPlease set the **Reopen Reason** field (Regression, Incomplete Implementation, Edge Case, Other)."
-
-          echo -e "$COMMENT" | gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file -
-          echo "Posted reopen comment on $REPO#$ISSUE_NUMBER"
-
-          # --- Clear Reopen Reason field on the project item ---
-          # Forces user to set a new reason for this specific reopen event.
-          # Old reason (if any) is stale and should not carry over.
-
-          ITEM_ID=$(gh api graphql -f query="
-            query(\$url: URI!) {
-              resource(url: \$url) {
-                ... on Issue {
-                  projectItems(first: 10) {
-                    nodes {
-                      id
-                      project { id }
-                    }
-                  }
-                }
-              }
-            }" -f url="$ISSUE_URL" \
-            --jq '.data.resource.projectItems.nodes[] | select(.project.id == "PVT_kwDOB4ppKM4AlVOh") | .id')
-
-          if [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]; then
-            # Get the Reopen Reason field ID
-            FIELD_ID=$(gh api graphql -f query='
-              { organization(login: "OmnitrustILM") {
-                projectV2(number: 5) {
-                  field(name: "Reopen Reason") {
-                    ... on ProjectV2SingleSelectField { id }
-                  }
-                }
-              } }' --jq '.data.organization.projectV2.field.id')
-
-            # Clear the field value
-            gh api graphql -f query="
-              mutation {
-                clearProjectV2ItemFieldValue(input: {
-                  projectId: \"PVT_kwDOB4ppKM4AlVOh\"
-                  itemId: \"$ITEM_ID\"
-                  fieldId: \"$FIELD_ID\"
-                }) {
-                  projectV2Item { id }
-                }
-              }"
-            echo "Cleared Reopen Reason field"
-          else
-            echo "::warning::Issue not found in project — Reopen Reason not cleared."
-          fi
+        run: .github/scripts/reopen-tracking/post-comment-and-clear.sh
