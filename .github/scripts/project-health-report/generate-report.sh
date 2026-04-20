@@ -33,7 +33,7 @@ while [ "$HAS_NEXT" = "true" ]; do
   if [ -n "$CURSOR" ]; then
     RESULT=$(gh api graphql -F cursor="$CURSOR" -f query='
       query($cursor: String!) {
-        organization(login: "OmnitrustILM") {
+        organization(login: "OmniTrustILM") {
           projectV2(number: 5) {
             items(first: 100, after: $cursor) {
               nodes {
@@ -67,7 +67,7 @@ while [ "$HAS_NEXT" = "true" ]; do
   else
     RESULT=$(gh api graphql -f query='
       {
-        organization(login: "OmnitrustILM") {
+        organization(login: "OmniTrustILM") {
           projectV2(number: 5) {
             items(first: 100) {
               nodes {

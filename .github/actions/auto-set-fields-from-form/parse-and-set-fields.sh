@@ -91,7 +91,7 @@ set_field() {
   local field_data
   field_data=$(gh api graphql -f query='
     query($field_name: String!) {
-      organization(login: "OmnitrustILM") {
+      organization(login: "OmniTrustILM") {
         projectV2(number: 5) {
           field(name: $field_name) {
             ... on ProjectV2SingleSelectField {

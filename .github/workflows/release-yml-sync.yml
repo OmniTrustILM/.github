@@ -50,7 +50,7 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
 
       - name: Resolve target repos
         id: resolve
@@ -74,7 +74,7 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
           repositories: |
             ${{ matrix.repo }}
 
@@ -86,7 +86,7 @@ jobs:
       - name: Checkout target repo
         uses: actions/checkout@v4
         with:
-          repository: OmnitrustILM/${{ matrix.repo }}
+          repository: OmniTrustILM/${{ matrix.repo }}
           path: target
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 1
@@ -101,7 +101,7 @@ jobs:
         if: ${{ !inputs.dry_run && steps.diff.outputs.status != 'IDENTICAL' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          REPO: OmnitrustILM/${{ matrix.repo }}
+          REPO: OmniTrustILM/${{ matrix.repo }}
           REPO_NAME: ${{ matrix.repo }}
           STATUS: ${{ steps.diff.outputs.status }}
         run: source/.github/scripts/release-yml-sync/open-sync-pr.sh
