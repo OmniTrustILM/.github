@@ -93,12 +93,12 @@ fi
 
 body_file=$(mktemp)
 {
-  echo "Automated alignment of this repo with the org templates in OmnitrustILM/.github."
+  echo "Automated alignment of this repo with the org templates in OmniTrustILM/.github."
   echo ""
   echo "Tasks this PR addresses:"
   sed 's/^-/  -/' "$summary_file"
   echo ""
-  echo "Source workflow: [Repo Template Sync](https://github.com/OmnitrustILM/.github/actions/workflows/repo-template-sync.yml)"
+  echo "Source workflow: [Repo Template Sync](https://github.com/OmniTrustILM/.github/actions/workflows/repo-template-sync.yml)"
   echo ""
   echo "To opt out of future syncs, close this PR without merging — the workflow will respect that decision on subsequent runs."
 } > "$body_file"

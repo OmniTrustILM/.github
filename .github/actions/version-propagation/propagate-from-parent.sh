@@ -99,7 +99,7 @@ for field_name in "Version" "Module"; do
   if [ -n "$parent_option_id" ] && [ -z "$child_option_id" ]; then
     field_id=$(gh api graphql -f query='
       query($field_name: String!) {
-        organization(login: "OmnitrustILM") {
+        organization(login: "OmniTrustILM") {
           projectV2(number: 5) {
             field(name: $field_name) {
               ... on ProjectV2SingleSelectField { id }

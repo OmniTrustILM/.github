@@ -18,7 +18,7 @@ runs:
       # pin to the latest specific release.
       uses: actions/add-to-project@v1.0.2
       with:
-        project-url: https://github.com/orgs/OmnitrustILM/projects/5
+        project-url: https://github.com/orgs/OmniTrustILM/projects/5
         github-token: ${{ inputs.github-token }}
 
     - name: Set initial status

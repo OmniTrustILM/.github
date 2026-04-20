@@ -1,7 +1,7 @@
 name: Issue Automation
 
 # Org-wide issue automation — calls composite actions hosted in
-# OmnitrustILM/.github. Kept in sync by the repo-template-sync workflow.
+# OmniTrustILM/.github. Kept in sync by the repo-template-sync workflow.
 #
 # opened:   add issue to Project #5 → set form fields → propagate from parent
 # reopened: post audit comment, clear Reopen Reason field
@@ -43,7 +43,7 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
           repositories: ${{ github.event.repository.name }}
 
       # Broad token — spans all installation repos. Only needed for
@@ -56,28 +56,28 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
 
       - name: Add to project
         if: github.event.action == 'opened'
-        uses: OmnitrustILM/.github/.github/actions/auto-add-to-project@issue-automation-v1
+        uses: OmniTrustILM/.github/.github/actions/auto-add-to-project@issue-automation-v1
         with:
           github-token: ${{ steps.token-narrow.outputs.token }}
 
       - name: Set fields from form
         if: ${{ !cancelled() && github.event.action == 'opened' }}
-        uses: OmnitrustILM/.github/.github/actions/auto-set-fields-from-form@issue-automation-v1
+        uses: OmniTrustILM/.github/.github/actions/auto-set-fields-from-form@issue-automation-v1
         with:
           github-token: ${{ steps.token-narrow.outputs.token }}
 
       - name: Propagate fields from parent
         if: ${{ !cancelled() && github.event.action == 'opened' }}
-        uses: OmnitrustILM/.github/.github/actions/version-propagation@issue-automation-v1
+        uses: OmniTrustILM/.github/.github/actions/version-propagation@issue-automation-v1
         with:
           github-token: ${{ steps.token-broad.outputs.token }}
 
       - name: Post reopen comment and clear Reopen Reason
         if: github.event.action == 'reopened'
-        uses: OmnitrustILM/.github/.github/actions/reopen-tracking@issue-automation-v1
+        uses: OmniTrustILM/.github/.github/actions/reopen-tracking@issue-automation-v1
         with:
           github-token: ${{ steps.token-narrow.outputs.token }}

@@ -38,7 +38,7 @@ PREV_RELEASE_DATE=$(printf '%s' "$PREV_RELEASES" | jq -r '.[1].published_at // "
 echo "Previous release date: $PREV_RELEASE_DATE"
 
 VERSION_FIELD=$(gh api graphql -f query='
-  { organization(login: "OmnitrustILM") {
+  { organization(login: "OmniTrustILM") {
     projectV2(number: 5) {
       field(name: "Version") {
         ... on ProjectV2SingleSelectField {

@@ -26,7 +26,7 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
 
       - name: Install yq
         run: |

@@ -63,9 +63,9 @@ fi
 # $STATUS is intentionally expanded.
 body_file=$(mktemp)
 cat > "$body_file" <<EOF
-Automated sync of \`.github/release.yml\` from the org template in OmnitrustILM/.github.
+Automated sync of \`.github/release.yml\` from the org template in OmniTrustILM/.github.
 
-Source workflow: [Release.yml Sync](https://github.com/OmnitrustILM/.github/actions/workflows/release-yml-sync.yml)
+Source workflow: [Release.yml Sync](https://github.com/OmniTrustILM/.github/actions/workflows/release-yml-sync.yml)
 Previous state: \`$STATUS\`
 
 Merge to adopt the shared release-notes categories. To opt out of future syncs, close this PR without merging — the workflow will respect that decision on subsequent runs.

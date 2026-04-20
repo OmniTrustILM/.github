@@ -41,4 +41,4 @@ consistency_rules:
   epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
 
 # Organization whose members are authorized to create Release and Epic issues
-authorized_org: OmnitrustILM
+authorized_org: OmniTrustILM

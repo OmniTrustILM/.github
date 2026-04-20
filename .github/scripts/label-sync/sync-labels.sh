@@ -13,7 +13,7 @@ SYNCED=0
 
 # Hard cap detection: gh silently truncates at --limit.
 LIMIT=500
-repos=$(gh repo list OmnitrustILM --no-archived --limit "$LIMIT" --json name --jq '.[].name')
+repos=$(gh repo list OmniTrustILM --no-archived --limit "$LIMIT" --json name --jq '.[].name')
 repo_count=$(printf '%s\n' "$repos" | grep -c . || :)
 if [ "$repo_count" -ge "$LIMIT" ]; then
   echo "::error::Reached --limit $LIMIT on gh repo list. Raise the limit."
@@ -31,7 +31,7 @@ for repo in $repos; do
     description=$(printf '%s' "$line" | yq eval '.description' -)
 
     if gh label create "$name" \
-      --repo "OmnitrustILM/$repo" \
+      --repo "OmniTrustILM/$repo" \
       --color "$color" \
       --description "$description" \
       --force 2>&1; then

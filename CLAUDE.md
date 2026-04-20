@@ -87,4 +87,4 @@ Release (called from `release-automation.yml` on `release.published`):
 - Platform docs: https://docs.otilm.com
 - Discussions: https://github.com/orgs/OmniTrustILM/discussions
 - Contact: ilm@omnitrust.com
-- Org name for API calls and authorization checks: `OmnitrustILM`
+- Org name for API calls and authorization checks: `OmniTrustILM`

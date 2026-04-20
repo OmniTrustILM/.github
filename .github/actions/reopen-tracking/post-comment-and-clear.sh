@@ -49,7 +49,7 @@ if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
 fi
 
 FIELD_ID=$(gh api graphql -f query='
-  { organization(login: "OmnitrustILM") {
+  { organization(login: "OmniTrustILM") {
     projectV2(number: 5) {
       field(name: "Reopen Reason") {
         ... on ProjectV2SingleSelectField { id }

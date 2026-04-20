@@ -51,7 +51,7 @@ if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
 fi
 
 STATUS_FIELD=$(gh api graphql -f query='
-  { organization(login: "OmnitrustILM") {
+  { organization(login: "OmniTrustILM") {
     projectV2(number: 5) {
       field(name: "Status") {
         ... on ProjectV2SingleSelectField {

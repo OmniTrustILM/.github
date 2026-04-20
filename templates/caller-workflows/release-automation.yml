@@ -1,7 +1,7 @@
 name: Release Automation
 
 # Org-wide release automation — calls the post-release-stamping
-# composite action hosted in OmnitrustILM/.github. Kept in sync by
+# composite action hosted in OmniTrustILM/.github. Kept in sync by
 # the repo-template-sync workflow.
 #
 # release.published (stable only — prereleases are skipped inside
@@ -29,10 +29,10 @@ jobs:
         with:
           app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
           private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
-          owner: OmnitrustILM
+          owner: OmniTrustILM
           repositories: ${{ github.event.repository.name }}
 
       - name: Stamp Version on un-tagged Done issues
-        uses: OmnitrustILM/.github/.github/actions/post-release-stamping@release-automation-v1
+        uses: OmniTrustILM/.github/.github/actions/post-release-stamping@release-automation-v1
         with:
           github-token: ${{ steps.app-token.outputs.token }}
