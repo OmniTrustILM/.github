@@ -14,7 +14,9 @@ runs:
   using: composite
   steps:
     - name: Add to project
-      uses: actions/add-to-project@v1
+      # actions/add-to-project doesn't publish a moving `v1` tag;
+      # pin to the latest specific release.
+      uses: actions/add-to-project@v1.0.2
       with:
         project-url: https://github.com/orgs/OmnitrustILM/projects/5
         github-token: ${{ inputs.github-token }}
