@@ -74,7 +74,7 @@ EOF
 url=$(gh pr create --repo "$REPO" \
   --head "$branch" \
   --base "$base" \
-  --title "chore: sync .github/release.yml from org template" \
+  --title "Sync .github/release.yml from org template" \
   --body-file "$body_file")
 echo "::notice::Opened $url"
 echo "### $REPO_NAME: OPENED $url" >> "$GITHUB_STEP_SUMMARY"
