@@ -1,0 +1,119 @@
+name: Issue Template Cleanup
+
+# Removes the per-repo .github/ISSUE_TEMPLATE/ directory from target
+# repos so they inherit the org-wide issue templates from
+# OmniTrustILM/.github. Destructive task kept intentionally separate
+# from repo-template-sync (which is additive) so reviewer attention
+# isn't diluted.
+#
+# Self-excludes the .github repo itself (its ISSUE_TEMPLATE/ IS the
+# source of truth).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repos:
+        description: '"all" or comma-separated repo names'
+        required: true
+        default: "all"
+        type: string
+      dry_run:
+        description: "Dry run: report what would be deleted, open no PRs"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-template-cleanup
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.resolve.outputs.repos }}
+      count: ${{ steps.resolve.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmniTrustILM
+
+      # Reuse resolve-targets.sh from release-yml-sync — same repo
+      # list resolution, self-exclusion of the .github repo, and
+      # comma-list validation.
+      - name: Resolve target repos
+        id: resolve
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET_INPUT: ${{ inputs.target_repos }}
+        run: .github/scripts/release-yml-sync/resolve-targets.sh
+
+  cleanup:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        repo: ${{ fromJSON(needs.plan.outputs.repos) }}
+    steps:
+      - name: Generate GitHub App token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ secrets.ILM_PROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.ILM_PROJECT_BOT_PRIVATE_KEY }}
+          owner: OmniTrustILM
+          repositories: |
+            ${{ matrix.repo }}
+
+      - name: Checkout .github (for scripts)
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout target repo
+        uses: actions/checkout@v4
+        with:
+          repository: OmniTrustILM/${{ matrix.repo }}
+          path: target
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 1
+
+      - name: Cleanup legacy issue templates
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: OmniTrustILM/${{ matrix.repo }}
+          REPO_NAME: ${{ matrix.repo }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: source/.github/scripts/issue-template-cleanup/cleanup-templates.sh
+
+  summary:
+    needs: [plan, cleanup]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run summary
+        env:
+          TARGET_COUNT: ${{ needs.plan.outputs.count }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          CLEANUP_RESULT: ${{ needs.cleanup.result }}
+        run: |
+          {
+            echo "## Issue Template Cleanup — Final Summary"
+            echo ""
+            echo "Target repos: $TARGET_COUNT"
+            echo "Dry run: $DRY_RUN"
+            echo "Cleanup job aggregate: $CLEANUP_RESULT"
+            echo ""
+            echo "_Note: with fail-fast disabled, individual repos may have succeeded even if aggregate is 'failure'. See per-repo sections above._"
+          } >> "$GITHUB_STEP_SUMMARY"
