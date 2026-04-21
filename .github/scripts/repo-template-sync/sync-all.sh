@@ -31,6 +31,10 @@ if [ "$closed_unmerged" -gt 0 ]; then
 fi
 
 git fetch origin "$base"
+# Fetch the sync branch if it exists on remote — required for
+# --force-with-lease to have an accurate view. Silent no-op on first
+# run when the branch doesn't exist yet.
+git fetch origin "$branch" 2>/dev/null || true
 git checkout -B "$branch" "origin/$base"
 
 commits_made=0
