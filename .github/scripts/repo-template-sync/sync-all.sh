@@ -106,7 +106,7 @@ body_file=$(mktemp)
 url=$(gh pr create --repo "$REPO" \
   --head "$branch" \
   --base "$base" \
-  --title "chore: sync repo to org template" \
+  --title "Sync repo to org template" \
   --body-file "$body_file")
 
 echo "::notice::Opened $url"
