@@ -25,6 +25,14 @@ body:
     attributes:
       label: Test Scope
       description: What functionality or area does this cover?
+  - type: textarea
+    id: test-scenarious
+    attributes:
+      label: Test Scenarious
+      description: Step-by-step manual test scenarios. Each scenario should describe a concrete user action and expected result.
+      placeholder: |
+        1. Open [page] → verify [expected]
+        2. Perform [action] → verify [result]
   - type: input
     id: related-feature
     attributes:
