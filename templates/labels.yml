@@ -7,6 +7,9 @@
 - name: documentation
   color: "06b6d4"
   description: "Documentation work"
+- name: tech-epic
+  color: "4b3e4f"
+  description: "Technical epic - for grouping issues"  
 - name: ignore-for-release
   color: "6b7280"
   description: "Exclude from auto-generated release notes"
