@@ -26,11 +26,11 @@ body:
       label: Test Scope
       description: What functionality or area does this cover?
   - type: textarea
-    id: test-scenarious
+    id: test-scenarios
     attributes:
-      label: Test Scenarious
+      label: Test Scenarios
       description: Step-by-step manual test scenarios. Each scenario should describe a concrete user action and expected result.
-      placeholder: |
+      value: |
         1. Open [page] → verify [expected]
         2. Perform [action] → verify [result]
   - type: input

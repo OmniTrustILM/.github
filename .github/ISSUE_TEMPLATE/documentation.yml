@@ -8,6 +8,7 @@ body:
     attributes:
       label: Description
       description: What documentation needs to be created or updated?
+      placeholder: "Add a Getting Started guide for new operators covering first login, profile setup, and dashboard tour."
     validations:
       required: true
   - type: dropdown
