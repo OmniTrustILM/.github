@@ -8,6 +8,7 @@ body:
     attributes:
       label: Description
       description: Clear description of the bug
+      placeholder: "The certificate detail page shows a blank renewal section when the authority is offline."
     validations:
       required: true
   - type: textarea
@@ -25,12 +26,14 @@ body:
     id: expected
     attributes:
       label: Expected Behavior
+      placeholder: "The renewal section shows the next-renewal date and a 'Renew now' button."
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
       label: Actual Behavior
+      placeholder: "The renewal section is blank with no error message — the operator has no way to act."
     validations:
       required: true
   - type: dropdown

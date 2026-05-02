@@ -7,6 +7,7 @@ body:
     attributes:
       label: Description
       description: What needs to be done?
+      placeholder: "Update the dashboard widget order — Certificates first, then Keys, then Discovery."
     validations:
       required: true
   - type: textarea
@@ -14,6 +15,6 @@ body:
     attributes:
       label: Definition of Done
       description: How do we know this task is complete?
-      placeholder: |
-        - [ ] ...
-        - [ ] ...
+      value: |
+        - [ ]
+        - [ ]

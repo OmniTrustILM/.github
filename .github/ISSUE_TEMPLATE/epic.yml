@@ -24,22 +24,17 @@ body:
     validations:
       required: true
   - type: textarea
-    id: business-context
-    attributes:
-      label: Business Context
-      description: Why does this matter? Customer/market drivers, strategic alignment.
-    validations:
-      required: true
-  - type: textarea
     id: constraints
     attributes:
       label: Constraints
       description: Security, performance, backwards compatibility, regulatory requirements
+      placeholder: "Must keep existing keyboard shortcuts on the certificate detail page; cannot break the screen-reader flow."
   - type: textarea
     id: out-of-scope
     attributes:
       label: Out of Scope
       description: Explicitly what this Epic does NOT include
+      placeholder: "Mobile/responsive layout — handled in a separate Frontend Epic."
   - type: markdown
     attributes:
       value: "## Testing Scope"
@@ -56,6 +51,7 @@ body:
     attributes:
       label: Regression Risk
       description: Describe what existing functionality might break
+      placeholder: "The certificate detail page shares state management with the renewal wizard — both flows need regression QA."
   - type: markdown
     attributes:
       value: |

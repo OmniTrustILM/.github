@@ -8,6 +8,7 @@ body:
     attributes:
       label: Description
       description: What do you want to add or change?
+      placeholder: "Add a 'Bulk renew' action on the certificates inventory page."
     validations:
       required: true
   - type: textarea
@@ -20,7 +21,8 @@ body:
     id: use-case
     attributes:
       label: Use Case
-      description: Describe how this feature would be used
+      description: Concrete scenarios of how this feature would be used. Skip if the User Story already covers the usage.
+      placeholder: "Operator selects multiple expiring certificates from the inventory grid, clicks Bulk renew, and the action queues a renewal request for each."
   - type: textarea
     id: acceptance-criteria
     attributes:
