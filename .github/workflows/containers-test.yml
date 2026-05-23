@@ -75,6 +75,8 @@ jobs:
           mkdir -p data
 
       - name: Maven package
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mvn -f pom.xml -U -B -ntp -T 1C clean package
 
       - name: Collect artifacts into tar (preserve perms)

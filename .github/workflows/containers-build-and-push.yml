@@ -112,6 +112,8 @@ jobs:
           mkdir -p data
 
       - name: Maven package (skip tests; tests run on PR)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: mvn -f pom.xml -U -B -ntp -T 1C -DskipTests clean package
 
       - name: Collect artifacts into tar (preserve perms)
