@@ -10,9 +10,11 @@ name: Publish Harbor image (reusable)
 #                                   a marker file.
 #   3. publish_manifest:            collects all per-arch digests, creates the
 #                                   multiarch manifest under each tag from
-#                                   docker/metadata-action, signs every digest
-#                                   and every tag with cosign, and pushes the
-#                                   repo README to the registry.
+#                                   docker/metadata-action, then signs every
+#                                   digest and every tag with cosign (tags are
+#                                   pushed before signing so a transient signing
+#                                   failure cannot leave tags unpublished), and
+#                                   pushes the repo README to the registry.
 #
 # Adding a new architecture later means adding one entry to the matrix - the
 # manifest job picks up any digests-* artifacts it finds.
@@ -275,25 +277,32 @@ jobs:
           echo "Per-arch digest files:"
           ls -1
 
-          # Build the source list of per-arch image references and sign each.
+          # Build the source list of per-arch image references.
           SOURCES=()
           for digest_file in *; do
-            ref="${IMAGE}@sha256:${digest_file}"
-            SOURCES+=("$ref")
-            echo "Signing per-arch image: $ref"
-            cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$ref"
+            SOURCES+=("${IMAGE}@sha256:${digest_file}")
           done
 
           echo "Tags to publish:"
           echo "${TAGS}"
 
+          # Publish every manifest tag FIRST. 
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
             echo "Publishing manifest: $tag"
 
             docker buildx imagetools create --tag "$tag" "${SOURCES[@]}"
             docker buildx imagetools inspect "$tag"
+          done <<< "${TAGS}"
 
+          # Sign every per-arch digest and every tag AFTER publication.
+          for ref in "${SOURCES[@]}"; do
+            echo "Signing per-arch image: $ref"
+            cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$ref"
+          done
+
+          while IFS= read -r tag; do
+            [ -z "$tag" ] && continue
             echo "Signing multiarch manifest tag: $tag"
             cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$tag"
           done <<< "${TAGS}"
