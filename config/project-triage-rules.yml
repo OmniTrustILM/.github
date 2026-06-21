@@ -39,6 +39,13 @@ consistency_rules:
   reopened_without_reason: true
   release_epic_by_non_org_member: true
   epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
+  epic_status_lags_children: true      # Warning: a child is more advanced than the Epic
+  epic_status_ahead_of_children: true  # Warning: Epic moved ahead of all its children
+  epic_done_with_open_children: true   # Error: Epic Status=Done but a child is still open
+
+# closed_but_not_done only flags issues closed (as completed) within this many days,
+# so it surfaces recent process slips rather than every legacy closed issue.
+closed_but_not_done_window_days: 30
 
 # Organization whose members are authorized to create Release and Epic issues
 authorized_org: OmniTrustILM

@@ -1,0 +1,34 @@
+# Mutations used by create.sh after `gh issue create`.
+#
+# Variables come from cache/project-fields.json + the issue node id
+# returned by `gh issue create --json id`.
+#
+# Each mutation is invoked separately by create.sh with `gh api graphql -F`.
+
+mutation AddItem($projectId: ID!, $contentId: ID!) {
+  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+    item { id }
+  }
+}
+
+mutation SetSingleSelectValue(
+  $projectId: ID!
+  $itemId:    ID!
+  $fieldId:   ID!
+  $optionId:  String!
+) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: $projectId
+    itemId:    $itemId
+    fieldId:   $fieldId
+    value:     { singleSelectOptionId: $optionId }
+  }) {
+    projectV2Item { id }
+  }
+}
+
+mutation SetIssueType($issueId: ID!, $issueTypeId: ID!) {
+  updateIssueIssueType(input: { issueId: $issueId, issueTypeId: $issueTypeId }) {
+    issue { id }
+  }
+}

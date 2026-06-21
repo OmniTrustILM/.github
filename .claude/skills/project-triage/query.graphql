@@ -1,0 +1,52 @@
+query($endCursor: String) {
+  organization(login: "OmniTrustILM") {
+    projectV2(number: 5) {
+      items(first: 100, after: $endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          content {
+            ... on Issue {
+              number title url body createdAt updatedAt closedAt state stateReason
+              repository { name }
+              issueType { name }
+              author { login }
+              assignees(first: 5) { nodes { login } }
+              labels(first: 20) { nodes { name } }
+              parent { number url repository { name } }
+              subIssues(first: 1) { totalCount }
+              timelineItems(last: 50, itemTypes: [REOPENED_EVENT]) {
+                nodes { ... on ReopenedEvent { createdAt } }
+              }
+            }
+          }
+          fieldValues(first: 30) {
+            nodes {
+              __typename
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                field { ... on ProjectV2SingleSelectField { name } }
+                name optionId updatedAt
+              }
+              ... on ProjectV2ItemFieldNumberValue {
+                field { ... on ProjectV2Field { name } }
+                number
+              }
+              ... on ProjectV2ItemFieldDateValue {
+                field { ... on ProjectV2Field { name } }
+                date
+              }
+              ... on ProjectV2ItemFieldIterationValue {
+                field { ... on ProjectV2IterationField { name } }
+                title startDate duration
+              }
+              ... on ProjectV2ItemFieldTextValue {
+                field { ... on ProjectV2Field { name } }
+                text
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
