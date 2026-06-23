@@ -250,7 +250,7 @@ Once code review is approved, QA tests the PR branch before it is merged:
 
 ### 2.6 Epic Breakdown
 
-> **Status:** the `/epic-breakdown` skill described below is **planned, not yet built**. Until it ships, Phase 2 is a manual exercise: PM/Tech Lead writes Acceptance Criteria, Technical Analysis, Impact Assessment, and creates sub-issues by hand. The shape and review flow described here remain the target for the skill.
+> **Status:** the `/epic-breakdown` skill described below is **available** (`.claude/skills/epic-breakdown/`). It runs the three-phase flow below and adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). The manual exercise — PM/Tech Lead writes Acceptance Criteria, Technical Analysis, Impact Assessment, and creates sub-issues by hand — remains valid when the skill is not deployed.
 
 Three-phase process with PM and QA review:
 
@@ -605,7 +605,7 @@ Blank issues are enabled as an escape hatch. Contact links guide to Discussions 
 | Testing Requirements | checkboxes | No | Manual testing required, E2E automation required, Existing tests need updating |
 | Regression Risk | textarea | No | Describe what existing functionality might break |
 
-> Sections filled by `/epic-breakdown` skill (planned — not yet available) after creation: Acceptance Criteria, Technical Analysis, Impact Assessment, enriched Testing Scope.
+> Sections filled by the `/epic-breakdown` skill after creation: Acceptance Criteria, Technical Analysis, Impact Assessment, enriched Testing Scope.
 
 **QA Issue** (type: Task, labels: `qa`)
 
@@ -841,11 +841,13 @@ All centralized config lives in the `OmniTrustILM/.github` repo: https://github.
 
 ### Available Claude Code skills
 
+These skills live in `.claude/skills/` in this repo (see `.claude/skills/README.md` for conventions and deployment).
+
 | Skill | Status | Scope |
 |---|---|---|
 | `/project-triage` | Available | Project health report on Project #5 — required-field gaps, stale issues, consistency violations, with optional per-finding auto-fixes. Validates issues against Module values. |
 | `/create-issue` | Available | Create well-formed OmniTrustILM issue from natural-language description. Supports Bug, Feature, Task, Documentation, QA. Auto-detects Module from description keywords and target repo. Skip for Epic, Release, Vulnerability — use form templates. |
-| `/epic-breakdown` | Planned (not yet built) | Read an Epic, explore repos, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, propose sub-issues with Module set per repo/area, dependencies, suggested Estimate. Until built, breakdown is manual (see §2.6). |
+| `/epic-breakdown` | Available | Read an Epic (or a requirement), explore repos and existing issues, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, and propose sub-issues by work stream with Module/Complexity set, dependencies, and a suggested Estimate — all behind a human-approval gate. Adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). Sanctioned writer of Complexity/Estimate (§3.1, §3.5). |
 
 For Module identification, use the Module table in Section 3.1 — match repo name and issue content to the "Key repos" and "What it covers" columns. For Core repo issues, use `@AuditLogged` annotations in controllers (Module.java enum, in the `core` repo) to determine the correct sub-module.
 

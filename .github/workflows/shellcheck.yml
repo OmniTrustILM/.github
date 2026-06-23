@@ -1,8 +1,10 @@
 name: ShellCheck
 
 # Lints all bash scripts in the repo on every PR and on pushes to main.
-# Covers both .github/scripts/ (used by workflows in this repo) and
-# .github/actions/ (composite actions consumed by org repos).
+# Covers .github/scripts/ (used by workflows in this repo), .github/actions/
+# (composite actions consumed by org repos), and .claude/skills/ (the committed
+# Claude Code skills). The skills are linted with -x so shellcheck follows each
+# script's `. _common.sh` source (resolved via source-path=SCRIPTDIR).
 
 on:
   push:
@@ -10,11 +12,13 @@ on:
     paths:
       - ".github/scripts/**"
       - ".github/actions/**"
+      - ".claude/skills/**"
       - ".github/workflows/shellcheck.yml"
   pull_request:
     paths:
       - ".github/scripts/**"
       - ".github/actions/**"
+      - ".claude/skills/**"
       - ".github/workflows/shellcheck.yml"
 
 permissions:
@@ -31,3 +35,11 @@ jobs:
         with:
           scandir: .github
           severity: warning
+
+      # Direct invocation (shellcheck is preinstalled on ubuntu-latest) so -x is
+      # applied for certain — the sourcing scripts need it to resolve _common.sh.
+      - name: Run shellcheck on Claude Code skills
+        run: |
+          shellcheck --version
+          find .claude/skills -type f -name '*.sh' -print0 \
+            | xargs -0 -r shellcheck -x --severity=warning

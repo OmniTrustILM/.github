@@ -30,6 +30,14 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 - `.github/actions/` — composite actions consumed by caller workflows in other org repos; each action is a directory with `action.yml` + its shell script
 - `.github/scripts/` — bash scripts called by workflows in this repo (label-sync, project-health-report, release-yml-sync, repo-template-sync)
 - `.github/ISSUE_TEMPLATE/` — issue forms (required path)
+- `.claude/skills/` — org-wide Claude Code skills for managing Project #5 (`create-issue`, `project-triage`, `epic-breakdown`). Tracked and reviewed here; each skill's `cache/` contents are gitignored (only `cache/.gitignore` is committed). See [`.claude/skills/README.md`](.claude/skills/README.md). The local superpowers planning workspace under `docs/superpowers/` is gitignored and never committed.
+
+### Claude Code skills (`.claude/skills/`)
+- **create-issue** — natural-language → well-formed Bug/Feature/Task/Documentation/QA issue, added to Project #5.
+- **project-triage** — Project #5 health report (field gaps, staleness, consistency) with optional per-finding auto-fixes; reads `config/project-triage-rules.yml`.
+- **epic-breakdown** — requirement → planned Epic + sub-issues (preflight / breakdown / reconcile modes); the sanctioned writer of Complexity/Estimate.
+
+House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/parsing lives in scripts; IDs are discovered at runtime (never hardcoded) into a gitignored `cache/`; every mutation is gated behind human approval (methodics §10). Skills need a `gh` token with `repo`, `read:org`, and `read:project`/`project` scopes. CI lints `.claude/skills/**/*.sh` with ShellCheck.
 
 ### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
 - **Bug**: requires `severity`. Recommended: module, priority, version, estimate, assignee.

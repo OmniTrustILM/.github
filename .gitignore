@@ -1,2 +1,15 @@
 /.idea/
-/.claude/
+
+# .claude: ignore everything except the committed skills (caches stay local)
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*/cache/*
+!/.claude/skills/*/cache/.gitignore
+/.claude/skills/*/cache.tmp/
+
+# Superpowers planning workspace — local design/plan docs, never committed
+/docs/superpowers/
+
+# Python bytecode (e.g. from running skill tests)
+__pycache__/
+*.pyc
