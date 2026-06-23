@@ -103,7 +103,7 @@ ISSUE_URL=$(gh issue create \
   --repo "OmniTrustILM/$REPO" \
   --title "$TITLE" \
   --body-file "$BODY_FILE" \
-  "${LABEL_FLAGS[@]}") || fail "gh issue create failed (see stderr above)"
+  ${LABEL_FLAGS[@]+"${LABEL_FLAGS[@]}"}) || fail "gh issue create failed (see stderr above)"
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 [ -n "$ISSUE_NUMBER" ] || fail "could not extract issue number from URL: $ISSUE_URL"
 ISSUE_NODE_ID=$(gh api "repos/OmniTrustILM/$REPO/issues/$ISSUE_NUMBER" --jq '.node_id')
