@@ -73,10 +73,11 @@ Reporting and CI:
 
 - **Project Health Report** (`.github/workflows/project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
 - **ShellCheck** (`.github/workflows/shellcheck.yml`) — on PRs touching `.github/scripts/**` or `.github/actions/**`. Lints all bash.
+- **Action tests** (`.github/workflows/action-tests.yml`) — on changes to `.github/actions/**`. Runs each composite action's `*.test.sh` suite (e.g. the `resolve-trivy-config` resolver) so a regression that silently weakened the vuln gate can't ship uncaught.
 
 Reusable workflows (called by other org repos' caller workflows):
 
-- **Test Docker image** (`.github/workflows/containers-test.yml`) and **Build & push** (`.github/workflows/containers-build-and-push.yml`) — build per-arch images and scan them with Trivy. The vulnerability gate enforces a single org-default policy bundled at `.github/actions/resolve-trivy-config/trivy.yaml` (fails on CRITICAL + HIGH OS/library vulns and leaked secrets). A repo may fully replace it with its own `trivy-config` file only by passing `allow-trivy-config-override: true` (default `false`); the choice is resolved by the `resolve-trivy-config` action.
+- **Test Docker image** (`.github/workflows/containers-test.yml`) and **Build & push** (`.github/workflows/containers-build-and-push.yml`) — build per-arch images and scan them with Trivy. The vulnerability gate enforces a single org-default policy bundled at `.github/actions/resolve-trivy-config/trivy.yaml` (fails on CRITICAL + HIGH OS/library vulns and leaked secrets). Under the locked default, a repo-local `.trivyignore` is neutralized so it cannot silently suppress findings. A repo may fully replace the policy with its own `trivy-config` file only by passing `allow-trivy-config-override: true` (default `false`); the choice is resolved by the `resolve-trivy-config` action. This override is **self-service** — it is set in the consuming repo's own caller workflow and reviewed there, not centrally gated in this repo — so with override enabled a repo owns its policy (including its own `.trivyignore`) entirely.
 
 ### Composite actions (consumed by caller workflows in target repos)
 
@@ -95,7 +96,7 @@ Release (called from `release-automation.yml` on `release.published`):
 
 Internal to this repo's reusable container workflows (not distributed to target repos; pinned `@main`):
 
-- **resolve-trivy-config** — picks which Trivy config the scan gate enforces: the bundled org default, or a repo override when `allow-trivy-config-override` is `true`. Bundles the default policy at `resolve-trivy-config/trivy.yaml`.
+- **resolve-trivy-config** — picks which Trivy config the scan gate enforces: the bundled org default, or a repo override when `allow-trivy-config-override` is `true`. Bundles the default policy at `resolve-trivy-config/trivy.yaml`; under the default it also neutralizes any repo-local `.trivyignore`. Has a `resolve.test.sh` suite run by the Action tests workflow.
 
 ## External References
 

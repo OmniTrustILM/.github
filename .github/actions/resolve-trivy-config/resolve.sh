@@ -8,12 +8,13 @@
 #
 # Behaviour:
 #   override not allowed (default) -> copy the bundled default into the
-#                                     workspace and use it (org policy enforced)
+#                                     workspace and use it (org policy enforced),
+#                                     and neutralize any repo-local .trivyignore
 #   override allowed + file present -> use the repo's file (full replacement)
 #   override allowed + file missing -> fail loudly (misconfiguration)
 #
 # Reads: INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE, INPUT_TRIVY_CONFIG_PATH,
-#        DEFAULT_CONFIG_SRC, GITHUB_OUTPUT
+#        DEFAULT_CONFIG_SRC, GITHUB_OUTPUT, GITHUB_ENV, RUNNER_TEMP
 set -euo pipefail
 
 # Any value other than the exact string "true" falls through to the org
@@ -45,7 +46,14 @@ else
     exit 1
   fi
   cp "$default_src" "$default_dest"
-  echo "Trivy config: using org-default policy (override not enabled)."
+  # Trivy auto-loads a repo-committed .trivyignore from the working directory,
+  # which would silently suppress findings under the locked org default. Point
+  # Trivy at an empty ignore file we control (outside the caller checkout) so
+  # the default gate can't be weakened without opting into an override.
+  empty_ignore="${RUNNER_TEMP:-/tmp}/trivy-empty-ignore"
+  : > "$empty_ignore"
+  echo "TRIVY_IGNOREFILE=$empty_ignore" >> "$GITHUB_ENV"
+  echo "Trivy config: using org-default policy (override not enabled); repo-local .trivyignore neutralized."
   resolved="$default_dest"
 fi
 

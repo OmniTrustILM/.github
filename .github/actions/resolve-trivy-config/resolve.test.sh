@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Self-contained test for resolve.sh. Runs each of the three branches in an
-# isolated temp workspace and asserts the resolved config-file and exit code.
+# Self-contained test for resolve.sh. Runs each branch in an isolated temp
+# workspace and asserts the resolved config-file, ignore-file handling, and
+# exit code.
 #
 # Run locally: bash .github/actions/resolve-trivy-config/resolve.test.sh
 set -euo pipefail
@@ -23,17 +24,24 @@ assert_eq() {
 }
 
 # ---------------------------------------------------------------------------
-# Case 1: override not allowed -> bundled default copied into the workspace.
+# Case 1: override not allowed -> bundled default copied into the workspace,
+# and a repo-local .trivyignore is neutralized via TRIVY_IGNOREFILE.
 # ---------------------------------------------------------------------------
 work="$(mktemp -d)"
 out="$work/gh_output"
+env_out="$work/gh_env"
+rt="$work/runner_temp"
+mkdir -p "$rt"
 : > "$out"
+: > "$env_out"
 (
   cd "$work"
   INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE=false \
   INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
   DEFAULT_CONFIG_SRC="$default_src" \
   GITHUB_OUTPUT="$out" \
+  GITHUB_ENV="$env_out" \
+  RUNNER_TEMP="$rt" \
   bash "$resolve"
 )
 assert_eq "default: exits 0" "0" "$?"
@@ -43,14 +51,23 @@ assert_eq "default: file materialized in workspace" \
   "yes" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 assert_eq "default: content matches bundled policy" \
   "$(cat "$default_src")" "$(cat "$work/.trivy-default.yaml")"
+assert_eq "default: TRIVY_IGNOREFILE pointed at empty ignore file" \
+  "TRIVY_IGNOREFILE=$rt/trivy-empty-ignore" "$(cat "$env_out")"
+assert_eq "default: empty ignore file exists and is empty" \
+  "yes" "$([ -f "$rt/trivy-empty-ignore" ] && [ ! -s "$rt/trivy-empty-ignore" ] && echo yes || echo no)"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
-# Case 2: override allowed + file present -> repo file used verbatim.
+# Case 2: override allowed + file present -> repo file used verbatim, and
+# Trivy's normal .trivyignore discovery is left intact (no TRIVY_IGNOREFILE).
 # ---------------------------------------------------------------------------
 work="$(mktemp -d)"
 out="$work/gh_output"
+env_out="$work/gh_env"
+rt="$work/runner_temp"
+mkdir -p "$rt"
 : > "$out"
+: > "$env_out"
 mkdir -p "$work/config"
 echo "severity: [CRITICAL]" > "$work/config/trivy.yaml"
 (
@@ -59,6 +76,8 @@ echo "severity: [CRITICAL]" > "$work/config/trivy.yaml"
   INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
   DEFAULT_CONFIG_SRC="$default_src" \
   GITHUB_OUTPUT="$out" \
+  GITHUB_ENV="$env_out" \
+  RUNNER_TEMP="$rt" \
   bash "$resolve"
 )
 assert_eq "override present: exits 0" "0" "$?"
@@ -66,6 +85,7 @@ assert_eq "override present: outputs repo path" \
   "config-file=config/trivy.yaml" "$(cat "$out")"
 assert_eq "override present: bundled default NOT copied" \
   "no" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
+assert_eq "override present: TRIVY_IGNOREFILE NOT set" "" "$(cat "$env_out")"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
