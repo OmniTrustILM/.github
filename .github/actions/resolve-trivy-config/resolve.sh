@@ -37,6 +37,13 @@ else
     echo "::error::Bundled org-default Trivy config not found at '$default_src' (action packaging error)."
     exit 1
   fi
+  # The workspace is the (untrusted) caller repo checkout. A committed symlink
+  # named "$default_dest" could redirect this write outside the workspace
+  # (symlink traversal), so refuse to write through one.
+  if [ -L "$default_dest" ]; then
+    echo "::error::'$default_dest' is a symlink in the checked-out repo; refusing to write the org-default Trivy config through it."
+    exit 1
+  fi
   cp "$default_src" "$default_dest"
   echo "Trivy config: using org-default policy (override not enabled)."
   resolved="$default_dest"

@@ -109,6 +109,29 @@ assert_eq "override empty: exits non-zero" "1" "$rc"
 assert_eq "override empty: no config-file written" "" "$(cat "$out")"
 rm -rf "$work"
 
+# ---------------------------------------------------------------------------
+# Case 5: override not allowed + workspace has a symlink named
+# .trivy-default.yaml -> fail closed (refuse symlink traversal, do not write).
+# ---------------------------------------------------------------------------
+work="$(mktemp -d)"
+out="$work/gh_output"
+: > "$out"
+ln -s /etc/passwd "$work/.trivy-default.yaml"
+rc=0
+(
+  cd "$work"
+  INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE=false \
+  INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
+  DEFAULT_CONFIG_SRC="$default_src" \
+  GITHUB_OUTPUT="$out" \
+  bash "$resolve"
+) || rc=$?
+assert_eq "symlink guard: exits non-zero" "1" "$rc"
+assert_eq "symlink guard: no config-file written" "" "$(cat "$out")"
+assert_eq "symlink guard: link left in place, not written through" \
+  "yes" "$([ -L "$work/.trivy-default.yaml" ] && echo yes || echo no)"
+rm -rf "$work"
+
 echo "----"
 if [ "$failures" -eq 0 ]; then
   echo "All resolve.sh tests passed."
