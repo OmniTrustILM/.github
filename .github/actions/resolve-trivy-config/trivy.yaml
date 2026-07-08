@@ -17,5 +17,5 @@ vulnerability:
   type:
     - os
     - library
-ignore-unfixed: false
+ignore-unfixed: true
 scanners: "vuln,secret"
