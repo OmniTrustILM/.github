@@ -27,7 +27,7 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
   - `templates/caller-workflows/` — caller workflow files that land in each repo's `.github/workflows/` to invoke the composite actions below
 - `config/` — files consumed HERE or by external automation (triage rules)
 - `.github/workflows/` — GitHub Actions workflows that run in THIS repo (required path)
-- `.github/actions/` — composite actions consumed by caller workflows in other org repos; each action is a directory with `action.yml` + its shell script
+- `.github/actions/` — composite actions consumed by caller workflows in other org repos (and by this repo's own reusable container workflows); each action is a directory with `action.yml` + its shell script
 - `.github/scripts/` — bash scripts called by workflows in this repo (label-sync, project-health-report, release-yml-sync, repo-template-sync)
 - `.github/ISSUE_TEMPLATE/` — issue forms (required path)
 - `.claude/skills/` — org-wide Claude Code skills for managing Project #5 (`create-issue`, `project-triage`, `epic-breakdown`). Tracked and reviewed here; each skill's `cache/` contents are gitignored (only `cache/.gitignore` is committed). See [`.claude/skills/README.md`](.claude/skills/README.md). The local superpowers planning workspace under `docs/superpowers/` is gitignored and never committed.
@@ -74,6 +74,10 @@ Reporting and CI:
 - **Project Health Report** (`.github/workflows/project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
 - **ShellCheck** (`.github/workflows/shellcheck.yml`) — on PRs touching `.github/scripts/**` or `.github/actions/**`. Lints all bash.
 
+Reusable workflows (called by other org repos' caller workflows):
+
+- **Test Docker image** (`.github/workflows/containers-test.yml`) and **Build & push** (`.github/workflows/containers-build-and-push.yml`) — build per-arch images and scan them with Trivy. The vulnerability gate enforces a single org-default policy bundled at `.github/actions/resolve-trivy-config/trivy.yaml` (fails on CRITICAL + HIGH OS/library vulns and leaked secrets). A repo may fully replace it with its own `trivy-config` file only by passing `allow-trivy-config-override: true` (default `false`); the choice is resolved by the `resolve-trivy-config` action.
+
 ### Composite actions (consumed by caller workflows in target repos)
 
 Each action lives under `.github/actions/<name>/` (directory containing `action.yml` + its shell script). Target repos invoke them via caller workflows deployed by Repo Template Sync. Pinned to moving tags `issue-automation-v1` and `release-automation-v1`.
@@ -88,6 +92,10 @@ Issue lifecycle (called from `issue-automation.yml` on `issues.opened`/`issues.r
 Release (called from `release-automation.yml` on `release.published`):
 
 - **post-release-stamping** — stamps Version on closed Done issues in the releasing repo. Skips prereleases.
+
+Internal to this repo's reusable container workflows (not distributed to target repos; pinned `@main`):
+
+- **resolve-trivy-config** — picks which Trivy config the scan gate enforces: the bundled org default, or a repo override when `allow-trivy-config-override` is `true`. Bundles the default policy at `resolve-trivy-config/trivy.yaml`.
 
 ## External References
 

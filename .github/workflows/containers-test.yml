@@ -48,10 +48,15 @@ on:
         type: string
         default: '21'
       trivy-config:
-        description: "Path to trivy config file (relative to repo root)"
+        description: "Path to a repo-local Trivy config that fully replaces the org default. Used ONLY when allow-trivy-config-override is true."
         required: false
         type: string
         default: config/trivy.yaml
+      allow-trivy-config-override:
+        description: "Allow this repo to fully replace the org-default Trivy policy with its own file at trivy-config. Default false = org policy enforced."
+        required: false
+        type: boolean
+        default: false
       skip-tests:
         description: "Skip Maven tests during pre-build (use when tests already run in a prior workflow)"
         required: false
@@ -169,9 +174,16 @@ jobs:
           name: trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
+      - name: Resolve Trivy config
+        id: trivy-config
+        uses: OmniTrustILM/.github/.github/actions/resolve-trivy-config@main
+        with:
+          allow-trivy-config-override: ${{ inputs.allow-trivy-config-override }}
+          trivy-config-path: ${{ inputs.trivy-config }}
+
       - name: Fail build on vulnerabilities
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: ${{ inputs.registry }}/${{ inputs.image }}:ci
-          trivy-config: ${{ inputs.trivy-config }}
+          trivy-config: ${{ steps.trivy-config.outputs.config-file }}
           skip-setup-trivy: true
