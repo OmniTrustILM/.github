@@ -13,9 +13,14 @@ exit-code: 1
 severity:
   - CRITICAL
   - HIGH
+
+scan:
+  scanners:
+    - vuln
+    - secret
+
 vulnerability:
   type:
     - os
     - library
   ignore-unfixed: true
-scanners: "vuln,secret"
