@@ -252,26 +252,23 @@ Once code review is approved, QA tests the PR branch before it is merged:
 
 > **Status:** the `/epic-breakdown` skill described below is **available** (`.claude/skills/epic-breakdown/`). It runs the three-phase flow below and adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). The manual exercise — PM/Tech Lead writes Acceptance Criteria, Technical Analysis, Impact Assessment, and creates sub-issues by hand — remains valid when the skill is not deployed.
 
-Three-phase process with PM and QA review:
+Three-phase process with Tech Lead and QA review:
 
 **Phase 1 — Human writes the Epic:** PM, Tech Lead, or Product Owner creates Epic via template. Fills in User Story, Use Cases, Constraints, Out of Scope, Testing Scope.
 
 **Phase 2 — Epic Owner drives the breakdown (AI-assisted):** the **Epic Owner** invokes `/epic-breakdown`, which reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, suggested Estimate (with review buffer), blocked-by relationships, suggested assignee.
 
-**Phase 3 — Review and approval (collaborative):**
-1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
-2. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
-3. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
-4. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
+**Phase 3 — Review and approval:**
+1. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
+2. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
+3. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
 
 ```mermaid
 flowchart TB
     A[PM/PO writes Epic using template] --> B[Invoke /epic-breakdown skill]
     B --> C[Skill reads Epic + explores repos]
     C --> D[Enriches Epic + proposes sub-issues]
-    D --> E{PM/PO reviews business scope}
-    E -->|Modify| D
-    E -->|Approve| F{Tech Lead / Developer reviews technical accuracy}
+    D --> F{Tech Lead / Developer reviews technical accuracy}
     F -->|Modify| D
     F -->|Approve| G{QA reviews testing coverage}
     G -->|Modify| D
@@ -751,7 +748,6 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Sets **Version**, **Sprint**, **Module** (if not set at creation), **Priority** for issues
 - Sets **Start Date** and **End Date** on Epics, and verifies **Complexity** and **Estimate** are filled by the Epic Owner, before Epics move past Planning (required per §3.2)
 - Decides release scope — accepts or defers known bugs
-- Reviews all sub-issues proposed by `/epic-breakdown` skill
 - Reassigns reopened issues if the original assignee is unavailable
 - Approves release readiness (with QA sign-off)
 - Can close any issue type as "not planned"
@@ -760,7 +756,6 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 
 - Writes user stories and use cases for Epics
 - Defines acceptance criteria
-- Approves Epic breakdowns (business scope)
 - Validates that delivered features match requirements
 
 ### Epic Owner
