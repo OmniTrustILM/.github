@@ -1,0 +1,21 @@
+# OmniTrustILM org-default Trivy policy.
+#
+# This is the single source of truth for the container vulnerability gate used
+# by the reusable Docker workflows (containers-test.yml and
+# containers-build-and-push.yml). It is copied into the workspace at scan time
+# by resolve.sh unless a repo has explicitly opted into a full override via the
+# `allow-trivy-config-override` workflow input.
+#
+# Gates the build on CRITICAL and HIGH OS/library vulnerabilities and on leaked
+# secrets. Keep changes here deliberate — every org repo inherits them.
+format: table
+exit-code: 1
+severity:
+  - CRITICAL
+  - HIGH
+vulnerability:
+  type:
+    - os
+    - library
+ignore-unfixed: false
+scanners: "vuln,secret"

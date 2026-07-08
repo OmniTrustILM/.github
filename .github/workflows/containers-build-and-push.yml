@@ -61,10 +61,15 @@ on:
         type: string
         default: '21'
       trivy-config:
-        description: "Path to trivy config file (relative to repo root)"
+        description: "Path to a repo-local Trivy config that fully replaces the org default. Used ONLY when allow-trivy-config-override is true."
         required: false
         type: string
         default: config/trivy.yaml
+      allow-trivy-config-override:
+        description: "Allow this repo to fully replace the org-default Trivy policy with its own file at trivy-config. Default false = org policy enforced."
+        required: false
+        type: boolean
+        default: false
       tag-rules:
         description: |
           Multiline tag rules passed to docker/metadata-action. Default emits:
@@ -200,6 +205,16 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      # Resolve first so TRIVY_IGNOREFILE (set for the org-default gate) also
+      # governs the informational report below — the report must reflect what
+      # the gate enforces.
+      - name: Resolve Trivy config
+        id: trivy-config
+        uses: OmniTrustILM/.github/.github/actions/resolve-trivy-config@main
+        with:
+          allow-trivy-config-override: ${{ inputs.allow-trivy-config-override }}
+          trivy-config-path: ${{ inputs.trivy-config }}
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         env:
@@ -209,6 +224,7 @@ jobs:
           image-ref: ${{ inputs.registry }}/${{ inputs.image }}@${{ steps.build.outputs.digest }}
           format: json
           output: trivy-report-${{ matrix.arch }}.json
+          scanners: "vuln,secret"
           exit-code: 0
 
       - name: Upload vulnerability report
@@ -224,7 +240,7 @@ jobs:
           TRIVY_PLATFORM: ${{ matrix.platform }}
         with:
           image-ref: ${{ inputs.registry }}/${{ inputs.image }}@${{ steps.build.outputs.digest }}
-          trivy-config: ${{ inputs.trivy-config }}
+          trivy-config: ${{ steps.trivy-config.outputs.config-file }}
           skip-setup-trivy: true
 
   publish_manifest:

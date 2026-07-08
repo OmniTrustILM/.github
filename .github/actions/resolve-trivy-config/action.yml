@@ -1,0 +1,38 @@
+name: Resolve Trivy config
+description: >-
+  Decide which Trivy config the vulnerability gate should use: the bundled
+  OmniTrustILM org-default policy, or (only when explicitly permitted) a
+  repo-local override file. Outputs the workspace-relative path to the chosen
+  config so the caller's Trivy step can consume it.
+
+inputs:
+  allow-trivy-config-override:
+    description: >-
+      Allow the calling repo to fully replace the org-default Trivy policy with
+      its own file at `trivy-config-path`. Default 'false' = org policy
+      enforced.
+    required: false
+    default: 'false'
+  trivy-config-path:
+    description: >-
+      Caller-relative path to the override config file. Consulted only when
+      `allow-trivy-config-override` is 'true'.
+    required: false
+    default: config/trivy.yaml
+
+outputs:
+  config-file:
+    description: Workspace-relative path to the resolved Trivy config file.
+    value: ${{ steps.resolve.outputs.config-file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Trivy config
+      id: resolve
+      shell: bash
+      env:
+        INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE: ${{ inputs.allow-trivy-config-override }}
+        INPUT_TRIVY_CONFIG_PATH: ${{ inputs.trivy-config-path }}
+        DEFAULT_CONFIG_SRC: ${{ github.action_path }}/trivy.yaml
+      run: bash "$GITHUB_ACTION_PATH/resolve.sh"
