@@ -385,7 +385,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
-| **Estimate** | Number | Mandays | Time estimate including buffer for review. For Epics: overall delivery estimate owned by the Epic Owner (not sum of children). For sub-issues: developer's estimate, coordinated by the Epic Owner. | Developer; Epic Owner for Epics |
+| **Estimate** | Number | Mandays | Time estimate including buffer for review. For sub-issues: estimated individually by the Epic Owner, the assigned developer, or QA. For Epics: the **sum of the sub-issue estimates** — the Epic Owner is responsible for it. | Epic Owner / assigned developer / QA for sub-issues; Epic Owner for the Epic total |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -462,7 +462,7 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 
 ### 3.5 Complexity and Estimate Suggestions
 
-Complexity is auto-set by the Epic breakdown skill. Estimate suggestions include buffer for review process. Developer overrides are always the final value.
+Complexity is auto-set by the Epic breakdown skill. Estimate suggestions include buffer for review process. The human estimate (by the Epic Owner, the assigned developer, or QA) always overrides the suggestion.
 
 | Complexity | Heuristic | Suggested Estimate |
 |---|---|---|
@@ -763,7 +763,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - The Epic's **Assignee** — one per Epic, typically the developer who led the Epic's analysis
 - Drives the Epic **breakdown** (§2.6): refines the analysis, invokes `/epic-breakdown`, creates the approved sub-issues
 - Distributes the Epic's work among developers and QA
-- Owns the Epic's **estimates**: coordinates sub-issue estimates with the implementing developers and sets the Epic-level Estimate
+- Owns the Epic's **estimates**: sub-issues are estimated individually (by the Epic Owner, the assigned developer, or QA); the Epic's Estimate is the **sum of the sub-issue estimates**
 - Accountable for the Epic meeting its **delivery deadline** within the release; escalates at-risk work to the Tech Lead early
 - Plans the Epic demo and handover to QA when development completes (defined in the Release Management process document)
 
@@ -771,7 +771,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 
 - Self-assigns Open issues — single assignee = primary developer responsible
 - Writes code, opens PRs, links PRs to issues
-- Sets Estimate on assigned issues (for Epic sub-issues, in coordination with the Epic Owner)
+- Sets Estimate on assigned issues (sub-issue estimates may also come from the Epic Owner or QA)
 - May perform technical analysis on assigned issues (root cause, impact assessment, correct repo identification) and move from Analysis → Open when analysis is complete
 - Reviews Epic breakdowns for technical accuracy (correct repos, complexity, dependencies)
 - Addresses code review feedback
