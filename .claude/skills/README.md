@@ -11,11 +11,14 @@ methodics — the single source of truth) and operate across all org repos.
 | [`create-issue`](create-issue/) | Turn a natural-language description into a well-formed Bug / Feature / Task / Documentation / QA issue, set its project fields, and add it to Project #5. | Creates one issue (on confirm). |
 | [`project-triage`](project-triage/) | Health report on Project #5 — required-field gaps, staleness, consistency violations — with optional per-finding auto-fixes. | Read-only by default; fixes only on per-finding confirmation. |
 | [`epic-breakdown`](epic-breakdown/) | Turn a requirement into a planned Epic + sub-issues, enrich an existing Epic, or reconcile an Epic against current progress. The ILM architect "buddy". | Creates/links sub-issues and sets fields only on confirm. |
+| [`connector-v3-design`](connector-v3-design/) | Knowledge/guardrail skill: keeps connector design, implementation, and reviews on the **stateless Authority Provider v3** contract (no database, 202+meta, Core-driven polling) instead of the v2 patterns models drift into. Code-verified against go-sdk, dlm-connector, otpki-connector and the AP v3 spec. | Read-only knowledge; mutates nothing. |
 
 ## Shared conventions
 
-All three skills follow the same house style — read one `SKILL.md` and you know
-the shape of the others:
+The three workflow skills follow the same house style — read one `SKILL.md`
+and you know the shape of the others (`connector-v3-design` is a different
+category: a read-only knowledge skill with no scripts, no cache, and no
+confirm gates — the conventions below apply to the workflow skills):
 
 - **`SKILL.md` is orchestration prose only.** Every deterministic `gh` / GraphQL /
   parsing step lives in a reviewed script (`fetch.sh`, `*.sh`, `*.py`, `*.graphql`).

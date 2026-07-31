@@ -1,0 +1,49 @@
+{
+  "skill_name": "connector-v3-design",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "fresh-design-invites-state",
+      "prompt": "We need an OmniTrust ILM connector for the GlobalSign Atlas REST API \u2014 authority provider (issue, renew, revoke, CRL, CA chain) plus certificate discovery. Sketch the design for the team: overall architecture, how each operation maps to Atlas calls, and what state the connector needs to keep and where.",
+      "expected_output": "A design sketch that targets Authority Provider v3: stateless (explicitly no database \u2014 the 'what state' bait answered with 'none, plus in-memory discovery store'), issue returning 200 or 202+meta, Core-driven status polling, credentials as resource-secret attributes per request, CRL/chain derived without meta, citing the spec yaml / go-sdk / reference connectors.",
+      "files": [],
+      "assertions": [
+        "States the connector keeps NO persistent state (no database/tables/files); at most in-memory discovery store + optional client cache",
+        "Async issue modeled as 202 + meta tracking handle with Core-driven status polling (no connector-side poll loop or timeout attribute)",
+        "Credentials modeled as per-request attributes (resource/Secret reference), never persisted by the connector",
+        "Contains NO v2-isms: no authority_instance/persist-on-create, no dedup/inflight store, no poll_timeout attribute",
+        "Cites at least one authoritative source: go-sdk, dlm-connector, otpki-connector, or authority-provider-v3.yaml",
+        "Discovery results held in memory keyed by a discovery uuid with restart-loss accepted (no discovery tables)"
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "review-v2-shaped-draft",
+      "prompt": "Review this connector design excerpt before I send it to the team:\n\n---\n## NetGuard CA connector \u2014 design draft\nPersistence: PostgreSQL 14 (Flyway). Tables: authority_instance (uuid, base_url, api_key_secret_ref, poll_timeout_hours), inflight_request (request_hash, order_ref, state) for deduplicating Core re-drives, discovery_run + discovered_certificate for scan results.\ncreateAuthorityInstance: probe GET /health, then persist the authority row (409 if exists).\nissueCertificate: POST /requests, then poll GET /requests/{id} every 30s until issued or poll_timeout_hours elapses; download and return the certificate.\ngetCrl: NetGuard has no CRL download endpoint, so return crlData: null and surface the CDP URL as certificate metadata for later calls to use.\n---\nAnything wrong with it?",
+      "expected_output": "A review that identifies every v2-ism as incompatible with Authority Provider v3: the entire persistence layer (all four tables), authority CRUD/persist-on-create, the dedup table (replaced by the exactly-once + non-retryable-after-mutation contract), the connector-side 30s/timeout poll loop (v3 = 202+meta, Core polls status, one read per call), and getCrl returning null (spec-invalid \u2014 live fetch or 501; also meta cannot reach authority-level ops).",
+      "files": [],
+      "assertions": [
+        "Flags the entire persistence layer (authority_instance, inflight_request, discovery_run/discovered_certificate) as incompatible with v3 statelessness",
+        "Flags the inflight_request dedup table and names the v3 alternative (mutating calls exactly-once, non-retryable after mutation, Core owns re-drives)",
+        "Flags the 30s/poll_timeout_hours connector-side loop and names the v3 shape (202 + meta handle, Core polls status, one upstream read per call)",
+        "Flags getCrl returning null as invalid (CRL response field required \u2014 live fetch or 501 OPERATION_NOT_SUPPORTED)",
+        "Flags persist-on-create/createAuthorityInstance (v3 has only a stateless connection check, nothing persisted)",
+        "Notes certificate metadata cannot feed authority-level operations (crl/caCertificates requests carry no meta)"
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "async-issue-implementation",
+      "prompt": "starting the Go implementation of an ILM connector for Sectigo. their enrollment API is async \u2014 you submit a CSR and the cert shows up minutes later after their backend validates. how should issueCertificate work? rough code structure is fine",
+      "expected_output": "Issue returns (resp, accepted=true) \u2192 202 with plain-string meta carrying the Sectigo request id; IssueStatus reads the handle from req.Meta, rebuilds the client from authorityAttributes, does exactly one upstream read per Core call and maps states (progress message from backend state); no sleep/loop/timeout in the connector; mutating submit runs exactly once with non-retryable-after-mutation error classification; references go-sdk authority/v3 Provider and the otpki-connector as the async template.",
+      "files": [],
+      "assertions": [
+        "Issue returns accepted=true / 202 with a meta tracking handle (e.g. request id) instead of blocking until the cert exists",
+        "IssueStatus reads the handle from req.Meta and performs exactly one upstream read per Core call",
+        "No sleep/loop/polling timer anywhere in the proposed connector code",
+        "Mentions mutating submit runs exactly once / errors after submission marked non-retryable",
+        "References the go-sdk authority/v3 Provider contract or otpki-connector as the async template"
+      ]
+    }
+  ]
+}
