@@ -13,12 +13,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_TAG="enrich"
 # shellcheck source-path=SCRIPTDIR source=_common.sh
 . "$SKILL_DIR/_common.sh"
-PYTHON="$(command -v python3 || command -v python || true)"
-[ -n "$PYTHON" ] || fail "python not found on PATH"
-# Issue bodies are UTF-8. Without this, Python's stdio defaults to the console
-# encoding (cp1252 on Windows) and every non-ASCII character in the merged body
-# is written as U+FFFD — silently corrupting em dashes, arrows and quotes.
-export PYTHONIOENCODING=utf-8
+resolve_python
 
 START_MARKER="<!-- epic-breakdown:enriched -->"
 END_MARKER="<!-- /epic-breakdown:enriched -->"
@@ -29,7 +24,8 @@ END_MARKER="<!-- /epic-breakdown:enriched -->"
 merge_body() {
   START="$START_MARKER" END="$END_MARKER" "$PYTHON" - "$1" "$2" <<'PY'
 import os, sys
-sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stdout, "reconfigure"):  # 3.7+; PYTHONIOENCODING covers 3.6
+    sys.stdout.reconfigure(encoding="utf-8")
 old = open(sys.argv[1], encoding="utf-8").read()
 enriched = open(sys.argv[2], encoding="utf-8").read().strip()
 start, end = os.environ["START"], os.environ["END"]

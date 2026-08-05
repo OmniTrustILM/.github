@@ -12,6 +12,20 @@ ORG="OmniTrustILM"
 log()  { echo "[${SCRIPT_TAG:-epic-breakdown}] $*" >&2; }
 fail() { echo "error: $*" >&2; exit 1; }
 
+# Resolve a Python 3 interpreter into $PYTHON and force UTF-8 stdio.
+# `python` on PATH can still be Python 2, where the embedded snippets fail with
+# confusing errors (`open(..., encoding=)`, f-strings), so the version is
+# verified rather than assumed. UTF-8 stdio is mandatory: without it Python
+# writes issue bodies in the console encoding (cp1252 on Windows) and every
+# non-ASCII character becomes U+FFFD.
+resolve_python() {
+  PYTHON="$(command -v python3 || command -v python || true)"
+  [ -n "$PYTHON" ] || fail "python3 not found on PATH"
+  "$PYTHON" -c 'import sys; sys.exit(0 if sys.version_info[0] >= 3 else 1)' 2>/dev/null \
+    || fail "python3 required, but $PYTHON is Python 2 — install python3 or put it first on PATH"
+  export PYTHONIOENCODING=utf-8
+}
+
 # Extract one named GraphQL operation (mutation or query) from $GRAPHQL_DOC.
 # The operation's closing brace is the only line that is exactly "}" at col 0.
 # Fails loudly if the operation is not found, so a typo/stale file can't send an
