@@ -42,10 +42,9 @@ concrete signal (a Module, a repo, an existing issue, a decision rule).
   audience seam exists (e.g. connector-facing contract vs core-web API in
   `interfaces`); merge sequential half-day migrations in one repo instead of
   filing them separately.
-- When an Epic's implementation is **agent-executed**, the Estimate field means
-  review + verification + supervision effort, not build effort → keep the human
-  baseline in the issue body so the board's velocity signal stays interpretable
-  (decided for ilm#267, 2026-08-05).
+- Estimate basis (agent-executed by default, per-child compression factors, Epic
+  `Estimate Basis` section, no estimates in child bodies) is specified in
+  **§3.5** — follow the methodics, do not re-derive it here.
 
 ## Content hygiene
 
