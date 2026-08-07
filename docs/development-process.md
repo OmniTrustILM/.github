@@ -342,7 +342,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
    - Smoke tests pass on integrated build
    - Regression test suite passes
    - Lead QA confirms: all critical bugs are fixed
-   - PM reviews known open bugs (if any) and decides to accept or defer
+   - PO reviews known open bugs (if any) and decides to accept or defer — after consultation with the Tech Lead (impact assessment); QA provides the quality assessment against the exit criteria
 6. PM moves Release to Done
 7. GitHub Releases published on repos → automation stamps Version on un-tagged Done issues
 
@@ -350,7 +350,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
 If a release has known open bugs that are accepted (not blocking release):
 - PM documents them in the Release issue's "Known Issues" section with links and rationale
 - Each known bug is reparented from the current Release to the next Release issue (or made standalone if no next Release exists yet), and its Version field is updated to the next release
-- The decision to ship with known issues is made by PM with QA input, documented on the Release issue
+- The decision to ship with known issues is made by the **PO** after consultation with the Tech Lead, with QA's assessment against the exit criteria (QA evaluates quality — it does not give the go/no-go); the PM documents it on the Release issue
 - This avoids triggering the "Version mismatch" consistency rule — deferred bugs always match their parent Release's Version
 
 ---
@@ -747,7 +747,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Triages backlog: moves issues through Planning → Analysis → Open
 - Sets **Version**, **Sprint**, **Module** (if not set at creation), **Priority** for issues
 - Sets **Start Date** and **End Date** on Epics, and verifies **Complexity** and **Estimate** are filled by the Epic Owner, before Epics move past Planning (required per §3.2)
-- Decides release scope — accepts or defers known bugs
+- Decides release scope; documents known-bug decisions on the Release issue (the accept/defer decision itself is the PO's — see Product Owner)
 - Reassigns reopened issues if the original assignee is unavailable
 - Approves release readiness (with QA sign-off)
 - Can close any issue type as "not planned"
@@ -757,6 +757,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Writes user stories and use cases for Epics
 - Defines acceptance criteria
 - Validates that delivered features match requirements
+- Decides whether an Epic or a release ships with known open bugs — accept (close) or defer to the next release — after consultation with the Tech Lead, with QA's assessment against the exit criteria
 
 ### Epic Owner
 
