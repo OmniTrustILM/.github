@@ -1,7 +1,7 @@
 # ILM Development Management Methodics
 
-**Version:** 1.0
-**Date:** 2026-04-15
+**Version:** 1.1
+**Date:** 2026-07-03
 **Organization:** OmniTrustILM (https://github.com/OmniTrustILM)
 **Project:** https://github.com/orgs/OmniTrustILM/projects/5
 
@@ -24,7 +24,7 @@ You've opened this doc. Jump to the section for your role:
 
 ### PM / Tech Lead
 1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Priority/Version/Module/Sprint during planning.
-2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date before moving past Planning.
+2. Assign Module and Version during planning (see Section 3 for options). Epic: set Start Date/End Date and verify the Epic Owner has Complexity/Estimate set before moving past Planning.
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
 ### QA
@@ -175,7 +175,7 @@ stateDiagram-v2
 | **Task** (non-code) | Planning → Open → In Progress → Done | No Review/Testing needed |
 | **Task** (code / QA) | Planning → Open → In Progress → Review → Testing → Done | Fuller lifecycle; QA-labeled Tasks follow this path |
 | **Task** (documentation) | Planning → Open → In Progress → Done | No Review/Testing unless docs require PR review |
-| **Epic** | Planning → Open → In Progress → Done | Breakdown happens **during Planning** (see §2.6): PM writes/refines User Story and Use Cases, enriches Acceptance Criteria and Technical Analysis (via `/epic-breakdown`), creates sub-issues. PM moves to Open when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2 before leaving Planning). PM moves to In Progress when the first child starts development. Done when all children complete. All transitions manual. |
+| **Epic** | Planning → Open → In Progress → Done | Breakdown happens **during Planning** (see §2.6): the **Epic Owner** (the Epic's Assignee, see §10) refines User Story and Use Cases, enriches Acceptance Criteria and Technical Analysis (via `/epic-breakdown`), creates sub-issues, and owns the estimates. PM moves to Open when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2 before leaving Planning). PM moves to In Progress when the first child starts development. Done when all children complete. All transitions manual. |
 | **Release** | Planning → In Progress → Done | PM sets **Start Date** and **End Date** before moving past Planning (required by §3.2). PM moves to In Progress when development begins. PM moves to Done after QA sign-off (see Section 2.9). All transitions manual. |
 
 **These are conventions, not hard enforcement.** The full pipeline is available for all types. For Tasks specifically: if a PR is linked, automation moves the Task through Review and Testing naturally. If no PR is involved (documentation, configuration via UI), the developer moves it directly to Done after completion.
@@ -252,26 +252,23 @@ Once code review is approved, QA tests the PR branch before it is merged:
 
 > **Status:** the `/epic-breakdown` skill described below is **available** (`.claude/skills/epic-breakdown/`). It runs the three-phase flow below and adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). The manual exercise — PM/Tech Lead writes Acceptance Criteria, Technical Analysis, Impact Assessment, and creates sub-issues by hand — remains valid when the skill is not deployed.
 
-Three-phase process with PM and QA review:
+Three-phase process with Tech Lead and QA review:
 
 **Phase 1 — Human writes the Epic:** PM, Tech Lead, or Product Owner creates Epic via template. Fills in User Story, Use Cases, Constraints, Out of Scope, Testing Scope.
 
-**Phase 2 — AI skill proposes breakdown:** `/epic-breakdown` reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, suggested Estimate (with review buffer), blocked-by relationships, suggested assignee.
+**Phase 2 — Epic Owner drives the breakdown (AI-assisted):** the **Epic Owner** invokes `/epic-breakdown`, which reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, suggested Estimate (with review buffer), blocked-by relationships, suggested assignee.
 
-**Phase 3 — Review and approval (collaborative):**
-1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
-2. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
-3. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
-4. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
+**Phase 3 — Review and approval:**
+1. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
+2. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
+3. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
 
 ```mermaid
 flowchart TB
     A[PM/PO writes Epic using template] --> B[Invoke /epic-breakdown skill]
     B --> C[Skill reads Epic + explores repos]
     C --> D[Enriches Epic + proposes sub-issues]
-    D --> E{PM/PO reviews business scope}
-    E -->|Modify| D
-    E -->|Approve| F{Tech Lead / Developer reviews technical accuracy}
+    D --> F{Tech Lead / Developer reviews technical accuracy}
     F -->|Modify| D
     F -->|Approve| G{QA reviews testing coverage}
     G -->|Modify| D
@@ -345,7 +342,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
    - Smoke tests pass on integrated build
    - Regression test suite passes
    - Lead QA confirms: all critical bugs are fixed
-   - PM reviews known open bugs (if any) and decides to accept or defer
+   - PO reviews known open bugs (if any) and decides to accept or defer — after consultation with the Tech Lead (impact assessment); QA provides the quality assessment against the exit criteria
 6. PM moves Release to Done
 7. GitHub Releases published on repos → automation stamps Version on un-tagged Done issues
 
@@ -353,7 +350,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
 If a release has known open bugs that are accepted (not blocking release):
 - PM documents them in the Release issue's "Known Issues" section with links and rationale
 - Each known bug is reparented from the current Release to the next Release issue (or made standalone if no next Release exists yet), and its Version field is updated to the next release
-- The decision to ship with known issues is made by PM with QA input, documented on the Release issue
+- The decision to ship with known issues is made by the **PO** after consultation with the Tech Lead, with QA's assessment against the exit criteria (QA evaluates quality — it does not give the go/no-go); the PM documents it on the Release issue
 - This avoids triggering the "Version mismatch" consistency rule — deferred bugs always match their parent Release's Version
 
 ---
@@ -367,7 +364,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | Field | Type | Description |
 |---|---|---|
 | **Title** | Text | Issue title — see naming conventions in Section 10 |
-| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: delivery owner. |
+| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: the **Epic Owner** (delivery owner, see §10). |
 | **Status** | Single-select | Workflow stage: Planning, Analysis, Open, In Progress, Review, Testing, Done |
 | **Labels** | Labels | Cross-cutting concerns and release notes categorization (see Section 4) |
 | **Linked PRs** | Pull requests | PRs linked to the issue — triggers status automation |
@@ -388,7 +385,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
-| **Estimate** | Number | Mandays | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate. | Developer; PM for Epics |
+| **Estimate** | Number | Mandays | Time estimate including buffer for review. For sub-issues: estimated individually by the Epic Owner, the assigned developer, or QA. For Epics: the **sum of the sub-issue estimates** — the Epic Owner is responsible for it. | Epic Owner / assigned developer / QA for sub-issues; Epic Owner for the Epic total |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -465,7 +462,7 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 
 ### 3.5 Complexity and Estimate Suggestions
 
-Complexity is auto-set by the Epic breakdown skill. Estimate suggestions include buffer for review process. Developer overrides are always the final value.
+Complexity is auto-set by the Epic breakdown skill. Estimate suggestions include buffer for review process. The human estimate (by the Epic Owner, the assigned developer, or QA) always overrides the suggestion.
 
 | Complexity | Heuristic | Suggested Estimate |
 |---|---|---|
@@ -749,9 +746,8 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Creates Releases and Epics
 - Triages backlog: moves issues through Planning → Analysis → Open
 - Sets **Version**, **Sprint**, **Module** (if not set at creation), **Priority** for issues
-- Sets **Complexity**, **Estimate**, **Start Date**, **End Date** on Epics before they move past Planning (required per §3.2)
-- Decides release scope — accepts or defers known bugs
-- Reviews all sub-issues proposed by `/epic-breakdown` skill
+- Sets **Start Date** and **End Date** on Epics, and verifies **Complexity** and **Estimate** are filled by the Epic Owner, before Epics move past Planning (required per §3.2)
+- Decides release scope; documents known-bug decisions on the Release issue (the accept/defer decision itself is the PO's — see Product Owner)
 - Reassigns reopened issues if the original assignee is unavailable
 - Approves release readiness (with QA sign-off)
 - Can close any issue type as "not planned"
@@ -760,14 +756,23 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 
 - Writes user stories and use cases for Epics
 - Defines acceptance criteria
-- Approves Epic breakdowns (business scope)
 - Validates that delivered features match requirements
+- Decides whether an Epic or a release ships with known open bugs — accept (close) or defer to the next release — after consultation with the Tech Lead, with QA's assessment against the exit criteria
+
+### Epic Owner
+
+- The Epic's **Assignee** — one per Epic, typically the developer who led the Epic's analysis
+- Drives the Epic **breakdown** (§2.6): refines the analysis, invokes `/epic-breakdown`, creates the approved sub-issues
+- Distributes the Epic's work among developers and QA
+- Owns the Epic's **estimates**: sub-issues are estimated individually (by the Epic Owner, the assigned developer, or QA); the Epic's Estimate is the **sum of the sub-issue estimates**
+- Accountable for the Epic meeting its **delivery deadline** within the release; escalates at-risk work to the Tech Lead early
+- Plans the Epic demo and handover to QA when development completes (defined in the Release Management process document)
 
 ### Developer (Assignee)
 
 - Self-assigns Open issues — single assignee = primary developer responsible
 - Writes code, opens PRs, links PRs to issues
-- Sets Estimate field
+- Sets Estimate on assigned issues (sub-issue estimates may also come from the Epic Owner or QA)
 - May perform technical analysis on assigned issues (root cause, impact assessment, correct repo identification) and move from Analysis → Open when analysis is complete
 - Reviews Epic breakdowns for technical accuracy (correct repos, complexity, dependencies)
 - Addresses code review feedback
