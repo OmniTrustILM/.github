@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Rewrite an Epic's body with the skill-enriched sections (Acceptance Criteria,
-# Technical Analysis, Impact Assessment, enriched Testing Scope). The enriched
+# Technical Analysis, Impact Assessment, enriched Testing Scope, Estimate Basis).
+# The enriched
 # block is delimited by HTML-comment markers so the human-authored sections
 # survive and re-runs (reconcile) replace — not duplicate — the block.
 #

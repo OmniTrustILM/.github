@@ -15,8 +15,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CACHE_DIR="$SKILL_DIR/cache"
 TMP_DIR="$SKILL_DIR/cache.tmp"
 
-# ORG, log, fail and resolve_python all come from _common.sh. Keeping local
-# copies here is what let this script drift out of step with the shared helper.
+# ORG, log, fail and resolve_python come from _common.sh.
 SCRIPT_TAG="fetch"
 # shellcheck source-path=SCRIPTDIR source=_common.sh
 . "$SKILL_DIR/_common.sh"

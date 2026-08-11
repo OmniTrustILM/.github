@@ -50,5 +50,5 @@ concrete signal (a Module, a repo, an existing issue, a decision rule).
 
 - Keep GitHub-bound bodies **ASCII-safe** (`-` not `—`, `->` not `→`). Even with
   `enrich-epic.sh` exporting `PYTHONIOENCODING=utf-8`, any other tool piping a
-  body through a cp1252 stdio on Windows silently writes `U+FFFD`; ilm#267 and
-  ilm#111 had to be rewritten for this on 2026-08-05.
+  body through a cp1252 stdio on Windows silently writes `U+FFFD`, and a body
+  already corrupted that way has to be rewritten by hand.
