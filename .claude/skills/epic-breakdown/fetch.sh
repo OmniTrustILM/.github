@@ -14,10 +14,11 @@ set -euo pipefail
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CACHE_DIR="$SKILL_DIR/cache"
 TMP_DIR="$SKILL_DIR/cache.tmp"
-ORG="OmniTrustILM"
 
-log()  { echo "[fetch] $*" >&2; }
-fail() { echo "error: $*" >&2; exit 1; }
+# ORG, log, fail and resolve_python come from _common.sh.
+SCRIPT_TAG="fetch"
+# shellcheck source-path=SCRIPTDIR source=_common.sh
+. "$SKILL_DIR/_common.sh"
 
 # --- Auth + scope check ---
 gh auth status >/dev/null 2>&1 || fail "gh not authenticated. Run: gh auth login"
@@ -42,9 +43,8 @@ else
 fi
 
 command -v jq >/dev/null 2>&1 || fail "jq not found on PATH"
-# python3 preferred; PyYAML (not stdlib) is required to parse templates + labels.
-PYTHON="$(command -v python3 || command -v python || true)"
-[ -n "$PYTHON" ] || fail "python3 (or python) not found on PATH"
+# PyYAML (not stdlib) is required to parse templates + labels.
+resolve_python
 "$PYTHON" -c 'import yaml' >/dev/null 2>&1 || fail "Python PyYAML is required to parse templates/labels. Run: $PYTHON -m pip install pyyaml"
 
 # --- Prepare tmp dir (cleaned on any exit so an aborted run leaves no cache.tmp/) ---

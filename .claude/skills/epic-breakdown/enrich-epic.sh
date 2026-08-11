@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Rewrite an Epic's body with the skill-enriched sections (Acceptance Criteria,
-# Technical Analysis, Impact Assessment, enriched Testing Scope). The enriched
+# Technical Analysis, Impact Assessment, enriched Testing Scope, Estimate Basis).
+# The enriched
 # block is delimited by HTML-comment markers so the human-authored sections
 # survive and re-runs (reconcile) replace — not duplicate — the block.
 #
@@ -13,8 +14,7 @@ SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_TAG="enrich"
 # shellcheck source-path=SCRIPTDIR source=_common.sh
 . "$SKILL_DIR/_common.sh"
-PYTHON="$(command -v python3 || command -v python || true)"
-[ -n "$PYTHON" ] || fail "python not found on PATH"
+resolve_python
 
 START_MARKER="<!-- epic-breakdown:enriched -->"
 END_MARKER="<!-- /epic-breakdown:enriched -->"
@@ -25,6 +25,8 @@ END_MARKER="<!-- /epic-breakdown:enriched -->"
 merge_body() {
   START="$START_MARKER" END="$END_MARKER" "$PYTHON" - "$1" "$2" <<'PY'
 import os, sys
+if hasattr(sys.stdout, "reconfigure"):  # 3.7+; PYTHONIOENCODING covers 3.6
+    sys.stdout.reconfigure(encoding="utf-8")
 old = open(sys.argv[1], encoding="utf-8").read()
 enriched = open(sys.argv[2], encoding="utf-8").read().strip()
 start, end = os.environ["START"], os.environ["END"]

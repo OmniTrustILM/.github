@@ -388,7 +388,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
-| **Estimate** | Number | Mandays | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate. | Developer; PM for Epics |
+| **Estimate** | Number | Mandays | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate. Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -467,11 +467,48 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 
 Complexity is auto-set by the Epic breakdown skill. Estimate suggestions include buffer for review process. Developer overrides are always the final value.
 
-| Complexity | Heuristic | Suggested Estimate |
+| Complexity | Heuristic | Suggested Estimate (developer-built) |
 |---|---|---|
 | **Low** | 1 repo, no API/DB changes, good tests | 1-2 mandays |
 | **Medium** | 2-3 repos, or API change, or migration | 3-5 mandays |
 | **High** | 4+ repos, breaking changes, or no tests | 5-10 mandays |
+
+#### Estimate basis — agent-executed by default
+
+**Default: agent-executed.** Implementation plans are executed by an AI agent
+task-by-task with the team reviewing, so Estimate carries the human effort that
+remains — review, verification, supervision. The Complexity table above is the
+**developer-built** scale; it stays the baseline reference from which
+agent-executed numbers are derived.
+
+An Epic may **declare developer-built** when a developer will build the change
+by hand; then the field means developer mandays including review buffer and the
+table applies directly.
+
+**The Epic's enriched body carries an `Estimate Basis` section** stating the
+basis and both aggregates (agent-executed total and developer baseline).
+Children inherit that basis and **do not repeat estimates in their bodies** —
+the Estimate field is the single source per child, and a developer's override of
+it is always final (§3.1). A child reassigned to hand-building is simply
+re-estimated by that developer.
+
+**What compresses under agent execution** — not uniform, so estimate per child
+rather than applying a blanket factor:
+
+| Work type | Compression |
+|---|---|
+| Templated scaffolding (DTOs, enums, controllers), mirroring an existing in-repo precedent, migrations, docs pages, test scaffolding | 5-10x |
+| Logic with correctness risk where the plan already specifies the test cases (extractions, ingestors, state machines) | ~2x |
+| Human PR review, CI/Sonar cycles, integration verification on a dev stack, cross-repo release mechanics, domain validation against real systems, environment work | none |
+
+Because the incompressible share is mostly **review**, an agent-executed Epic's
+constraint is reviewer availability rather than build capacity — and cross-repo
+dependency chains serialize that review. Observed on the first agent-executed
+Epic (ilm#267): agent basis ≈ 35-40 % of the developer baseline.
+
+**Epic rounding.** The Epic Estimate stays the overall delivery estimate, not
+the child sum (§3.1) — round the child sum up for coordination buffer (ilm#267:
+18.5 → 20; ilm#111: 4.0 → 5).
 
 ---
 

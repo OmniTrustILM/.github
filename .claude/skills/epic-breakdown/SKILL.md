@@ -166,13 +166,18 @@ and stop unless confirmed.
 2. **Explore** the affected repos and existing issues; apply relevant
    `lessons.md` entries.
 3. **Generate enrichment** for the Epic body: Acceptance Criteria, Technical
-   Analysis, Impact Assessment, enriched Testing Scope.
+   Analysis, Impact Assessment, enriched Testing Scope, and **Estimate Basis**
+   (§3.5 — the basis plus both aggregates: agent-executed total and developer
+   baseline).
 4. **Decompose by work stream** — API, Backend, Frontend, Access Control,
    Testing, Documentation, Deployment (§2.6). For each child: type
    (Feature/Task/Bug — **never a sub-Feature under a Feature**, §1), target repo,
    §9-conformant title, description, acceptance criteria **including the Sonar +
-   ≥80% coverage quality gate**, Module, Complexity, a *suggested* Estimate (with
-   review buffer per §3.5), blocked-by dependencies, and a suggested assignee.
+   ≥80% coverage quality gate**, Module, Complexity, a *suggested* Estimate
+   (agent-executed basis per §3.5 by default — derive it from the developer-built
+   Complexity scale; use the developer-built basis only when the Epic declares
+   it, and **never repeat estimates inside a child body**), blocked-by
+   dependencies, and a suggested assignee.
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing
