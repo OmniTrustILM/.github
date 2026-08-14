@@ -46,6 +46,10 @@ e.g. `/create-issue`, `/project-triage`, `/epic-breakdown`, `/pr-hygiene`. `crea
 `.git/config`; `project-triage` reads its rules from the local
 `config/project-triage-rules.yml` when run inside a `.github` checkout.
 
+`pr-hygiene` is the exception: it reads the diff of the repo it is run in, so
+deploy it (below) and invoke it from the repo whose PR you are reviewing.
+Running it from a `.github` checkout only ever scans this repo's own diffs.
+
 ### Deploying for use from any repo
 
 The canonical, reviewed copies live here. To use the skills while working inside
