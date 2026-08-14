@@ -1,21 +1,27 @@
 # OmniTrustILM Claude Code skills
 
-Org-wide [Claude Code](https://claude.com/claude-code) skills for managing
-development on **Project #5** (https://github.com/orgs/OmniTrustILM/projects/5).
-They are the executable companions to the process defined in
+Org-wide [Claude Code](https://claude.com/claude-code) skills for OmniTrustILM
+development. Most of them manage work on **Project #5**
+(https://github.com/orgs/OmniTrustILM/projects/5) and are the executable
+companions to the process defined in
 [`docs/development-process.md`](../../docs/development-process.md) (the
-methodics — the single source of truth) and operate across all org repos.
+methodics — the single source of truth); `pr-hygiene` works on code rather than
+issues. All of them operate across all org repos.
 
 | Skill | What it does | Mutates? |
 |---|---|---|
 | [`create-issue`](create-issue/) | Turn a natural-language description into a well-formed Bug / Feature / Task / Documentation / QA issue, set its project fields, and add it to Project #5. | Creates one issue (on confirm). |
 | [`project-triage`](project-triage/) | Health report on Project #5 — required-field gaps, staleness, consistency violations — with optional per-finding auto-fixes. | Read-only by default; fixes only on per-finding confirmation. |
 | [`epic-breakdown`](epic-breakdown/) | Turn a requirement into a planned Epic + sub-issues, enrich an existing Epic, or reconcile an Epic against current progress. The ILM architect "buddy". | Creates/links sub-issues and sets fields only on confirm. |
+| [`pr-hygiene`](pr-hygiene/) | Scan a PR or branch diff for comment and log noise over the lines it adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — and propose before/after edits. | Edits the local working tree only on confirm; never commits, pushes or stages. |
 
 ## Shared conventions
 
-All three skills follow the same house style — read one `SKILL.md` and you know
-the shape of the others:
+The skills follow the same house style — read one `SKILL.md` and you know the
+shape of the others. The `cache/`, GraphQL and Project-scope conventions apply
+to the Project #5 skills only; `pr-hygiene` reads a git diff and needs none of
+them. Everything else — deterministic steps in reviewed scripts, and preview
+before any write — holds for all of them:
 
 - **`SKILL.md` is orchestration prose only.** Every deterministic `gh` / GraphQL /
   parsing step lives in a reviewed script (`fetch.sh`, `*.sh`, `*.py`, `*.graphql`).
@@ -40,6 +46,12 @@ e.g. `/create-issue`, `/project-triage`, `/epic-breakdown`. `create-issue` and
 `epic-breakdown` auto-detect the target repo from the current clone's
 `.git/config`; `project-triage` reads its rules from the local
 `config/project-triage-rules.yml` when run inside a `.github` checkout.
+
+`pr-hygiene` is the exception and is not in that list. It scans the head of the
+PR or branch you name — not whatever happens to be checked out — and refuses to
+apply edits unless your working tree is on that same commit. It also refuses a
+PR belonging to another repository, since the diff can only come from the local
+clone. Deploy it (below) and run it from a clone of the reviewed repo.
 
 ### Deploying for use from any repo
 
