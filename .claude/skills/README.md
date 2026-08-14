@@ -21,7 +21,7 @@ The skills follow the same house style — read one `SKILL.md` and you know the
 shape of the others. The `cache/`, GraphQL and Project-scope conventions apply
 to the Project #5 skills only; `pr-hygiene` reads a git diff and needs none of
 them. Everything else — deterministic steps in reviewed scripts, and preview
-before any write — holds for all four:
+before any write — holds for all of them:
 
 - **`SKILL.md` is orchestration prose only.** Every deterministic `gh` / GraphQL /
   parsing step lives in a reviewed script (`fetch.sh`, `*.sh`, `*.py`, `*.graphql`).
