@@ -1,7 +1,7 @@
 # OmniTrustILM Claude Code skills
 
 Org-wide [Claude Code](https://claude.com/claude-code) skills for OmniTrustILM
-development. Three of them manage work on **Project #5**
+development. Most of them manage work on **Project #5**
 (https://github.com/orgs/OmniTrustILM/projects/5) and are the executable
 companions to the process defined in
 [`docs/development-process.md`](../../docs/development-process.md) (the
@@ -18,9 +18,9 @@ issues. All of them operate across all org repos.
 ## Shared conventions
 
 The skills follow the same house style — read one `SKILL.md` and you know the
-shape of the others. The `cache/`, GraphQL and scope conventions apply to the
-three Project #5 skills; `pr-hygiene` reads a git diff and needs none of them,
-but follows the same preview-then-confirm discipline:
+shape of the others. The script-backed, `cache/`, GraphQL and scope conventions
+apply to the Project #5 skills; `pr-hygiene` reads a git diff, ships no scripts
+and needs none of them, but follows the same preview-then-confirm discipline:
 
 - **`SKILL.md` is orchestration prose only.** Every deterministic `gh` / GraphQL /
   parsing step lives in a reviewed script (`fetch.sh`, `*.sh`, `*.py`, `*.graphql`).
@@ -41,14 +41,15 @@ but follows the same preview-then-confirm discipline:
 ## Using them
 
 Run Claude Code from a clone of this `.github` repo and invoke a skill by name,
-e.g. `/create-issue`, `/project-triage`, `/epic-breakdown`, `/pr-hygiene`. `create-issue` and
+e.g. `/create-issue`, `/project-triage`, `/epic-breakdown`. `create-issue` and
 `epic-breakdown` auto-detect the target repo from the current clone's
 `.git/config`; `project-triage` reads its rules from the local
 `config/project-triage-rules.yml` when run inside a `.github` checkout.
 
-`pr-hygiene` is the exception: it reads the diff of the repo it is run in, so
-deploy it (below) and invoke it from the repo whose PR you are reviewing.
-Running it from a `.github` checkout only ever scans this repo's own diffs.
+`pr-hygiene` is the exception and is not in that list: it always diffs the local
+checkout, and its target argument selects a PR only to resolve that PR's base
+branch. Deploy it (below) and run it from a clone of the PR's own repo. Run from
+a `.github` checkout it would only ever scan this repo's diffs.
 
 ### Deploying for use from any repo
 
