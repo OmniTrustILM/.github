@@ -18,9 +18,10 @@ issues. All of them operate across all org repos.
 ## Shared conventions
 
 The skills follow the same house style — read one `SKILL.md` and you know the
-shape of the others. The script-backed, `cache/`, GraphQL and scope conventions
-apply to the Project #5 skills; `pr-hygiene` reads a git diff, ships no scripts
-and needs none of them, but follows the same preview-then-confirm discipline:
+shape of the others. The `cache/`, GraphQL and Project-scope conventions apply
+to the Project #5 skills only; `pr-hygiene` reads a git diff and needs none of
+them. Everything else — deterministic steps in reviewed scripts, and preview
+before any write — holds for all four:
 
 - **`SKILL.md` is orchestration prose only.** Every deterministic `gh` / GraphQL /
   parsing step lives in a reviewed script (`fetch.sh`, `*.sh`, `*.py`, `*.graphql`).
@@ -46,10 +47,11 @@ e.g. `/create-issue`, `/project-triage`, `/epic-breakdown`. `create-issue` and
 `.git/config`; `project-triage` reads its rules from the local
 `config/project-triage-rules.yml` when run inside a `.github` checkout.
 
-`pr-hygiene` is the exception and is not in that list: it always diffs the local
-checkout, and its target argument selects a PR only to resolve that PR's base
-branch. Deploy it (below) and run it from a clone of the PR's own repo. Run from
-a `.github` checkout it would only ever scan this repo's diffs.
+`pr-hygiene` is the exception and is not in that list. It scans the head of the
+PR or branch you name — not whatever happens to be checked out — and refuses to
+apply edits unless your working tree is on that same commit. It also refuses a
+PR belonging to another repository, since the diff can only come from the local
+clone. Deploy it (below) and run it from a clone of the reviewed repo.
 
 ### Deploying for use from any repo
 
