@@ -81,6 +81,8 @@ If the range is empty, stop — in default mode say so plainly; under `--propose
 
 **Read scope and flag scope are different things.** Read the whole file freely — several checks cannot be decided otherwise: Check 3 needs the method's existing doc comment to know an added inline comment restates it, Check 5 needs the import block and types in scope to rule out a simple-name collision, Check 8 needs the adjacent annotation. But only ever **flag** lines the diff adds or modifies (the `+` hunks), and only ever **edit** those lines. A pre-existing line is never a finding and never an edit target; when the fix would land outside the diff, report the finding as advisory with no proposed edit.
 
+**Read that context from the scanned commit, never the working tree** — `git show "$diff_to":<path>`. The working tree is only required to match `head_oid` at Step 4, so during the scan it can be a different branch entirely, or not contain the file at all when the PR adds it. Deciding "does the doc comment already say this" or "is the simple name collision-free" against the wrong revision produces findings that are wrong or silently missing, while the output still looks authoritative.
+
 Be **language-aware** for comment and log syntax across the languages present in the diff (JS/TS, Java/Kotlin, Go, Python, shell, C#, SQL, YAML, etc.). Classify each added line against the checks below:
 
 | # | Category | What to flag |
@@ -107,7 +109,7 @@ Be **language-aware** for comment and log syntax across the languages present in
 - **Duplication findings (Check 8)** are always **suggest**, capped at `medium` — deciding which copy is authoritative is a judgment call, and deleting the wrong copy can strip the only surface a given reader sees (IDE hover reads Javadoc; generated clients read annotations). Propose which copy survives and why.
 - **Check 8 never edits a surface the diff did not touch** — when a PR adds an `@Operation`/`@Schema` annotation beside a doc comment that already existed, the duplicate is pre-existing and out of bounds. Report it as advisory with no proposed edit. The same applies to the Check-3 Javadoc-restatement case when the doc comment predates the diff: only the added line can be edited.
 - **Genuine WHY comments (Check 6)** — do **not** flag a comment that explains *why the current code is the way it is* (a constraint, gotcha, or non-obvious reason) — those are valuable and stay. Only flag *history / decision-event* narration (what the code used to be, when/why/who changed it, ticket/PR/review references). When a comment mixes rationale and history, propose trimming the history and keeping the rationale — do not delete the whole comment.
-- **A tracker reference that names a constraint is rationale, not history (Checks 1 and 6)** — `// workaround for interfaces#798: AA_COMPROMISE maps to the wrong CRLReason` explains why the code exists and stays, even though it contains an issue reference. Only *bare provenance* carries no reason and goes: "per review #12", "see PR 340", "added in ticket X". This overrides Check 1's tracker-URL clause, which targets links that replace an explanation rather than links that supply one.
+- **A tracker reference that names a constraint is rationale, not history (Checks 1 and 6)** — `// workaround for interfaces#798: AA_COMPROMISE maps to the wrong CRLReason` explains why the code exists and stays, even though it contains an issue reference. Only *bare provenance* carries no reason and goes: "per review #12", "see PR 340", "added in ticket X". This overrides **Check 1 in its entirety**, not just its tracker-URL clause: a cross-repo issue reference also matches Check 1's "references a repository that is not part of the deployed artifact" clause, and without a whole-check override that clause would flag - and `apply all` would delete - the very comment this guardrail exists to protect.
 
 For each finding decide a **confidence**: `high` (clear debug print, obvious comment, internal ref), `medium`, `low` (judgment call).
 
@@ -119,7 +121,10 @@ For each finding decide a **confidence**: `high` (clear debug print, obvious com
 
 Present findings grouped by category, sorted high→low confidence:
 
-A compact table: `# | Cat | Conf | Location (file:line) | Issue | Suggested edit`. Keep cells short. `Conf` is the finding's confidence — the bulk apply options act on it, so it must be visible before the author chooses. Mark suggest-only findings (Checks 5, 7, 8) with a trailing `*` and note beneath the table that starred rows are excluded from bulk apply.
+A compact table: `# | Cat | Conf | Location (file:line) | Issue | Suggested edit`. Keep cells short. `Conf` is the finding's confidence — the bulk apply options act on it, so it must be visible before the author chooses. Mark findings by how they may be applied, and say so beneath the table:
+
+- `*` **suggest-only** (Checks 7 and 8, and anything at `low` confidence) — excluded from the bulk options, selectable by number.
+- `!` **advisory** (Check 5 always; any Check 7 annotation-move or Check 8 finding whose authoritative copy sits outside the diff) — **not applicable at all**. Omit these rows from the selection and edit prompts entirely, so no number the author can type maps to one. A half-applied advisory fix leaves the file broken: dropping an FQN to its simple name without adding the import does not compile.
 
 Below the table, for any non-trivial edit, a one-line before/after block so the user sees exactly what changes.
 
@@ -145,6 +150,8 @@ After applying, report a short summary: N edits applied across M files, by categ
 
 Skip Steps 3–4 entirely. Emit **only** this JSON array, one object per finding — no prose, no table, no questions, no edits. **When there are no findings (or the diff is empty), emit `[]`** — never prose; the caller parses this output.
 
+**Failures also keep stdout clean.** If target resolution fails — repo mismatch, PR not found, fetch error — write the reason to **stderr** and exit non-zero. Never print an explanation on stdout: the caller parses stdout as JSON and prose there is a parse error rather than a diagnosable failure.
+
 ```json
 [{ "category": "internal-ref|debug-log|obvious-comment|dead-code|fqn-instead-of-import|decision-narration|verbose-doc|doc-duplication",
    "file": "path", "line": 0, "line_text": "the exact added line, verbatim",
@@ -156,7 +163,8 @@ Skip Steps 3–4 entirely. Emit **only** this JSON array, one object per finding
 
 Contract notes for callers:
 
-- **`line`** is the line number in the **post-image** of the diff (the `+` side), as `git diff` reports it. A caller posting an inline PR review comment should anchor to the `RIGHT` side at this number.
+- **`line`** is the line number in the **post-image** of the diff (the `+` side), as `git diff` reports it, and it **always stays on an added line** — it is safe for a caller to anchor an inline PR review comment to the `RIGHT` side at this number.
+- **`target_file` / `target_line`** (optional, advisory findings only) name the out-of-diff location the finding is *about* — the pre-existing doc comment beside a newly added `@Operation`, or the Check-8 authoritative copy. They are context for a human, never an anchor: posting a review comment there would fall outside the diff hunk and be rejected.
 - **`line_text`** carries that line verbatim. Because working-tree line numbers can drift from diff line numbers, this is the reliable anchor — prefer it over `line` when re-locating the finding.
 - **`advisory: true`** marks a finding whose fix cannot be expressed as a single-line edit and must not be applied mechanically: the two-part Check-5 fix (replace the usage *and* add the import), the Check-7 annotation-to-doc-comment move, and any Check-8 finding whose authoritative copy sits outside the diff. Callers should surface these for a human and never auto-apply them.
 

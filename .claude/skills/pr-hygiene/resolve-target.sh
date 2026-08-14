@@ -23,10 +23,13 @@ command -v gh  >/dev/null 2>&1 || fail "gh not found on PATH"
 command -v jq  >/dev/null 2>&1 || fail "jq not found on PATH"
 git rev-parse --git-dir >/dev/null 2>&1 || fail "not inside a git repository"
 
-PR_FIELDS='number,url,baseRefName,headRefName,headRefOid,headRepository,headRepositoryOwner'
+PR_FIELDS='number,url,baseRefName,headRefName,headRefOid'
 
-# origin's owner/repo, used to reject a PR from a different repository.
-ORIGIN_NWO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"
+# origin's owner/repo, read from the remote itself. `gh repo view` would report
+# gh's *default* repo, which in a fork clone is the upstream parent - exactly
+# the case this guard exists to catch.
+ORIGIN_NWO="$(git remote get-url origin 2>/dev/null \
+  | sed -E 's#^git@[^:]+:#/#; s#^[a-z]+://[^/]+/#/#; s#^/##; s#\.git$##' || true)"
 
 is_pr=false
 number=""
@@ -34,30 +37,32 @@ url=""
 base=""
 head_ref=""
 head_oid=""
-head_repo_nwo=""
 
 pr_json=""
 if [ -z "$TARGET" ]; then
   pr_json="$(gh pr view --json "$PR_FIELDS" 2>/dev/null || true)"
-elif printf '%s' "$TARGET" | grep -qE '^([0-9]+|https?://)'; then
+elif printf '%s' "$TARGET" | grep -qE '^([0-9]+|https?://.+)$'; then
+  # Fully anchored: a bare number is all digits, so a branch like 123-feature
+  # is not mistaken for PR 123.
   pr_json="$(gh pr view "$TARGET" --json "$PR_FIELDS" 2>/dev/null || true)"
   [ -n "$pr_json" ] || fail "no PR found for target '$TARGET'"
 else
-  # A branch name. gh pr list returns an ARRAY; an empty array means no PR.
-  list_json="$(gh pr list --head "$TARGET" --json "$PR_FIELDS" 2>/dev/null || echo '[]')"
+  # A branch name. --state all so a branch whose PR is merged or closed still
+  # resolves to that PR: falling through to branch-only would take the default
+  # branch as the base and pull unrelated commits into the merge-base diff.
+  list_json="$(gh pr list --head "$TARGET" --state all --json "$PR_FIELDS" 2>/dev/null || echo '[]')"
   if [ "$(printf '%s' "$list_json" | jq 'length')" -gt 0 ]; then
-    pr_json="$(printf '%s' "$list_json" | jq '.[0]')"
+    pr_json="$(printf '%s' "$list_json" | jq 'sort_by(.number) | last')"
   fi
 fi
 
 if [ -n "$pr_json" ]; then
   is_pr=true
-  number="$(printf '%s' "$pr_json"  | jq -r '.number')"
-  url="$(printf '%s' "$pr_json"     | jq -r '.url')"
-  base="$(printf '%s' "$pr_json"    | jq -r '.baseRefName')"
-  head_ref="$(printf '%s' "$pr_json"| jq -r '.headRefName')"
-  head_oid="$(printf '%s' "$pr_json"| jq -r '.headRefOid')"
-  head_repo_nwo="$(printf '%s' "$pr_json" | jq -r '"\(.headRepositoryOwner.login)/\(.headRepository.name)"')"
+  number="$(printf '%s' "$pr_json"   | jq -r '.number')"
+  url="$(printf '%s' "$pr_json"      | jq -r '.url')"
+  base="$(printf '%s' "$pr_json"     | jq -r '.baseRefName')"
+  head_ref="$(printf '%s' "$pr_json" | jq -r '.headRefName')"
+  head_oid="$(printf '%s' "$pr_json" | jq -r '.headRefOid')"
 
   pr_nwo="$(printf '%s' "$url" | sed -E 's#https?://[^/]+/([^/]+/[^/]+)/pull/.*#\1#')"
   if [ -n "$ORIGIN_NWO" ] && [ "$pr_nwo" != "$ORIGIN_NWO" ]; then
@@ -65,7 +70,9 @@ if [ -n "$pr_json" ]; then
   The diff would come from the local checkout while the metadata came from another repo.
   Run pr-hygiene from a clone of $pr_nwo."
   fi
-else
+fi
+
+if [ "$is_pr" = false ]; then
   # Branch-only: no PR. Resolve the branch itself so the apply gate still works.
   head_ref="${TARGET:-$(git rev-parse --abbrev-ref HEAD)}"
   base="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)"
@@ -75,13 +82,19 @@ fi
 
 git fetch origin "$base" --quiet || fail "cannot fetch origin/$base"
 
-# Fetch the head. A fork PR's head is not on origin, so fetch from the head
-# repository directly; FETCH_HEAD then names it regardless of local branches.
-if [ "$is_pr" = true ] && [ -n "$head_repo_nwo" ] && [ "$head_repo_nwo" != "$ORIGIN_NWO" ]; then
-  log "fork PR: fetching $head_ref from $head_repo_nwo"
-  git fetch "https://github.com/$head_repo_nwo.git" "$head_ref" --quiet \
-    || fail "cannot fetch $head_ref from $head_repo_nwo"
+if [ "$is_pr" = true ]; then
+  # refs/pull/<n>/head lives on the base repo for every PR, fork or not: no fork
+  # remote to add, and it keeps working if the fork is private or renamed.
+  git fetch origin "refs/pull/$number/head" --quiet \
+    || fail "cannot fetch refs/pull/$number/head from origin"
   diff_to="$(git rev-parse FETCH_HEAD)"
+  # The head can advance between reading the metadata and fetching. Scanning a
+  # newer commit than the apply gate checks would let a checkout at the old OID
+  # accept edits derived from a different snapshot.
+  if [ "$diff_to" != "$head_oid" ]; then
+    fail "PR #$number advanced while resolving: metadata says $head_oid, fetched $diff_to.
+  Re-run so the scan and the apply gate agree on one revision."
+  fi
 elif git fetch origin "$head_ref" --quiet 2>/dev/null; then
   diff_to="$(git rev-parse FETCH_HEAD)"
 else
