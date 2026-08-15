@@ -1,14 +1,16 @@
 ---
 name: pr-hygiene
-version: 1.0.0
+version: 1.1.0
 description: >
   Use when scanning a pull request or branch diff for comment and log noise
   before merge - internal or planning refs, leftover debug prints, comments
   that restate the code, verbose doc comments, decision-log narration, facts
   duplicated across doc surfaces, unimported fully-qualified names and dead
-  code. Proposes concrete before/after edits over added lines only and applies
-  the ones the author picks. Hygiene only: correctness, security, performance
-  and design belong to a full code review.
+  code. Also scans uncommitted working-tree changes, for checking freshly
+  written code before it becomes a commit. Proposes concrete before/after
+  edits over added lines only and applies the ones the author picks. Hygiene
+  only: correctness, security, performance and design belong to a full code
+  review.
 tags:
   - github
   - pull-requests
@@ -17,7 +19,9 @@ tags:
   - ilm
 inputs:
   - name: TARGET
-    description: A PR URL, a bare PR number, or a branch name. Defaults to the current branch.
+    description: >
+      A PR URL, a bare PR number, a branch name, or --worktree to scan
+      uncommitted changes against HEAD. Defaults to the current branch.
     required: false
     example: "1234"
   - name: PROPOSE_ONLY
@@ -30,7 +34,7 @@ permissions:
   - github:contents:read
   - local:files:write
 created_at: 2026-08-14
-updated_at: 2026-08-14
+updated_at: 2026-08-15
 ---
 
 # Skill: PR Hygiene
@@ -40,10 +44,12 @@ Find low-value comments, logging noise, and small code-hygiene issues in the lin
 ## Invocation
 
 ```
-/pr-hygiene [PR url | PR number | branch] [--propose-only]
+/pr-hygiene [PR url | PR number | branch | --worktree] [--propose-only]
 ```
 
 Both arguments are optional. With no target, the current branch is used.
+
+`--worktree` scans uncommitted changes against `HEAD` rather than a committed range — for checking code that has just been written, before it becomes a commit. It is a target form, so it composes with `--propose-only` exactly as a PR number does.
 
 ## Modes
 
@@ -75,13 +81,26 @@ git --no-pager diff "$diff_from".."$diff_to"
 
 If the range is empty, stop — in default mode say so plainly; under `--propose-only` emit `[]` and nothing else.
 
+**A worktree target has no commit pair.** When `diff_to=WORKTREE`, capture the change set from the tree itself:
+
+```bash
+git --no-pager diff HEAD -- <paths>                    # modified tracked files
+git ls-files --others --exclude-standard -- <paths>    # new files, added in full
+```
+
+Treat each untracked file as wholly added. The pathspec is optional and narrows the scan: a caller that knows which files it just wrote passes exactly those, keeping unrelated edits and build side-effects — regenerated sources, rewritten lock files, stray scratch files — out of the scan and out of the findings. With no pathspec the whole tree is in scope. A clean tree is the empty-range case above.
+
 **Before applying anything in Step 4**, require `git rev-parse HEAD` to equal `head_oid`. If it differs, report the findings and refuse to edit: the working tree is not what was scanned. This holds for branch-only runs too, where `head_oid` is the named branch's commit.
+
+**That gate does not apply to a worktree target** — there `head_oid` *is* `HEAD`, so the comparison passes while proving nothing, and the uncommitted tree is the scanned artifact by definition. The equivalent protection is Step 4's text matching: re-read each file immediately before editing and locate the finding by `line_text`. If the text is gone, the tree moved under the scan — skip that edit and report it.
 
 ## Step 2 — Scan added/changed lines only
 
 **Read scope and flag scope are different things.** Read the whole file freely — several checks cannot be decided otherwise: Check 3 needs the method's existing doc comment to know an added inline comment restates it, Check 5 needs the import block and types in scope to rule out a simple-name collision, Check 8 needs the adjacent annotation. But only ever **flag** lines the diff adds or modifies (the `+` hunks), and only ever **edit** those lines. A pre-existing line is never a finding and never an edit target; when the fix would land outside the diff, report the finding as advisory with no proposed edit.
 
 **Read that context from the scanned commit, never the working tree** — `git show "$diff_to":<path>`. The working tree is only required to match `head_oid` at Step 4, so during the scan it can be a different branch entirely, or not contain the file at all when the PR adds it. Deciding "does the doc comment already say this" or "is the simple name collision-free" against the wrong revision produces findings that are wrong or silently missing, while the output still looks authoritative.
+
+**A worktree target inverts this: read context from the file on disk.** `$diff_to` is the sentinel `WORKTREE`, not a revision, so `git show` has nothing to resolve — and the committed file would be the wrong source anyway, since the uncommitted tree is exactly what was scanned.
 
 Be **language-aware** for comment and log syntax across the languages present in the diff (JS/TS, Java/Kotlin, Go, Python, shell, C#, SQL, YAML, etc.). Classify each added line against the checks below:
 
@@ -174,4 +193,5 @@ Contract notes for callers:
 - Added/changed lines only. Never touch pre-existing lines.
 - Honor every guardrail above. When a guardrail and a check disagree, the guardrail wins.
 - No commit, no push, no staging. No edits outside the repository under review.
+- A worktree target scans `git diff HEAD` plus untracked files in place of a committed range; the no-staging rule is unchanged, so the author still stages and commits.
 - Empty diff / no findings: default mode says so plainly and stops; `--propose-only` emits `[]`.
