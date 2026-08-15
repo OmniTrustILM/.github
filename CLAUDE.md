@@ -33,7 +33,7 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 - `.claude/skills/` — org-wide Claude Code skills: three for managing Project #5 (`create-issue`, `project-triage`, `epic-breakdown`) plus `pr-hygiene`, which reviews a code diff and touches no issues or project fields. Tracked and reviewed here; each skill's `cache/` contents are gitignored (only `cache/.gitignore` is committed). See [`.claude/skills/README.md`](.claude/skills/README.md). The local superpowers planning workspace under `docs/superpowers/` is gitignored and never committed.
 
 ### Claude Code skills (`.claude/skills/`)
-- **create-issue** — natural-language → well-formed Bug/Feature/Task/Documentation/QA issue, added to Project #5.
+- **create-issue** — natural-language → well-formed Bug/Feature/Task/Documentation/QA issue, added to Project #5 and linked under the active `Bugs x.y.z` cycle in `ilm` (bugs only; other types only on request).
 - **project-triage** — Project #5 health report (field gaps, staleness, consistency) with optional per-finding auto-fixes; reads `config/project-triage-rules.yml`.
 - **epic-breakdown** — requirement → planned Epic + sub-issues (preflight / breakdown / reconcile modes); the sanctioned writer of Complexity/Estimate.
 - **pr-hygiene** — pre-merge comment and log hygiene over the lines a PR adds; proposes before/after edits, applies only on confirm. Not a Project #5 skill: it reads a git diff, and it is run from a clone of the *reviewed* repo rather than from this one.

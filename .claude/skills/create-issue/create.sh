@@ -9,6 +9,9 @@
 #   --severity NAME     (optional, Bug only) Minor|Major|Critical|Blocker
 #   --module NAME       (optional) one of the 17 Module values
 #   --label NAME        (optional, repeatable) extra labels beyond template defaults
+#   --parent-id ID      (optional) node id of the issue to link this one under,
+#                       from resolve-parent.sh. Usually the active `Bugs x.y.z`
+#                       cycle in OmniTrustILM/ilm, so usually a cross-repo link.
 #
 # Output: prints created issue URL, project item id, and field-set summary.
 #
@@ -29,7 +32,7 @@ for f in project-fields.json repos.json templates.json; do
 done
 
 # --- Parse args ---
-REPO="" TYPE="" TITLE="" BODY_FILE="" SEVERITY="" MODULE=""
+REPO="" TYPE="" TITLE="" BODY_FILE="" SEVERITY="" MODULE="" PARENT_ID=""
 LABELS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]; do
     --severity)   SEVERITY="$2"; shift 2 ;;
     --module)     MODULE="$2"; shift 2 ;;
     --label)      LABELS+=("$2"); shift 2 ;;
+    --parent-id)  PARENT_ID="$2"; shift 2 ;;
     *)            fail "unknown arg: $1" ;;
   esac
 done
@@ -202,8 +206,31 @@ set_single_select() {
 if [ -n "$SEVERITY" ]; then set_single_select "Severity" "$SEVERITY"; fi
 if [ -n "$MODULE" ];   then set_single_select "Module"   "$MODULE";   fi
 
+# --- Link under the parent issue ---
+# Warn rather than fail: by this point the issue exists and is in the project,
+# so it is usable. An unlinked issue is a missing link, not a broken issue.
+# Same recovery shape as epic-breakdown/link.sh — orphans.log plus a
+# copy-paste fix, so the state is never left to guesswork.
+PARENT_LINKED="false"
+if [ -n "$PARENT_ID" ]; then
+  ADD_SUB_QUERY="$(awk '/^mutation AddSubIssue/,/^}$/' "$GRAPHQL_DOC")"
+  if gh api graphql -f query="$ADD_SUB_QUERY" \
+      -f issueId="$PARENT_ID" \
+      -f subIssueId="$ISSUE_NODE_ID" >/dev/null 2>&1; then
+    PARENT_LINKED="true"
+    log "  linked under parent $PARENT_ID"
+  else
+    printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ISSUE_URL" "addSubIssue->$PARENT_ID failed" \
+      >> "$CACHE_DIR/orphans.log"
+    log "  warn: failed to link under parent $PARENT_ID (logged to $CACHE_DIR/orphans.log)"
+    log "  hint: addSubIssue writes to the *parent's* repo — this needs push access there, not on $REPO"
+    log "  manual fix: gh api graphql -f query='mutation{addSubIssue(input:{issueId:\"$PARENT_ID\",subIssueId:\"$ISSUE_NODE_ID\"}){issue{number}}}'"
+  fi
+fi
+
 # --- Final summary ---
 log "done: $ISSUE_URL"
 echo "url=$ISSUE_URL"
 echo "number=$ISSUE_NUMBER"
 echo "item_id=$ITEM_ID"
+echo "parent_linked=$PARENT_LINKED"

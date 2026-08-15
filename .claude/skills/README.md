@@ -10,7 +10,7 @@ issues. All of them operate across all org repos.
 
 | Skill | What it does | Mutates? |
 |---|---|---|
-| [`create-issue`](create-issue/) | Turn a natural-language description into a well-formed Bug / Feature / Task / Documentation / QA issue, set its project fields, and add it to Project #5. | Creates one issue (on confirm). |
+| [`create-issue`](create-issue/) | Turn a natural-language description into a well-formed Bug / Feature / Task / Documentation / QA issue, set its project fields, add it to Project #5, and link a bug under the active `Bugs x.y.z` cycle. | Creates one issue and links it under its parent (on confirm). |
 | [`project-triage`](project-triage/) | Health report on Project #5 — required-field gaps, staleness, consistency violations — with optional per-finding auto-fixes. | Read-only by default; fixes only on per-finding confirmation. |
 | [`epic-breakdown`](epic-breakdown/) | Turn a requirement into a planned Epic + sub-issues, enrich an existing Epic, or reconcile an Epic against current progress. The ILM architect "buddy". | Creates/links sub-issues and sets fields only on confirm. |
 | [`pr-hygiene`](pr-hygiene/) | Scan a PR or branch diff for comment and log noise over the lines it adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — and propose before/after edits. | Edits the local working tree only on confirm; never commits, pushes or stages. |

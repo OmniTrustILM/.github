@@ -32,3 +32,10 @@ mutation SetIssueType($issueId: ID!, $issueTypeId: ID!) {
     issue { id }
   }
 }
+
+mutation AddSubIssue($issueId: ID!, $subIssueId: ID!) {
+  addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId }) {
+    issue { number }
+    subIssue { number }
+  }
+}
