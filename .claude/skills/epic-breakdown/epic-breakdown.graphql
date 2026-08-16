@@ -82,6 +82,7 @@ query EpicState($owner: String!, $repo: String!, $number: Int!) {
               __typename
               ... on ProjectV2ItemFieldSingleSelectValue { name field { ... on ProjectV2FieldCommon { name } } }
               ... on ProjectV2ItemFieldNumberValue        { number field { ... on ProjectV2FieldCommon { name } } }
+              ... on ProjectV2ItemFieldDateValue          { date field { ... on ProjectV2FieldCommon { name } } }
             }
           }
         }
