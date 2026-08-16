@@ -186,6 +186,13 @@ for it in target:
             if is_field_missing(it, f):
                 add(it, 'Error', f'required_past_planning:{f}', f'missing `{f}` (required past Planning)')
 
+    # Epic breakdown fields: produced during Analysis, required from Open on
+    # (methodics §3.2, Release Management §5.1)
+    if status and status not in ('Planning', 'Analysis'):
+        for f in rules.get('required_past_analysis', {}).get(t_lower, []):
+            if is_field_missing(it, f):
+                add(it, 'Error', f'required_past_analysis:{f}', f'missing `{f}` (required from Open on)')
+
     for f in rules['recommended_fields'].get(t_lower, []):
         if is_field_missing(it, f):
             add(it, 'Warning', f'recommended:{f}', f'missing recommended field `{f}`')
@@ -269,22 +276,21 @@ for it in target:
 
     # §7.2 Epic-status consistency (logic mirrored from epic-breakdown/reconcile.py).
     # Child project Status comes from the `lookup` table; open/closed from sub_issues.
-    _epic_status_rules = ('epic_done_with_open_children', 'epic_status_lags_children', 'epic_status_ahead_of_children')
+    _epic_status_rules = ('epic_done_with_open_children', 'epic_status_mismatch')
     if t == 'Epic' and any(rules['consistency_rules'].get(r) for r in _epic_status_rules):
         subs = load_sub_issues(c['repository']['name'], c['number'])
-        open_count = sum(1 for s in subs if (s.get('state') or '').upper() == 'OPEN')
-        child_statuses = []
+        children = []
         for s in subs:
             # REST sub_issues objects carry repository_url (a string), not a nested
             # repository object; derive the repo name from it (defensive fallback).
             ru = s.get('repository_url') or ''
             srepo = ru.rstrip('/').split('/')[-1] if ru else (s.get('repository') or {}).get('name')
             sit = lookup.get((srepo, s.get('number')))
-            if sit:
-                cs = field_value(sit, 'Status')
-                if cs:
-                    child_statuses.append(cs)
-        for level, rule, msg in epic_status_findings(status, child_statuses, open_count):
+            children.append((field_value(sit, 'Status') if sit else None,
+                             s.get('state')))
+        breakdown_done = not any(is_field_missing(it, f)
+                                 for f in ('complexity', 'estimate', 'start_date', 'end_date'))
+        for level, rule, msg in epic_status_findings(status, children, breakdown_done):
             if rules['consistency_rules'].get(rule):
                 add(it, level, rule, msg)
 

@@ -9,47 +9,94 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from consistency import epic_status_findings, closed_but_not_done_finding, within_window  # noqa: E402
+from consistency import (  # noqa: E402
+    epic_status_findings, expected_epic_status,
+    closed_but_not_done_finding, within_window,
+)
 
 _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
+BD, NBD = True, False  # breakdown done / not done
+
+
+def kid(status, state="OPEN"):
+    return (status, state)
 
 
 def rules_of(findings):
     return {r for _, r, _ in findings}
 
 
+# ---- expected_epic_status: the RM §5.1 ladder ----
+
+def test_expected_all_done_children():
+    assert expected_epic_status([kid("Done"), kid(None, "CLOSED")], BD) == "Done"
+
+
+def test_expected_closed_not_planned_counts_as_done():
+    assert expected_epic_status([kid("Done"), kid("Open", "CLOSED")], BD) == "Done"
+
+
+def test_expected_all_testing_or_beyond():
+    assert expected_epic_status([kid("Testing"), kid("Done")], BD) == "Testing"
+
+
+def test_expected_all_review_or_beyond():
+    assert expected_epic_status([kid("Review"), kid("Testing")], BD) == "Review"
+
+
+def test_expected_any_started_wins():
+    assert expected_epic_status([kid("In Progress"), kid("Planning")], BD) == "In Progress"
+
+
+def test_expected_open_when_breakdown_done():
+    assert expected_epic_status([kid("Planning")], BD) == "Open"
+
+
+def test_expected_analysis_while_breakdown_running():
+    assert expected_epic_status([kid("Analysis"), kid("Open")], NBD) == "Analysis"
+
+
+def test_expected_open_child_without_breakdown():
+    assert expected_epic_status([kid("Open"), kid("Planning")], NBD) == "Open"
+
+
+def test_expected_planning_default():
+    assert expected_epic_status([kid("Planning"), kid("Planning")], NBD) == "Planning"
+
+
+def test_expected_none_without_usable_children():
+    assert expected_epic_status([kid(None)], BD) is None
+    assert expected_epic_status([], BD) is None
+
+
+# ---- epic_status_findings: findings + §7.3 precedence ----
+
 def test_done_with_open_children_is_error():
-    f = epic_status_findings("Done", ["Planning"], 2)
+    f = epic_status_findings("Done", [kid("Planning"), kid("Planning")], BD)
     assert [(lvl, r) for lvl, r, _ in f] == [("Error", "epic_done_with_open_children")]
 
 
-def test_done_with_no_open_children_no_finding():
-    assert epic_status_findings("Done", [], 0) == []
+def test_done_with_all_children_closed_no_finding():
+    assert epic_status_findings("Done", [kid("Done", "CLOSED")], BD) == []
 
 
-def test_lags_children_warns():
-    assert "epic_status_lags_children" in rules_of(epic_status_findings("Open", ["In Progress"], 1))
+def test_matching_status_no_finding():
+    assert epic_status_findings("In Progress", [kid("In Progress"), kid("Open")], BD) == []
 
 
-def test_open_no_advanced_child_no_finding():
-    assert epic_status_findings("Open", ["Open", "Planning"], 1) == []
+def test_mismatch_warns():
+    f = epic_status_findings("Open", [kid("In Progress")], BD)
+    assert rules_of(f) == {"epic_status_mismatch"}
+    assert f[0][0] == "Warning" and "In Progress" in f[0][2]
 
 
-def test_ahead_of_children_warns():
-    assert "epic_status_ahead_of_children" in rules_of(epic_status_findings("In Progress", ["Open", "Planning"], 2))
+def test_no_children_no_finding():
+    assert epic_status_findings("In Progress", [], BD) == []
 
 
-def test_in_progress_with_advanced_child_no_ahead():
-    assert epic_status_findings("In Progress", ["Review"], 1) == []
-
-
-def test_in_progress_no_children_no_finding():
-    assert epic_status_findings("In Progress", [], 0) == []
-
-
-def test_status_rules_mutually_exclusive():
-    # A Done Epic with an In Progress child yields only the Done error.
-    assert rules_of(epic_status_findings("Done", ["In Progress"], 1)) == {"epic_done_with_open_children"}
+def test_done_error_outranks_mismatch():
+    # A Done Epic with an In Progress child yields only the Done error (§7.3 rule 5).
+    assert rules_of(epic_status_findings("Done", [kid("In Progress")], BD)) == {"epic_done_with_open_children"}
 
 
 def test_closed_but_not_done_fires():

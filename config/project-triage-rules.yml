@@ -14,10 +14,14 @@ required_fields:
   epic: [user_story, use_cases, acceptance_criteria]
   release: [version]
 
-# Error-level fields required once Epic/Release moves past Planning status
+# Error-level fields required once a Release moves past Planning status
 required_past_planning:
-  epic: [complexity, estimate, start_date, end_date]
   release: [start_date, end_date]
+
+# Error-level fields required once an Epic reaches Open — the breakdown
+# produces them during Analysis (methodics §3.2, Release Management §5.1)
+required_past_analysis:
+  epic: [complexity, estimate, start_date, end_date]
 
 # Warning-level recommended fields (flagged but not blocking)
 recommended_fields:
@@ -39,8 +43,7 @@ consistency_rules:
   reopened_without_reason: true
   release_epic_by_non_org_member: true
   epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
-  epic_status_lags_children: true      # Warning: a child is more advanced than the Epic
-  epic_status_ahead_of_children: true  # Warning: Epic moved ahead of all its children
+  epic_status_mismatch: true           # Warning: Epic Status differs from the children-derived value (RM §5.1)
   epic_done_with_open_children: true   # Error: Epic Status=Done but a child is still open
 
 # closed_but_not_done only flags issues closed (as completed) within this many days,
