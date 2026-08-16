@@ -219,8 +219,8 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    state + any new related issues; annotate each child with its work stream.
 3. **Present findings** (from `reconcile.py`, which mirrors the §7.2 rules):
    missing QA/docs child, missing work streams, orphaned children,
-   Epic-status-lags/ahead-of-children, Epic-Done-with-open-children, version
-   mismatch, plus proposed new children or estimate/complexity adjustments.
+   Epic-status-vs-children mismatch (RM §5.1), Epic-Done-with-open-children,
+   version mismatch, plus proposed new children or estimate/complexity adjustments.
 4. **Per-change confirm** (like `/project-triage`, not one bulk confirm). Before
    each mutation, re-check current state and skip with a warning if it changed.
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
@@ -232,8 +232,8 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
 **Rule coverage.** `reconcile.py` checks the Epic-and-children consistency rules
 (using the same rule names as `project-triage`'s `eval.py`): `empty_epic_no_sub_issues`,
 `epic_without_qa_sub_issue`, `epic_without_docs_sub_issue` (this skill's
-completeness extension), `epic_done_with_open_children`, `epic_status_lags_children`,
-`epic_status_ahead_of_children`, `orphaned_sub_issues`, `version_mismatch`, plus a
+completeness extension), `epic_done_with_open_children`, `epic_status_mismatch`
+(Status vs. the children-derived value, RM §5.1), `orphaned_sub_issues`, `version_mismatch`, plus a
 `missing_workstream` hint. §7.3 precedence is applied (the Done-with-open-children
 error suppresses the overlapping status/orphan warnings). Board-wide hygiene —
 staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_done`,

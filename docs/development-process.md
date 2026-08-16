@@ -727,11 +727,8 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 | Reopened without reason | Warning | Reopen Reason empty after reopen |
 | Release/Epic by non-org-member | Warning | Created by someone outside OmniTrustILM org |
 | Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten |
-| Epic status lags children | Warning | Epic is in Open but at least one child issue has a more advanced status (In Progress, Review, Testing). Epic should be moved to In Progress. |
-| Epic status ahead of children | Warning | Epic is in In Progress but all child issues are still in Open or Planning. Epic may have been moved prematurely. |
+| Epic status mismatch | Warning | Epic's Status differs from the value derived from its children per [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (see §2.2 Epic row): Done = all children done (closed children count as complete); Testing / Review = all children at that stage or beyond; In Progress = any child started; otherwise Open once the breakdown is complete (Complexity, Estimate, Start/End Date set — §3.2), Analysis while a child is still being scoped, else Planning. Also checked daily by the release dashboard's Health tab. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
-
-> **Note:** the exact Epic-status rules are defined in [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (status derived from the children; see §2.2 Epic row) and are checked daily by the release dashboard's Health tab. The three Epic-status rows above are the triage report's simplified approximation and are pending alignment with §5.1.
 
 ### 7.3 Rule precedence
 
@@ -741,7 +738,7 @@ When multiple rules fire on the same issue, resolve conflicts in this order:
 2. **Legitimate close reasons override "Closed but not Done".** An issue closed as `not planned` or `duplicate` is a valid terminal state — the "Closed but not Done" Warning does NOT fire for these closures.
 3. **"Done but Open state" takes precedence over "Closed but not Done".** If the Status says Done and the issue is still open, that's an automation failure — fix it before evaluating any other close-related rule.
 4. **Status transitions driven by automation always win over human-set status.** If a human sets Status = Done but the PR hasn't merged, the automation will re-enter the correct Status on the next relevant event. Don't manually force Status.
-5. **"Epic Done with open children" takes precedence over "Epic status ahead of children".** If the Epic is Done with open children, the Error is shown and the Warning is suppressed.
+5. **"Epic Done with open children" takes precedence over "Epic status mismatch".** If the Epic is Done with open children, the Error is shown and the mismatch Warning is suppressed.
 
 If two Warnings fire on the same issue, the triage report shows both — no suppression; the operator resolves in any order.
 
