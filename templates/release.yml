@@ -3,6 +3,12 @@ changelog:
     labels:
       - ignore-for-release
   categories:
+    # First on purpose: a PR lands in the first category it matches, so
+    # `bug` + `upgrade-action` reports as an upgrade action, not a bug fix.
+    - title: "⚠️ Breaking Changes"
+      labels: [breaking-change]
+    - title: "🧰 Upgrade Actions"
+      labels: [upgrade-action]
     - title: "✨ New Features"
       labels: [new-feature]
     - title: "🔧 Enhancements"
