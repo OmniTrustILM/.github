@@ -68,6 +68,35 @@ else
   echo "- caller workflows: no change" >> "$summary_file"
 fi
 
+# ---------- Task 3: CODEOWNERS ----------
+# Render to a temp file first so an excluded repo's existing CODEOWNERS is
+# never truncated/deleted.
+co_tmp=$(mktemp)
+set +e
+bash ../source/.github/scripts/repo-template-sync/render-codeowners.sh \
+  "$REPO_NAME" ../source/config/repo-domains.yml > "$co_tmp"
+co_rc=$?
+set -e
+if [ "$co_rc" -eq 0 ]; then
+  mkdir -p .github
+  cp "$co_tmp" .github/CODEOWNERS
+  git add .github/CODEOWNERS
+  if ! git diff --cached --quiet; then
+    git commit -m "chore: sync .github/CODEOWNERS from org repo-domains"
+    commits_made=$((commits_made + 1))
+    echo "- CODEOWNERS: synced" >> "$summary_file"
+  else
+    echo "- CODEOWNERS: no change" >> "$summary_file"
+  fi
+elif [ "$co_rc" -eq 3 ]; then
+  echo "- CODEOWNERS: skipped (excluded repo)" >> "$summary_file"
+else
+  rm -f "$co_tmp"
+  echo "::error::render-codeowners.sh failed for $REPO_NAME (rc=$co_rc)"
+  exit "$co_rc"
+fi
+rm -f "$co_tmp"
+
 # ---------- Skip PR if no commits ----------
 if [ "$commits_made" -eq 0 ]; then
   {

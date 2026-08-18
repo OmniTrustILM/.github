@@ -1,0 +1,80 @@
+# Drives per-repo CODEOWNERS sync (and documents domain ownership).
+# Domain = OWNER team. Source is curated purpose, never GitHub primaryLanguage
+# (Linguist misreports scaffold/connector repos).
+#
+# Resolution order in the renderer:
+#   1. repo in any domain (core/fe/go/infra) -> @OmniTrustILM/maintainers-<domain>
+#      A repo may appear in SEVERAL domains  -> all those teams become owners
+#      on ONE CODEOWNERS line; an approval from ANY ONE of them satisfies the
+#      code-owner gate (multiple owners on a line = OR, not AND).
+#   2. repo in `qa`                          -> + @OmniTrustILM/qa
+#   3. anything else (common repos)          -> @OmniTrustILM/maintainers  (DEFAULT)
+#
+# The renderer still honors an optional `exclude:` list if ever added; none is
+# defined — junk repos are removed from the org, not skipped. The `.github`
+# repo is self-excluded by the sync's resolve step.
+#
+# Convention: domains in order core, fe, go, qa, infra; repos alphabetical.
+
+core:
+  - auth
+  - cert-manager-issuer
+  - core
+  - dependencies
+  - helm-charts
+  - interface-documentation
+  - interfaces
+  - mcp-server
+  - operator
+  - provisioning-rabbitmq
+  - proxy
+  - saas-provisioning
+  - scheduler
+
+fe:
+  - fe-administrator
+  - saas-provisioning
+
+go:
+  - cbom-lens
+  - cbom-repository
+  - cert-manager-issuer
+  - go-sdk
+  - hashicorp-vault-connector
+  - otpki-connector
+  - proxy
+
+qa:
+  - automated-testing-framework
+
+infra:
+  - ansible-role-helm
+  - ansible-role-http-proxy
+  - ansible-role-ilm
+  - ansible-role-ilm-branding
+  - ansible-role-postgres
+  - ansible-role-rke2
+  - ansible-role-systemd-timesyncd
+  - appliance
+  - appliance-tools
+  - debian-repository
+  - development-environment
+  - helm-charts
+  - keycloak-optimized
+  - keycloak-theme
+  - saas-infrastructure
+  - saas-provisioning
+  - saas-shared-infrastructure
+  - saas-tenant-deployment
+  - saas-tenant-pipeline
+
+# Everything NOT in a domain above or `qa` falls to the DEFAULT owner
+# @OmniTrustILM/maintainers — e.g. documentation, pm-reporting, ilm (umbrella),
+# .allstar, auth-opa-policies, ui-design, and connector/provider repos not
+# individually curated into a domain.
+#
+# Multi-domain repos (owned by >1 team; an approval from ANY one satisfies):
+#   proxy               -> core + go
+#   cert-manager-issuer -> core + go
+#   saas-provisioning   -> core + fe + infra
+#   helm-charts         -> core + infra

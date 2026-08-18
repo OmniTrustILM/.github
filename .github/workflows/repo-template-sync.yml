@@ -5,8 +5,10 @@ name: Repo Template Sync
 #   Task 2: .github/workflows/
 #             issue-automation.yml         ← templates/caller-workflows/...
 #             release-automation.yml       ← templates/caller-workflows/...
+#   Task 3: .github/CODEOWNERS             ← rendered from config/repo-domains.yml
+#             (domain maintainer team per repo; excluded repos untouched)
 #
-# One PR per repo, up to 2 commits (one per task, skipped if no diff).
+# One PR per repo, up to 3 commits (one per task, skipped if no diff).
 # If both tasks are no-op for a repo, no PR is opened.
 #
 # Self-excludes the .github repo itself. Per-repo opt-out: close the
