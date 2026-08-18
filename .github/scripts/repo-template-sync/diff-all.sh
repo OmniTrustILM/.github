@@ -30,12 +30,22 @@ elif [ "$co_rc" -ne 0 ]; then
   co_state="ERROR (rc=$co_rc)"
   co_failed=1
   echo "::error::render-codeowners.sh failed for $REPO_NAME (rc=$co_rc) — dry-run will fail"
-elif [ ! -f target/.github/CODEOWNERS ]; then
-  co_state="MISSING (would be created)"
-elif cmp -s "$co_tmp" target/.github/CODEOWNERS; then
-  co_state="IDENTICAL"
 else
-  co_state="DIFFERS (would be updated)"
+  # Mirror sync-all's guard: an existing CODEOWNERS not managed by sync (at
+  # .github/, root, or docs/) is left untouched — report it as SKIPPED, not DIFFERS.
+  existing_co=""
+  for loc in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
+    if [ -f "target/$loc" ]; then existing_co="$loc"; break; fi
+  done
+  if [ -n "$existing_co" ] && ! head -n1 "target/$existing_co" | grep -qF "# Synced by repo-template-sync"; then
+    co_state="SKIPPED (existing $existing_co not sync-managed)"
+  elif [ ! -f target/.github/CODEOWNERS ]; then
+    co_state="MISSING (would be created)"
+  elif cmp -s "$co_tmp" target/.github/CODEOWNERS; then
+    co_state="IDENTICAL"
+  else
+    co_state="DIFFERS (would be updated)"
+  fi
 fi
 rm -f "$co_tmp"
 

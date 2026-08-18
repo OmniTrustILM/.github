@@ -11,9 +11,15 @@ name: Repo Template Sync
 # One PR per repo, up to 3 commits (one per task, skipped if no diff).
 # If all tasks are no-op for a repo, no PR is opened.
 #
-# Self-excludes the .github repo itself. Per-repo opt-out: close the
-# bot's sync PR without merging — the workflow respects that on later
-# runs.
+# Self-excludes the .github repo itself.
+#
+# Opt-out levers:
+#   - Close the bot's sync PR without merging → opts the repo out of ALL
+#     tasks (release.yml + workflows + CODEOWNERS); respected on later runs.
+#   - Add the repo to `exclude:` in config/repo-domains.yml → opts out of the
+#     CODEOWNERS task ONLY; release.yml + workflows still sync. Use this for a
+#     repo that hand-maintains its own CODEOWNERS. (A pre-existing non-sync
+#     CODEOWNERS is also auto-skipped, but exclude: makes the intent explicit.)
 
 on:
   workflow_dispatch:

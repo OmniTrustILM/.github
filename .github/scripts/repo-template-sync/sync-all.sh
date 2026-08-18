@@ -78,15 +78,28 @@ bash ../source/.github/scripts/repo-template-sync/render-codeowners.sh \
 co_rc=$?
 set -e
 if [ "$co_rc" -eq 0 ]; then
-  mkdir -p .github
-  cp "$co_tmp" .github/CODEOWNERS
-  git add .github/CODEOWNERS
-  if ! git diff --cached --quiet; then
-    git commit -m "chore: sync .github/CODEOWNERS from org repo-domains"
-    commits_made=$((commits_made + 1))
-    echo "- CODEOWNERS: synced" >> "$summary_file"
+  # Guard: never clobber a hand-curated CODEOWNERS, and don't silently shadow
+  # one at root/ or docs/ with a new .github/CODEOWNERS. Write only when there
+  # is no owner file yet, or the existing .github/CODEOWNERS is one we synced
+  # (identified by our header). A repo with its own CODEOWNERS opts in manually.
+  existing_co=""
+  for loc in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
+    if [ -f "$loc" ]; then existing_co="$loc"; break; fi
+  done
+  if [ -n "$existing_co" ] && ! head -n1 "$existing_co" | grep -qF "# Synced by repo-template-sync"; then
+    echo "::warning::$REPO_NAME has an existing $existing_co not managed by sync — skipping CODEOWNERS"
+    echo "- CODEOWNERS: skipped (existing $existing_co not sync-managed)" >> "$summary_file"
   else
-    echo "- CODEOWNERS: no change" >> "$summary_file"
+    mkdir -p .github
+    cp "$co_tmp" .github/CODEOWNERS
+    git add .github/CODEOWNERS
+    if ! git diff --cached --quiet; then
+      git commit -m "chore: sync .github/CODEOWNERS from org repo-domains"
+      commits_made=$((commits_made + 1))
+      echo "- CODEOWNERS: synced" >> "$summary_file"
+    else
+      echo "- CODEOWNERS: no change" >> "$summary_file"
+    fi
   fi
 elif [ "$co_rc" -eq 3 ]; then
   echo "- CODEOWNERS: skipped (excluded repo)" >> "$summary_file"
