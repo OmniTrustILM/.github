@@ -23,6 +23,14 @@ set -euo pipefail
 repo="${1:?repo name required}"
 map="${2:?path to repo-domains.yml required}"
 
+# Preflight: fail loudly rather than falling through to the default owner. If yq
+# were missing or the map unparseable, every `yq -e` lookup below would return
+# non-zero (read as "no match"), owners[] would stay empty, and EVERY repo would
+# silently get the default owner — a wrong, org-wide ownership downgrade. Abort
+# instead so the caller (sync-all/diff-all) surfaces the error.
+command -v yq >/dev/null 2>&1 || { echo "render-codeowners: yq not found on PATH" >&2; exit 2; }
+yq -e '.' "$map" >/dev/null 2>&1 || { echo "render-codeowners: cannot parse map: $map" >&2; exit 2; }
+
 # 1. Excluded → signal skip (no `exclude` key defined today; harmless if absent).
 if yq -e ".exclude[] | select(. == \"$repo\")" "$map" >/dev/null 2>&1; then
   exit 3
@@ -49,5 +57,5 @@ if [ "${#owners[@]}" -eq 0 ]; then
 fi
 
 echo "# Synced by repo-template-sync — do not edit by hand."
-echo "# Owner = domain maintainer team (permissions model, see OmniTrustILM planning)."
+echo "# Owner = domain maintainer team (OmniTrustILM permissions model)."
 echo "*  ${owners[*]}"

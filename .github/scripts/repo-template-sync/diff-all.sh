@@ -23,10 +23,13 @@ bash source/.github/scripts/repo-template-sync/render-codeowners.sh \
   "$REPO_NAME" source/config/repo-domains.yml > "$co_tmp"
 co_rc=$?
 set -e
+co_failed=0
 if [ "$co_rc" -eq 3 ]; then
   co_state="SKIPPED (excluded)"
 elif [ "$co_rc" -ne 0 ]; then
   co_state="ERROR (rc=$co_rc)"
+  co_failed=1
+  echo "::error::render-codeowners.sh failed for $REPO_NAME (rc=$co_rc) — dry-run will fail"
 elif [ ! -f target/.github/CODEOWNERS ]; then
   co_state="MISSING (would be created)"
 elif cmp -s "$co_tmp" target/.github/CODEOWNERS; then
@@ -56,3 +59,8 @@ rm -f "$co_tmp"
   done
   echo "| \`.github/CODEOWNERS\` | $co_state |"
 } >> "$GITHUB_STEP_SUMMARY"
+
+# A broken renderer must fail the dry-run, not just show an ERROR row in the table.
+if [ "$co_failed" -eq 1 ]; then
+  exit 1
+fi
