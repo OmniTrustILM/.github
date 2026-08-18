@@ -41,7 +41,7 @@ owners=()
 # 2. Domain team(s) — accumulate ALL matching domains (a repo may be in more
 #    than one, e.g. proxy in core+go). Order core,ui,go,infra for stable output.
 for d in core ui go infra; do
-  if yq -e ".$d[] | select(. == \"$repo\")" "$map" >/dev/null 2>&1; then
+  if yq -e ".${d}[] | select(. == \"$repo\")" "$map" >/dev/null 2>&1; then
     owners+=("@OmniTrustILM/maintainers-$d")
   fi
 done
