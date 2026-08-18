@@ -3,7 +3,7 @@
 # (Linguist misreports scaffold/connector repos).
 #
 # Resolution order in the renderer:
-#   1. repo in any domain (core/fe/go/infra) -> @OmniTrustILM/maintainers-<domain>
+#   1. repo in any domain (core/ui/go/infra) -> @OmniTrustILM/maintainers-<domain>
 #      A repo may appear in SEVERAL domains  -> all those teams become owners
 #      on ONE CODEOWNERS line; an approval from ANY ONE of them satisfies the
 #      code-owner gate (multiple owners on a line = OR, not AND).
@@ -16,7 +16,7 @@
 # and workflows still sync (closing the sync PR opts out of everything instead).
 # The `.github` repo is self-excluded by the sync's resolve step.
 #
-# Convention: domains in order core, fe, go, qa, infra; repos alphabetical.
+# Convention: domains in order core, ui, go, qa, infra; repos alphabetical.
 
 core:
   - auth
@@ -33,7 +33,7 @@ core:
   - saas-provisioning
   - scheduler
 
-fe:
+ui:
   - fe-administrator
   - saas-provisioning
 
@@ -78,5 +78,5 @@ infra:
 # Multi-domain repos (owned by >1 team; an approval from ANY one satisfies):
 #   proxy               -> core + go
 #   cert-manager-issuer -> core + go
-#   saas-provisioning   -> core + fe + infra
+#   saas-provisioning   -> core + ui + infra
 #   helm-charts         -> core + infra

@@ -8,7 +8,7 @@
 #
 # Resolution order:
 #   1. repo in `exclude`              -> exit 3 (skip)
-#   2. repo in any domain core/fe/go/infra -> @OmniTrustILM/maintainers-<domain>
+#   2. repo in any domain core/ui/go/infra -> @OmniTrustILM/maintainers-<domain>
 #      (a repo may match SEVERAL domains -> all those teams become owners)
 #   3. repo in `qa`                   -> + @OmniTrustILM/qa
 #   4. anything else (common repos)   -> @OmniTrustILM/maintainers (DEFAULT)
@@ -39,8 +39,8 @@ fi
 owners=()
 
 # 2. Domain team(s) — accumulate ALL matching domains (a repo may be in more
-#    than one, e.g. proxy in core+go). Order core,fe,go,infra for stable output.
-for d in core fe go infra; do
+#    than one, e.g. proxy in core+go). Order core,ui,go,infra for stable output.
+for d in core ui go infra; do
   if yq -e ".$d[] | select(. == \"$repo\")" "$map" >/dev/null 2>&1; then
     owners+=("@OmniTrustILM/maintainers-$d")
   fi

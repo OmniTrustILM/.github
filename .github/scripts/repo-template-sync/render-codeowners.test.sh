@@ -16,7 +16,7 @@ core:
   - core
   - proxy
   - saas-provisioning
-fe:
+ui:
   - fe-administrator
   - saas-provisioning
 go:
@@ -51,9 +51,9 @@ check() {
 
 check "single-domain core"    0 "*  @OmniTrustILM/maintainers-core" core
 check "single-domain go"      0 "*  @OmniTrustILM/maintainers-go" go-sdk
-check "single-domain fe"      0 "*  @OmniTrustILM/maintainers-fe" fe-administrator
+check "single-domain ui"      0 "*  @OmniTrustILM/maintainers-ui" fe-administrator
 check "multi core+go"         0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/maintainers-go" proxy
-check "multi core+fe+infra"   0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/maintainers-fe @OmniTrustILM/maintainers-infra" saas-provisioning
+check "multi core+ui+infra"   0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/maintainers-ui @OmniTrustILM/maintainers-infra" saas-provisioning
 check "qa"                    0 "*  @OmniTrustILM/qa" automated-testing-framework
 check "default maintainers"   0 "*  @OmniTrustILM/maintainers" some-uncurated-repo
 check "excluded -> exit 3"    3 "" figma-test
