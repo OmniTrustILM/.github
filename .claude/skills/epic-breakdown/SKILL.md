@@ -197,14 +197,14 @@ and stop unless confirmed.
    1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M>` (add `--severity <S>` for Bug children) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
    2. `link.sh --parent-node-id <epic> --child-node-id <child>` to attach the child.
    3. `link.sh --issue-node-id <child> --blocked-by-node-id <blocker>` for each dependency.
-   4. `set-epic-fields.sh --item-id <child item> --complexity <C>` (child Complexity only — **not** child Estimate).
+   4. `set-epic-fields.sh --item-id <child item> --complexity <C> --estimate <E>`.
    5. After all children: `set-epic-fields.sh --item-id <epic item> --complexity <C> --estimate <E>` for the Epic.
    6. `enrich-epic.sh --repo <r> --number <epic#> --enriched-file -` to rewrite the Epic body.
    - **Leave child Version blank** so `version-propagation` automation copies it from the parent. Status stays Planning.
    - **Mid-sequence failure:** stop, and print three lists — completed (with URLs), the failing step (with the error), and not-yet-started. Created-but-unlinked children are also in `cache/orphans.log`. Never silently continue.
 8. **Confirm to the user** every created URL, what was set, and what remains:
    **PM** — Version, Sprint, Priority, Start/End Date, moving Status to Open;
-   **Developer** — the child Estimate field (the suggested value is shown, not written).
+   **Developer** — reviewing the written child Estimates; an override is final (§3.5).
 
 ---
 
@@ -226,8 +226,11 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
    showing the before→after diff and getting that change approved.** Apply
    approved changes with the same scripts as breakdown.
-5. **Never** set Version/Sprint/Priority/dates, force Status, write child
-   Estimate, or close issues. Propose status nudges to the human (§7.3 rule 4).
+5. **Never** set Version/Sprint/Priority/dates, force Status, or close issues.
+   Propose status nudges to the human (§7.3 rule 4). Child Estimate may be set
+   on children this run *creates*, as in breakdown; an Estimate already on an
+   existing child is a developer's number and falls under the overwrite rule
+   above — diff and approval, never a silent replacement.
 
 **Rule coverage.** `reconcile.py` checks the Epic-and-children consistency rules
 (using the same rule names as `project-triage`'s `eval.py`): `empty_epic_no_sub_issues`,
@@ -245,8 +248,14 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
 
 - **Propose freely; require explicit human approval before ANY create/mutation.**
 - **Writes (on approval):** Epic Complexity, Epic Estimate, child Complexity,
-  child Module, Epic body, sub-issue links, blocked-by deps, sub-issue creation.
-- **Suggest-only:** child Estimate (Developer-owned, §3.1/§10/§3.5).
+  child Estimate, child Module, Epic body, sub-issue links, blocked-by deps,
+  sub-issue creation.
+  Child Estimate is written as the *suggested* value the preview showed — the
+  approval gate already covered it, and re-typing an approved number by hand
+  only loses it. The Developer still owns the field: an override is final
+  (§3.5), and the numbers are seeds, not verdicts. Note the trade-off: a
+  pre-filled Estimate silences the §3.2 "missing Estimate" warning, so
+  "not yet estimated" and "estimate accepted" look alike on the board.
 - **Never autonomously:** Version, Sprint, Priority, Start/End Date; forcing
   Status; the deprecated Component/Developer fields; closing issues.
 
