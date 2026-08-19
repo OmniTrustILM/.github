@@ -178,10 +178,12 @@ and stop unless confirmed.
    Complexity scale; use the developer-built basis only when the Epic declares
    it, and **never repeat estimates inside a child body**), blocked-by
    dependencies, and a suggested assignee.
-   **Estimate granularity:** mandays, **at most two decimals**, no leading dot
-   and no exponent — prefer quarter-day steps (`0.25`, `0.5`, `1.5`, `3`).
-   `set-epic-fields.sh` rejects anything else outright, so a value derived by
-   division (a day split three ways → `0.333`) fails the write. Round it.
+   **Estimate granularity — quarter days, nothing finer.** Every estimate is a
+   positive multiple of **0.25** mandays: `0.25`, `0.5`, `0.75`, `1`, `1.25`, …
+   0.25 is both the minimum and the increment; `0`, `0.1`, `0.333` and `1.4` are
+   all rejected outright by `set-epic-fields.sh`. Round to the nearest quarter
+   day — a value derived by division (a day split three ways → `0.333`) fails
+   the write. Ceiling is 365; anything larger is an Epic that needs splitting.
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing
@@ -254,12 +256,9 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
 - **Writes (on approval):** Epic Complexity, Epic Estimate, child Complexity,
   child Estimate, child Module, Epic body, sub-issue links, blocked-by deps,
   sub-issue creation.
-  Child Estimate is written as the *suggested* value the preview showed — the
-  approval gate already covered it, and re-typing an approved number by hand
-  only loses it. The Developer still owns the field: an override is final
-  (§3.5), and the numbers are seeds, not verdicts. Note the trade-off: a
-  pre-filled Estimate silences the §3.2 "missing Estimate" warning, so
-  "not yet estimated" and "estimate accepted" look alike on the board.
+  Child Estimate is written as the *suggested* value the preview showed; the
+  Developer owns the field and an override is final. Rationale, granularity and
+  the board-visibility trade-off are in §3.5 — do not restate them here.
 - **Never autonomously:** Version, Sprint, Priority, Start/End Date; forcing
   Status; the deprecated Component/Developer fields; closing issues.
 

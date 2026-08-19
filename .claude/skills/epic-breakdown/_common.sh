@@ -74,12 +74,23 @@ set_single_select() {
   fi
 }
 
-# estimate_is_valid MANDAYS — fractional to two decimals (§3.5).
-# Rejects `.5`, `1e3` and >2 decimals: jq would take them, but they read as
-# typos, and precision below 0.01 mandays is noise.
-ESTIMATE_RULE_MSG="estimate must be a non-negative number with at most two decimals"
+# Ceiling on a single item's estimate. Guards a fat-fingered 500 for 50; an
+# item genuinely larger than this is an Epic that needs splitting, not a number.
+ESTIMATE_MAX=365
+
+# estimate_is_valid MANDAYS — quarter-day steps only (§3.5).
+# 0.25 is both the minimum and the increment: 0.25, 0.5, 0.75, 1, 1.25 … There
+# is no finer granularity. Anything between the steps is false precision on a
+# number that already carries a review buffer, and 0 is not an estimate - it
+# would clear the §3.2 required-field gate while saying nothing.
+ESTIMATE_RULE_MSG="estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most $ESTIMATE_MAX"
 estimate_is_valid() {
-  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$ ]]
+  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
+  local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}"
+  case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
+  case "$frac" in 00|25|50|75) ;; *) return 1 ;; esac
+  [ "$whole" = 0 ] && [ "$frac" = 00 ] && return 1
+  [ "$whole" -le "$ESTIMATE_MAX" ] || return 1
 }
 
 # number_payload FIELD_ID NUMBER  (uses PROJECT_ID, ITEM_ID, GRAPHQL_DOC)
@@ -103,7 +114,14 @@ set_number() {
   # `return 1` into the warn path, not `fail`: callers set several fields per
   # item, and aborting here would leave the item half-written mid-sequence.
   # set-epic-fields.sh validates up front, so reaching this is a caller bug.
-  estimate_is_valid "$number" || { log "  warn: $ESTIMATE_RULE_MSG, got '$number'"; return 1; }
+  # The quarter-day rule is Estimate's, not every NUMBER field's - a second
+  # numeric field must not silently inherit it.
+  if [ "$field_name" = "Estimate" ]; then
+    estimate_is_valid "$number" || { log "  warn: $ESTIMATE_RULE_MSG, got '$number'"; return 1; }
+  else
+    [[ "$number" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
+      || { log "  warn: $field_name must be numeric, got '$number'"; return 1; }
+  fi
   if err=$(number_payload "$field_id" "$number" | gh api graphql --input - 2>&1 >/dev/null); then
     log "  set $field_name=$number"
   else
