@@ -34,6 +34,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/codeowners-sentinel.sh"
 command -v yq >/dev/null 2>&1 || { echo "render-codeowners: yq not found on PATH" >&2; exit 2; }
 yq -e '.' "$map" >/dev/null 2>&1 || { echo "render-codeowners: cannot parse map: $map" >&2; exit 2; }
 
+# Reject unknown top-level keys — a typo'd domain (e.g. `fe:` instead of `ui:`)
+# would otherwise match nothing and silently fall through to the default owner.
+while IFS= read -r key; do
+  case " core ui go infra qa exclude " in
+    *" $key "*) ;;
+    *) echo "render-codeowners: unknown top-level key '$key' in $map" >&2; exit 2 ;;
+  esac
+done < <(yq -r 'keys | .[]' "$map")
+
 # 1. Excluded → signal skip (no `exclude` key defined today; harmless if absent).
 if yq -e ".exclude[] | select(. == \"$repo\")" "$map" >/dev/null 2>&1; then
   exit 3

@@ -18,6 +18,7 @@ core:
   - core
   - dual-listed
   - proxy
+  - qa-and-core
   - saas-provisioning
 ui:
   - fe-administrator
@@ -27,6 +28,7 @@ go:
   - proxy
 qa:
   - automated-testing-framework
+  - qa-and-core
 infra:
   - saas-provisioning
 exclude:
@@ -59,6 +61,7 @@ check "single-domain ui"      0 "*  @OmniTrustILM/maintainers-ui" fe-administrat
 check "multi core+go"         0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/maintainers-go" proxy
 check "multi core+ui+infra"   0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/maintainers-ui @OmniTrustILM/maintainers-infra" saas-provisioning
 check "qa"                    0 "*  @OmniTrustILM/qa" automated-testing-framework
+check "qa additive on domain" 0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM/qa" qa-and-core
 check "default maintainers"   0 "*  @OmniTrustILM/maintainers" some-uncurated-repo
 check "excluded -> exit 3"    3 "" figma-test
 # Precedence: exclude wins over a domain match (a repo in both opts out).
@@ -78,6 +81,17 @@ set +e
 bash "$render" core /nonexistent/repo-domains.yml >/dev/null 2>&1; rc=$?
 set -e
 if [ "$rc" -eq 2 ]; then echo "ok   missing-map -> exit 2"; else echo "FAIL missing-map: rc=$rc, expected 2"; fail=1; fi
+
+# Unknown top-level key must be rejected (a typo'd domain would otherwise silently default).
+badmap="$(mktemp)"; printf 'fe:\n  - x\ncore:\n  - y\n' > "$badmap"
+set +e; bash "$render" x "$badmap" >/dev/null 2>&1; rc=$?; set -e
+rm -f "$badmap"
+if [ "$rc" -eq 2 ]; then echo "ok   unknown-key -> exit 2"; else echo "FAIL unknown-key: rc=$rc, expected 2"; fail=1; fi
+
+# The real config/repo-domains.yml must pass validation (known keys, parses, core resolves).
+real_map="$here/../../../config/repo-domains.yml"
+set +e; bash "$render" core "$real_map" >/dev/null 2>&1; rc=$?; set -e
+if [ "$rc" -eq 0 ]; then echo "ok   real config validates"; else echo "FAIL real config: rc=$rc, expected 0"; fail=1; fi
 
 if [ "$fail" -ne 0 ]; then echo "render-codeowners tests FAILED"; exit 1; fi
 echo "All render-codeowners tests passed."

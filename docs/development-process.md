@@ -851,10 +851,11 @@ All centralized config lives in the `OmniTrustILM/.github` repo: https://github.
 | Template chooser | `config.yml` | `.github/ISSUE_TEMPLATE/config.yml` |
 | Standard labels (synced to all repos) | `labels.yml` | `templates/labels.yml` |
 | Triage rules | `project-triage-rules.yml` | `config/project-triage-rules.yml` |
+| Repo→domain owner mapping (drives per-repo CODEOWNERS) | `repo-domains.yml` | `config/repo-domains.yml` |
 | Release notes categories (synced to all repos) | `release.yml` | `templates/release.yml` |
 | Caller workflows (deployed to all org repos) | `issue-automation.yml`, `release-automation.yml` | `templates/caller-workflows/` |
 | Composite actions (consumed by caller workflows) | `action.yml` + shell script per action | `.github/actions/<name>/` (e.g. `auto-add-to-project/`, `reopen-tracking/`) |
-| Workflows that run in `.github` repo | `*.yml` | `.github/workflows/` (`label-sync.yml`, `release-yml-sync.yml`, `repo-template-sync.yml`, `project-health-report.yml`, `shellcheck.yml`) |
+| Workflows that run in `.github` repo | `*.yml` | `.github/workflows/` (`label-sync.yml`, `release-yml-sync.yml`, `repo-template-sync.yml`, `project-health-report.yml`, `shellcheck.yml`, `action-tests.yml`) |
 | Bash scripts used by in-repo workflows | `*.sh` | `.github/scripts/<workflow-basename>/` |
 
 **Propagation to target repos:** changes to `templates/labels.yml` propagate automatically via `label-sync.yml` on push to main. Changes to `templates/release.yml` and `templates/caller-workflows/*.yml`, plus the per-repo `.github/CODEOWNERS` rendered from `config/repo-domains.yml`, are distributed by manual dispatch of `repo-template-sync.yml` (opens one PR per target repo with up to 3 commits; skips repos with no drift). For release.yml-only hotfixes, `release-yml-sync.yml` dispatches a focused rollout.

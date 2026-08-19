@@ -13,10 +13,9 @@
 # no reviewer) — create the team before adding a domain key.
 #
 # The renderer honors an optional `exclude:` list; none is defined today.
-# Two uses: (1) junk repos are removed from the org, not skipped; (2) adding a
-# repo here is the per-repo opt-out from managed CODEOWNERS ONLY — release.yml
-# and workflows still sync (closing the sync PR opts out of everything instead).
-# The `.github` repo is self-excluded by the sync's resolve step.
+# Adding a repo here is the per-repo opt-out from managed CODEOWNERS ONLY —
+# release.yml and workflows still sync (closing the sync PR opts out of
+# everything instead). The `.github` repo is self-excluded by the resolve step.
 #
 # Convention: domains in order core, ui, go, qa, infra; repos alphabetical.
 
