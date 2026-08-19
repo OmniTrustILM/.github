@@ -3,10 +3,8 @@
 # allowed) on an Epic's or child's Project #5 item. epic-breakdown is the
 # sanctioned writer of these per §3.1/§3.5 (Complexity auto-set; Epic Estimate
 # PM-owned, written here behind the breakdown approval gate). Child Estimate is
-# written from the approved breakdown preview: the values are seeds, the
-# Developer owns the field and an override is final (§3.5). In reconcile mode an
-# Estimate already on an existing child needs a before/after diff and explicit
-# approval before it is replaced.
+# written from the approved breakdown preview; see §3.5 for ownership and the
+# reconcile-mode overwrite rule.
 #
 # Usage:
 #   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High]
@@ -53,7 +51,8 @@ esac
 
 # Validate before anything is printed or written. Breakdown calls this once per
 # child, so a late failure would abort the sequence with Complexity already set
-# and Estimate missing - and a preview that printed the write first would lie.
+# and Estimate missing. The dry-run preview must not print a write it is about
+# to reject either.
 #
 # A child over its cap is not rejected outright: it is allowed when the issue
 # body says why it cannot be split. Check the shape first, then the rationale,

@@ -88,7 +88,7 @@ ESTIMATE_MAX_EPIC=100
 ESTIMATE_MAX_CHILD=4
 
 # estimate_quarters MANDAYS — echo the value in whole quarter-day units.
-# Everything downstream compares integers, so decimal boundaries (100 vs 100.25)
+# Everything downstream compares integers, so a value at a decimal boundary
 # cannot be got subtly wrong.
 estimate_quarters() {
   [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
@@ -114,11 +114,6 @@ estimate_rule_msg() {
   printf 'estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most %s' "$1"
 }
 
-# require_estimate_rationale ITEM_ID MANDAYS
-# A child over ESTIMATE_MAX_CHILD is allowed only when its issue body explains
-# why it cannot be split. Read that from the body rather than taking it as a
-# flag: the body is what a reviewer reads six months later, and a flag would let
-# the two drift. Silence here means the child should have been decomposed.
 # estimate_rationale_ok BODY — 0 when the body carries a usable reason.
 # Exit 1 = no '### Estimate' section, 2 = section present but empty or too short
 # to be a reason. Pure so it can be tested without touching a live issue.
@@ -131,6 +126,11 @@ estimate_rationale_ok() {
   [ "${#rationale}" -ge 20 ] || return 2
 }
 
+# require_estimate_rationale ITEM_ID MANDAYS
+# A child over ESTIMATE_MAX_CHILD is allowed only when its issue body explains
+# why it cannot be split. Read that from the body rather than taking it as a
+# flag: the body is what a reviewer reads six months later, and a flag would let
+# the two drift. Silence here means the child should have been decomposed.
 require_estimate_rationale() {
   local item="$1" mandays="$2" body rc=0
   body=$(gh api graphql -f id="$item" -f query='

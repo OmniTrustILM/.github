@@ -274,8 +274,9 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
   child Estimate, child Module, Epic body, sub-issue links, blocked-by deps,
   sub-issue creation.
   Child Estimate is written as the *suggested* value the preview showed; the
-  Developer owns the field and an override is final. Rationale, granularity and
-  the board-visibility trade-off are in §3.5 — do not restate them here.
+  Developer owns the field and an override is final. Rationale and the
+  board-visibility trade-off are in §3.5. (The granularity and caps are in
+  step 4 above, where estimates are produced.)
 - **Never autonomously:** Version, Sprint, Priority, Start/End Date; forcing
   Status; the deprecated Component/Developer fields; closing issues.
 

@@ -493,16 +493,14 @@ it is always final (§3.1). A child reassigned to hand-building is simply
 re-estimated by that developer.
 
 **`/epic-breakdown` writes the suggested child Estimate** when you approve the
-breakdown, rather than showing a number for you to re-type. The approval gate
-already covered it, and hand-copying an approved figure only loses it. The
-values are **seeds, not verdicts** — the Developer owns the field and an
-override is final. Two consequences worth knowing: a pre-filled Estimate
+breakdown. The values are **seeds, not verdicts** — the Developer owns the field
+and an override is final. Two consequences worth knowing: a pre-filled Estimate
 silences the §3.2 "missing Estimate" warning, so "not yet estimated" and
 "estimate accepted" look alike on the board; and in *reconcile* mode an
 Estimate already on an existing child is a developer's number, changed only
 with a before/after diff and explicit approval.
 
-**Estimate ceilings come from delivery capacity, not from taste.**
+**Estimate ceilings come from delivery capacity.**
 
 | Scope | Cap | Why |
 |---|---|---|
@@ -518,14 +516,13 @@ section from the issue and refuses to write an over-cap child estimate without
 it, so the justification lives where a reviewer will find it months later
 rather than in a planning conversation nobody kept.
 
-**Estimates are quarter days — positive multiples of 0.25, nothing finer.**
 Sub-day values are normal under the agent-executed basis: compressed scaffolding
-work is genuinely 0.25 or 0.75 mandays. 0.25 is both the minimum and the
-increment, so `0` is not a valid estimate — it would clear the §3.2
-required-field gate while carrying no information. Anything between the steps is
-false precision on a number that already includes a review buffer. The integer
-ranges in the Complexity table above are the developer-built baseline, not a
-constraint on what the field may hold.
+work is genuinely 0.25 or 0.75 mandays. Since 0.25 is the minimum, `0` is not a
+valid estimate — it would clear the §3.2 required-field gate while carrying no
+information. Anything between the steps is false precision on a number that
+already includes a review buffer. The integer ranges in the Complexity table
+above are the developer-built baseline, not a constraint on what the field may
+hold.
 
 **What compresses under agent execution** — not uniform, so estimate per child
 rather than applying a blanket factor:
