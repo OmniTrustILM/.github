@@ -37,8 +37,8 @@ yq -e '.' "$map" >/dev/null 2>&1 || { echo "render-codeowners: cannot parse map:
 # Reject unknown top-level keys — a typo'd domain (e.g. `fe:` instead of `ui:`)
 # would otherwise match nothing and silently fall through to the default owner.
 while IFS= read -r key; do
-  case " core ui go infra qa exclude " in
-    *" $key "*) ;;
+  case "$key" in
+    core|ui|go|infra|qa|exclude) ;;
     *) echo "render-codeowners: unknown top-level key '$key' in $map" >&2; exit 2 ;;
   esac
 done < <(yq -r 'keys | .[]' "$map")
