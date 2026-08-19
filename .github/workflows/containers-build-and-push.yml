@@ -35,8 +35,9 @@ on:
           Extra image repository paths within the same registry, one per line,
           to publish this build under as well. The image is built and scanned
           ONCE against `image`; every path receives that same manifest and so
-          resolves to the same digest. Tags, signatures and the README are
-          published to each. Empty (the default) publishes to `image` alone.
+          resolves to the same digest. Tags, their cosign signatures and the
+          README are published to each; the per-arch digests are signed under
+          `image` only. Empty (the default) publishes to `image` alone.
         required: false
         type: string
         default: ''
@@ -340,7 +341,6 @@ jobs:
         working-directory: ${{ runner.temp }}/digests
         env:
           TAGS: ${{ steps.meta.outputs.tags }}
-          TARGETS: ${{ steps.targets.outputs.list }}
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
@@ -369,18 +369,18 @@ jobs:
           done <<< "${TAGS}"
 
           # Sign every per-arch digest and every tag AFTER publication.
-          # Every path needs its own signature: cosign stores these as
+          # Primary path only: these digests are the intermediate per-arch
+          # indexes that build pushed here, and imagetools copies just the leaf
+          # manifests the final index references, so they do not exist under an
+          # additional path. Those paths are covered by the tag loop below.
+          for ref in "${SOURCES[@]}"; do
+            echo "Signing per-arch image: $ref"
+            cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$ref"
+          done
+
+          # Every path needs its own signature here: cosign stores these as
           # sha256-<digest>.sig in the repository, and a signature written to one
           # repository does not verify from another.
-          while IFS= read -r target; do
-            [ -z "$target" ] && continue
-            for digest_file in *; do
-              ref="${target}@sha256:${digest_file}"
-              echo "Signing per-arch image: $ref"
-              cosign sign --yes --key env://COSIGN_PRIVATE_KEY "$ref"
-            done
-          done <<< "${TARGETS}"
-
           while IFS= read -r tag; do
             [ -z "$tag" ] && continue
             echo "Signing multiarch manifest tag: $tag"
