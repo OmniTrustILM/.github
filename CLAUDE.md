@@ -38,7 +38,7 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 - **epic-breakdown** — requirement → planned Epic + sub-issues (preflight / breakdown / reconcile modes); the sanctioned writer of Complexity/Estimate.
 - **pr-hygiene** — pre-merge comment and log hygiene over the lines a PR adds; proposes before/after edits, applies only on confirm. Not a Project #5 skill: it reads a git diff, and it is run from a clone of the *reviewed* repo rather than from this one.
 
-House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/parsing lives in scripts; every mutation is gated behind human approval (methodics §10). CI lints `.claude/skills/**/*.sh` with ShellCheck. The runtime-discovered gitignored `cache/` and the `read:project`/`project` scopes apply to the Project #5 skills; `pr-hygiene` needs only `repo` and reads a git diff, so it has neither.
+House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/parsing lives in scripts; every mutation is gated behind human approval (methodics §10). CI lints `.claude/skills/**/*.sh` with ShellCheck and runs any `*.test.sh` suite. The runtime-discovered gitignored `cache/` and the `read:project`/`project` scopes apply to the Project #5 skills; `pr-hygiene` needs only `repo` and reads a git diff, so it has neither.
 
 ### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
 - **Bug**: requires `severity`. Recommended: module, priority, version, estimate, assignee.
@@ -74,7 +74,7 @@ Reporting and CI:
 
 - **Project Health Report** (`.github/workflows/project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
 - **ShellCheck** (`.github/workflows/shellcheck.yml`) — on PRs touching `.github/scripts/**` or `.github/actions/**`. Lints all bash.
-- **Action tests** (`.github/workflows/action-tests.yml`) — on changes to `.github/actions/**`. Runs each composite action's `*.test.sh` suite (e.g. the `resolve-trivy-config` resolver) so a regression that silently weakened the vuln gate can't ship uncaught.
+- **Action tests** (`.github/workflows/action-tests.yml`) — on changes to `.github/actions/**` or `.claude/skills/**`. Runs every `*.test.sh` suite under both (e.g. the `resolve-trivy-config` resolver, `pr-hygiene`'s target resolver) so a regression that silently weakened the vuln gate or broke a skill's output contract can't ship uncaught.
 
 Reusable workflows (called by other org repos' caller workflows):
 

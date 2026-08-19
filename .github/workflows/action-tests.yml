@@ -1,19 +1,22 @@
 name: Action tests
 
-# Runs the shell test suites for composite actions in this repo (e.g. the
-# resolve-trivy-config security-gate resolver). ShellCheck lints the scripts;
-# this workflow actually executes their tests so a regression that silently
-# weakened the vulnerability gate cannot ship uncaught.
+# Runs the shell test suites in this repo: composite actions (e.g. the
+# resolve-trivy-config security-gate resolver) and Claude Code skills (e.g.
+# pr-hygiene's target resolver). ShellCheck lints those scripts; this workflow
+# actually executes their tests, so a regression that silently weakened the
+# vulnerability gate or broke a skill's output contract cannot ship uncaught.
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/actions/**"
+      - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
   pull_request:
     paths:
       - ".github/actions/**"
+      - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
 
 permissions:
@@ -25,16 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run composite action test suites
+      - name: Run action and skill test suites
         run: |
           shopt -s globstar nullglob
           found=0
-          for t in .github/actions/**/*.test.sh; do
+          for t in .github/actions/**/*.test.sh .claude/skills/**/*.test.sh; do
             found=1
             echo "::group::$t"
             bash "$t"
             echo "::endgroup::"
           done
           if [ "$found" -eq 0 ]; then
-            echo "No *.test.sh suites found under .github/actions/"
+            echo "No *.test.sh suites found under .github/actions/ or .claude/skills/"
           fi
