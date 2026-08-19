@@ -1,21 +1,25 @@
 name: Action tests
 
 # Runs the shell test suites in this repo: composite actions (e.g. the
-# resolve-trivy-config security-gate resolver) and Claude Code skills (e.g.
-# pr-hygiene's target resolver). ShellCheck lints those scripts; this workflow
-# actually executes their tests, so a regression that silently weakened the
-# vulnerability gate or broke a skill's output contract cannot ship uncaught.
+# resolve-trivy-config security-gate resolver), repo scripts (repo-template-sync's
+# render-codeowners resolver), and Claude Code skills (e.g. pr-hygiene's target
+# resolver). ShellCheck lints those scripts; this workflow actually executes
+# their tests so a regression — a silently weakened vuln gate, a CODEOWNERS
+# resolver that mis-assigns ownership, or a broken skill output contract —
+# cannot ship uncaught.
 
 on:
   push:
     branches: [main]
     paths:
       - ".github/actions/**"
+      - ".github/scripts/**"
       - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
   pull_request:
     paths:
       - ".github/actions/**"
+      - ".github/scripts/**"
       - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
 
@@ -28,16 +32,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Run action and skill test suites
+      # Some script test suites (render-codeowners) require mikefarah yq v4.
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Run shell test suites
         run: |
           shopt -s globstar nullglob
           found=0
-          for t in .github/actions/**/*.test.sh .claude/skills/**/*.test.sh; do
+          for t in .github/actions/**/*.test.sh .github/scripts/**/*.test.sh .claude/skills/**/*.test.sh; do
             found=1
             echo "::group::$t"
             bash "$t"
             echo "::endgroup::"
           done
           if [ "$found" -eq 0 ]; then
-            echo "No *.test.sh suites found under .github/actions/ or .claude/skills/"
+            echo "No *.test.sh suites found under .github/actions/, .github/scripts/, or .claude/skills/"
           fi
