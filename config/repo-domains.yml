@@ -74,9 +74,3 @@ infra:
 # @OmniTrustILM/maintainers — e.g. documentation, pm-reporting, ilm (umbrella),
 # .allstar, auth-opa-policies, ui-design, and connector/provider repos not
 # individually curated into a domain.
-#
-# Multi-domain repos (owned by >1 team; an approval from ANY one satisfies):
-#   proxy               -> core + go
-#   cert-manager-issuer -> core + go
-#   saas-provisioning   -> core + ui + infra
-#   helm-charts         -> core + infra
