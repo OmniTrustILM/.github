@@ -9,7 +9,12 @@
 # approval before it is replaced.
 #
 # Usage:
-#   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High] [--estimate <mandays>] [--dry-run]
+#   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High]
+#                      [--estimate <mandays>] [--scope epic|child] [--dry-run]
+#
+# --scope selects the estimate ceiling (epic 100, child 4 - see §3.5). Defaults
+# to epic. A child over its cap needs an '### Estimate' section in the issue
+# body explaining why it cannot be split.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,16 +26,23 @@ SCRIPT_TAG="fields"
 
 [ -f "$CACHE_DIR/project-fields.json" ] || fail "missing $CACHE_DIR/project-fields.json — run fetch.sh first"
 
-ITEM_ID="" COMPLEXITY="" ESTIMATE="" ESTIMATE_SET=0 DRY_RUN=0
+ITEM_ID="" COMPLEXITY="" ESTIMATE="" ESTIMATE_SET=0 SCOPE=epic DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --item-id)    ITEM_ID="${2:-}"; shift 2 ;;
     --complexity) COMPLEXITY="${2:-}"; shift 2 ;;
     --estimate)   ESTIMATE="${2:-}"; ESTIMATE_SET=1; shift 2 ;;
+    --scope)      SCOPE="${2:-}"; shift 2 ;;
     --dry-run)    DRY_RUN=1; shift ;;
     *)            fail "unknown arg: $1" ;;
   esac
 done
+
+case "$SCOPE" in
+  epic)  ESTIMATE_MAX="$ESTIMATE_MAX_EPIC" ;;
+  child) ESTIMATE_MAX="$ESTIMATE_MAX_CHILD" ;;
+  *)     fail "--scope must be epic or child, got '$SCOPE'" ;;
+esac
 
 [ -n "$ITEM_ID" ] || fail "--item-id is required"
 # Supplied-but-empty is a caller bug, not "no estimate requested". Breakdown
@@ -42,7 +54,24 @@ done
 # Validate before anything is printed or written. Breakdown calls this once per
 # child, so a late failure would abort the sequence with Complexity already set
 # and Estimate missing - and a preview that printed the write first would lie.
-[ -n "$ESTIMATE" ] && { estimate_is_valid "$ESTIMATE" || fail "$ESTIMATE_RULE_MSG, got '$ESTIMATE'"; }
+#
+# A child over its cap is not rejected outright: it is allowed when the issue
+# body says why it cannot be split. Check the shape first, then the rationale,
+# so an off-grid value fails on the grid rather than on a missing section.
+if [ -n "$ESTIMATE" ]; then
+  estimate_is_valid "$ESTIMATE" "$ESTIMATE_MAX_EPIC" \
+    || fail "$(estimate_rule_msg "$ESTIMATE_MAX_EPIC"), got '$ESTIMATE'"
+  if ! estimate_is_valid "$ESTIMATE" "$ESTIMATE_MAX"; then
+    [ "$SCOPE" = child ] \
+      || fail "$(estimate_rule_msg "$ESTIMATE_MAX"), got '$ESTIMATE'"
+    if [ "$DRY_RUN" -eq 1 ]; then
+      log "note: ${ESTIMATE} exceeds the ${ESTIMATE_MAX}-manday child cap; the live run requires an '### Estimate' section in the issue body"
+    else
+      require_estimate_rationale "$ITEM_ID" "$ESTIMATE"
+      log "  note: ${ESTIMATE} exceeds the ${ESTIMATE_MAX}-manday child cap; accepted on the issue's stated rationale"
+    fi
+  fi
+fi
 
 PROJECT_ID=$(jq -r '.project_id' "$CACHE_DIR/project-fields.json")
 

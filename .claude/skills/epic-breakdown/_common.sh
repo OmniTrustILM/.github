@@ -74,31 +74,77 @@ set_single_select() {
   fi
 }
 
-# Ceiling on a single item's estimate, derived from release capacity rather than
-# picked: a release is a ~10-week development cycle (50 working days) and an
-# Epic is staffed by at most 2 people, so 100 mandays is the largest estimate
-# that can fit one release. Above it the number is either a typo (500 for 50) or
-# an Epic that cannot ship in one cycle and has to be split.
-ESTIMATE_MAX=100
+# Two ceilings, both derived from delivery capacity rather than picked.
+#
+# Epic: a release is a ~10-week development cycle (50 working days) and an Epic
+# is staffed by at most 2 people, so 100 mandays is the largest estimate that
+# can fit one release. Above it the Epic has to be split.
+#
+# Child: 4 mandays keeps a sub-issue deliverable inside one week with reserve.
+# A child above it is usually an Epic wearing the wrong issue type - but not
+# always, so it is allowed when the issue body says why it cannot be split
+# (§3.5). That justification is enforced, not requested; see require_estimate_rationale.
+ESTIMATE_MAX_EPIC=100
+ESTIMATE_MAX_CHILD=4
 
-# estimate_is_valid MANDAYS — quarter-day steps only (§3.5).
+# estimate_quarters MANDAYS — echo the value in whole quarter-day units.
+# Everything downstream compares integers, so decimal boundaries (100 vs 100.25)
+# cannot be got subtly wrong.
+estimate_quarters() {
+  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
+  local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}" q
+  case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
+  case "$frac" in 00) q=0 ;; 25) q=1 ;; 50) q=2 ;; 75) q=3 ;; *) return 1 ;; esac
+  printf '%d' $(( whole * 4 + q ))
+}
+
+# estimate_is_valid MANDAYS MAX_MANDAYS — quarter-day steps only (§3.5).
 # 0.25 is both the minimum and the increment: 0.25, 0.5, 0.75, 1, 1.25 … There
 # is no finer granularity. Anything between the steps is false precision on a
 # number that already carries a review buffer, and 0 is not an estimate - it
 # would clear the §3.2 required-field gate while saying nothing.
-ESTIMATE_RULE_MSG="estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most $ESTIMATE_MAX"
 estimate_is_valid() {
-  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
-  local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}"
-  case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
-  case "$frac" in 00|25|50|75) ;; *) return 1 ;; esac
-  [ "$whole" = 0 ] && [ "$frac" = 00 ] && return 1
-  # The ceiling is on the whole value, so the fractional part has to be checked
-  # at the boundary too - 100.25 is over a limit of 100 even though its integer
-  # part is not.
-  [ "$whole" -gt "$ESTIMATE_MAX" ] && return 1
-  [ "$whole" -eq "$ESTIMATE_MAX" ] && [ "$frac" != 00 ] && return 1
-  return 0
+  local q max="${2:-$ESTIMATE_MAX_EPIC}"
+  q=$(estimate_quarters "$1") || return 1
+  [ "$q" -gt 0 ] || return 1
+  [ "$q" -le $(( max * 4 )) ] || return 1
+}
+
+estimate_rule_msg() {
+  printf 'estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most %s' "$1"
+}
+
+# require_estimate_rationale ITEM_ID MANDAYS
+# A child over ESTIMATE_MAX_CHILD is allowed only when its issue body explains
+# why it cannot be split. Read that from the body rather than taking it as a
+# flag: the body is what a reviewer reads six months later, and a flag would let
+# the two drift. Silence here means the child should have been decomposed.
+# estimate_rationale_ok BODY — 0 when the body carries a usable reason.
+# Exit 1 = no '### Estimate' section, 2 = section present but empty or too short
+# to be a reason. Pure so it can be tested without touching a live issue.
+estimate_rationale_ok() {
+  local body="$1" rationale
+  printf '%s' "$body" | grep -qiE '^#{2,4}[[:space:]]*Estimate[[:space:]]*$' || return 1
+  rationale=$(printf '%s' "$body" \
+    | sed -n '/^#\{2,4\}[[:space:]]*[Ee]stimate[[:space:]]*$/,$p' \
+    | sed '1d' | sed -n '/^#\{2,4\}[[:space:]]/q;p' | tr -d '[:space:]')
+  [ "${#rationale}" -ge 20 ] || return 2
+}
+
+require_estimate_rationale() {
+  local item="$1" mandays="$2" body rc=0
+  body=$(gh api graphql -f id="$item" -f query='
+    query($id:ID!){ node(id:$id){ ... on ProjectV2Item {
+      content { ... on Issue { body } } } } }' \
+    -q '.data.node.content.body // ""' 2>/dev/null) \
+    || fail "could not read the issue body for item $item to check the estimate rationale"
+
+  estimate_rationale_ok "$body" || rc=$?
+  case "$rc" in
+    0) ;;
+    1) fail "child estimate ${mandays} exceeds ${ESTIMATE_MAX_CHILD} mandays: split it, or add an '### Estimate' section to the issue body saying why it cannot be split (§3.5)" ;;
+    2) fail "the '### Estimate' section is empty or too short to be a reason; state why ${mandays} mandays cannot be split (§3.5)" ;;
+  esac
 }
 
 # number_payload FIELD_ID NUMBER  (uses PROJECT_ID, ITEM_ID, GRAPHQL_DOC)
@@ -125,7 +171,8 @@ set_number() {
   # The quarter-day rule is Estimate's, not every NUMBER field's - a second
   # numeric field must not silently inherit it.
   if [ "$field_name" = "Estimate" ]; then
-    estimate_is_valid "$number" || { log "  warn: $ESTIMATE_RULE_MSG, got '$number'"; return 1; }
+    estimate_is_valid "$number" "$ESTIMATE_MAX" \
+      || { log "  warn: $(estimate_rule_msg "$ESTIMATE_MAX"), got '$number'"; return 1; }
   else
     [[ "$number" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
       || { log "  warn: $field_name must be numeric, got '$number'"; return 1; }

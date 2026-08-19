@@ -502,11 +502,21 @@ silences the §3.2 "missing Estimate" warning, so "not yet estimated" and
 Estimate already on an existing child is a developer's number, changed only
 with a before/after diff and explicit approval.
 
-**Estimates are capped at 100 mandays**, which is release capacity rather than
-an arbitrary limit: a release is a ~10-week development cycle (50 working days)
-and an Epic is staffed by at most 2 people. An Epic estimated above 100 cannot
-ship in one release and must be split into Epics that can; a child above it is
-an Epic wearing the wrong issue type.
+**Estimate ceilings come from delivery capacity, not from taste.**
+
+| Scope | Cap | Why |
+|---|---|---|
+| **Epic** | 100 mandays | A release is a ~10-week development cycle (50 working days) and an Epic is staffed by at most 2 people. An Epic above 100 cannot ship in one release and must be split into Epics that can. |
+| **Sub-issue** | 4 mandays | Keeps a child deliverable inside one week with reserve. A child above 4 is usually an Epic wearing the wrong issue type. |
+
+**A child over 4 mandays needs a stated reason.** Prefer splitting it. When the
+work genuinely cannot be split, the issue body must carry an `### Estimate`
+section explaining why it has to be delivered whole — a single migration that
+would leave the schema inconsistent if applied in halves, a third-party
+integration with one atomic cutover, and so on. `/epic-breakdown` reads that
+section from the issue and refuses to write an over-cap child estimate without
+it, so the justification lives where a reviewer will find it months later
+rather than in a planning conversation nobody kept.
 
 **Estimates are quarter days — positive multiples of 0.25, nothing finer.**
 Sub-day values are normal under the agent-executed basis: compressed scaffolding

@@ -80,4 +80,54 @@ fi
   [ "$(jq -r '.variables.fieldId' <<<"$(number_payload FIELD1 1)")" = "FIELD1" ] \
     || { echo "FAIL: payload fieldId wrong"; exit 1; }
 ) || exit 1
+
+
+# 8) Scope selects the estimate ceiling (§3.5): epic 100, child 4.
+bash "$SCRIPT" --item-id ITEM1 --scope child --estimate 4 --dry-run >/dev/null 2>&1 \
+  || { echo "FAIL: 4 rejected at child scope"; exit 1; }
+bash "$SCRIPT" --item-id ITEM1 --scope epic --estimate 100 --dry-run >/dev/null 2>&1 \
+  || { echo "FAIL: 100 rejected at epic scope"; exit 1; }
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope epic --estimate 101 --dry-run 2>&1)
+[ $? -ne 0 ] || { echo "FAIL: 101 accepted at epic scope"; exit 1; }
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope banana --estimate 1 --dry-run 2>&1)
+[ $? -ne 0 ] || { echo "FAIL: bogus scope accepted"; exit 1; }
+
+# An over-cap child is allowed but must be flagged; an off-grid value must still
+# fail on the grid rather than on the missing rationale.
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope child --estimate 6 --dry-run 2>&1) \
+  || { echo "FAIL: over-cap child rejected outright in dry-run"; exit 1; }
+echo "$out" | grep -q "exceeds the 4-manday child cap" \
+  || { echo "FAIL: over-cap child not flagged: $out"; exit 1; }
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope child --estimate 5.3 --dry-run 2>&1)
+echo "$out" | grep -q "multiple of 0.25" \
+  || { echo "FAIL: off-grid child failed for the wrong reason: $out"; exit 1; }
+
+# 9) The over-cap rationale is read from the issue body, not taken on trust.
+(
+  SKILL_DIR="$HERE/.."
+  SCRIPT_TAG="test"
+  # shellcheck source=/dev/null
+  . "$SKILL_DIR/_common.sh"
+
+  estimate_rationale_ok "## Description
+Some work.
+### Estimate
+Single Flyway migration that cannot be applied in halves without leaving the
+schema inconsistent between steps."
+  [ $? -eq 0 ] || { echo "FAIL: valid rationale rejected"; exit 1; }
+
+  estimate_rationale_ok "## Description
+No estimate section here at all."
+  [ $? -eq 1 ] || { echo "FAIL: missing section not reported as missing"; exit 1; }
+
+  estimate_rationale_ok "### Estimate
+
+### Acceptance criteria
+- [ ] x"
+  [ $? -eq 2 ] || { echo "FAIL: empty section not reported as empty"; exit 1; }
+
+  estimate_rationale_ok "### Estimate
+too short"
+  [ $? -eq 2 ] || { echo "FAIL: stub rationale accepted"; exit 1; }
+) || exit 1
 echo "PASS"

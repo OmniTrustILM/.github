@@ -183,10 +183,24 @@ and stop unless confirmed.
    0.25 is both the minimum and the increment; `0`, `0.1`, `0.333` and `1.4` are
    all rejected outright by `set-epic-fields.sh`. Round to the nearest quarter
    day — a value derived by division (a day split three ways → `0.333`) fails
-   the write. Ceiling is **100** mandays, the release capacity of an Epic (a
-   ~10-week cycle, 50 working days, at most 2 people). An Epic estimated above
-   it cannot ship in one release and has to be split — say so rather than
-   writing the number.
+   the write.
+   **Two ceilings.** An **Epic** caps at **100** mandays: a ~10-week cycle, 50
+   working days, at most 2 people. Above it the Epic cannot ship in one release
+   — say so rather than writing the number.
+   A **child** caps at **4** mandays, so it stays deliverable inside one week
+   with reserve. Prefer splitting. When a child genuinely cannot be split, it is
+   allowed over the cap **only** if its body carries an `### Estimate` section
+   saying why — `set-epic-fields.sh --scope child` reads that section from the
+   issue and refuses the write without it. Put the reason in the body you build
+   in step 7.1, and surface it in the preview so it is approved along with
+   everything else:
+
+   ```markdown
+   ### Estimate
+
+   Single Flyway migration; applying it in halves would leave the schema
+   inconsistent between steps, so it cannot be split across sub-issues.
+   ```
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing
@@ -206,8 +220,8 @@ and stop unless confirmed.
    1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M>` (add `--severity <S>` for Bug children) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
    2. `link.sh --parent-node-id <epic> --child-node-id <child>` to attach the child.
    3. `link.sh --issue-node-id <child> --blocked-by-node-id <blocker>` for each dependency.
-   4. `set-epic-fields.sh --item-id <child item> --complexity <C> --estimate <E>`.
-   5. After all children: `set-epic-fields.sh --item-id <epic item> --complexity <C> --estimate <E>` for the Epic.
+   4. `set-epic-fields.sh --item-id <child item> --scope child --complexity <C> --estimate <E>`.
+   5. After all children: `set-epic-fields.sh --item-id <epic item> --scope epic --complexity <C> --estimate <E>` for the Epic.
    6. `enrich-epic.sh --repo <r> --number <epic#> --enriched-file -` to rewrite the Epic body.
    - **Leave child Version blank** so `version-propagation` automation copies it from the parent. Status stays Planning.
    - **Mid-sequence failure:** stop, and print three lists — completed (with URLs), the failing step (with the error), and not-yet-started. Created-but-unlinked children are also in `cache/orphans.log`. Never silently continue.
