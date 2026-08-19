@@ -39,7 +39,7 @@
   description: "Technical epic - for grouping issues"
 - name: testing
   color: "eab308"
-  description: "Manual or developer testing task — scenarios to verify (not qa, which is test automation / framework work)"
+  description: "Manual/developer testing task — scenarios to verify (not qa: test automation/framework)"
 - name: vulnerability
   color: "e11d48"
   description: "Security vulnerability or concern"
