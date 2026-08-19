@@ -388,7 +388,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
-| **Estimate** | Number | Mandays, fractional allowed (e.g. 0.25, 1.5) | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate, seeded by the Epic breakdown skill from the approved breakdown (§3.5). Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics; breakdown skill seeds children |
+| **Estimate** | Number | Mandays, fractional to at most two decimals (e.g. 0.25, 1.5) | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate, seeded by the Epic breakdown skill from the approved breakdown (§3.5). Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics; breakdown skill seeds children |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -502,10 +502,11 @@ silences the §3.2 "missing Estimate" warning, so "not yet estimated" and
 Estimate already on an existing child is a developer's number, changed only
 with a before/after diff and explicit approval.
 
-**Estimates may be fractional.** Mandays are a `Number` field and sub-day values
-are normal under the agent-executed basis — compressed scaffolding work is
-genuinely 0.25 or 0.75 mandays. The integer ranges in the Complexity table above
-are the developer-built baseline, not a constraint on what the field may hold.
+**Estimates may be fractional**, to at most two decimals — prefer quarter-day
+steps. Sub-day values are normal under the agent-executed basis: compressed
+scaffolding work is genuinely 0.25 or 0.75 mandays. The integer ranges in the
+Complexity table above are the developer-built baseline, not a constraint on
+what the field may hold.
 
 **What compresses under agent execution** — not uniform, so estimate per child
 rather than applying a blanket factor:

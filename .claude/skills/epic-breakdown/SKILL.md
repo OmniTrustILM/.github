@@ -178,6 +178,10 @@ and stop unless confirmed.
    Complexity scale; use the developer-built basis only when the Epic declares
    it, and **never repeat estimates inside a child body**), blocked-by
    dependencies, and a suggested assignee.
+   **Estimate granularity:** mandays, **at most two decimals**, no leading dot
+   and no exponent — prefer quarter-day steps (`0.25`, `0.5`, `1.5`, `3`).
+   `set-epic-fields.sh` rejects anything else outright, so a value derived by
+   division (a day split three ways → `0.333`) fails the write. Round it.
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing

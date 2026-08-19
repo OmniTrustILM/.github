@@ -74,39 +74,43 @@ set_single_select() {
   fi
 }
 
-# set_number FIELD_NAME INTEGER  (uses PROJECT_ID, ITEM_ID, CACHE_DIR, GRAPHQL_DOC)
-# Estimate accepts fractional mandays to at most two decimal places. The §3.5
-# agent-executed basis routinely lands below a day (compressed scaffolding work
-# is genuinely 0.75 or 1.25), and rounding those to whole days either inflates
-# the number or erases the difference between a half-day and a two-day task.
-# The integer-range heuristics in the §3.5 table remain the developer-built
-# baseline they always were.
-#
-# Rejects `.5`, `1e3`, and anything with more than two decimals: a leading-dot
-# or exponent form would reach jq as a valid number but reads as a typo, and
-# precision below 0.01 mandays is noise, not information.
+# estimate_is_valid MANDAYS — fractional to two decimals (§3.5).
+# Rejects `.5`, `1e3` and >2 decimals: jq would take them, but they read as
+# typos, and precision below 0.01 mandays is noise.
+ESTIMATE_RULE_MSG="estimate must be a non-negative number with at most two decimals"
 estimate_is_valid() {
   [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$ ]]
 }
 
+# number_payload FIELD_ID NUMBER  (uses PROJECT_ID, ITEM_ID, GRAPHQL_DOC)
+# Separated from the mutation so a test can assert the payload shape offline —
+# specifically that `variables.number` leaves as a JSON number. `gh -F`
+# type-infers and sends a non-integer as a string, which `Float!` rejects with
+# the unhelpful "provided invalid value"; `--argjson` keeps the type.
+number_payload() {
+  jq -n --arg q "$(gql_op SetNumberValue)" --arg p "$PROJECT_ID" --arg i "$ITEM_ID" \
+        --arg f "$1" --argjson n "$2" \
+        '{query:$q, variables:{projectId:$p, itemId:$i, fieldId:$f, number:$n}}'
+}
+
+# set_number FIELD_NAME MANDAYS  (uses PROJECT_ID, ITEM_ID, CACHE_DIR, GRAPHQL_DOC)
 set_number() {
   local field_name="$1" number="$2" field_id dtype
   field_id=$(jq -r --arg f "$field_name" '.fields[$f].id // ""' "$CACHE_DIR/project-fields.json")
   dtype=$(jq -r --arg f "$field_name" '.fields[$f].dataType // ""' "$CACHE_DIR/project-fields.json")
   [ -n "$field_id" ] || { log "  skip: field '$field_name' not in cache"; return 1; }
   [ "$dtype" = "NUMBER" ] || fail "field '$field_name' is '$dtype', not NUMBER"
-  estimate_is_valid "$number" \
-    || fail "estimate must be a non-negative number with at most two decimals, got '$number'"
-  # A JSON variables payload, not `gh -F`: -F type-infers, so it sends a
-  # non-integer as a string and the Float! argument rejects it with the
-  # unhelpful "provided invalid value". --argjson keeps it a JSON number.
-  if jq -n --arg q "$(gql_op SetNumberValue)" --arg p "$PROJECT_ID" --arg i "$ITEM_ID" \
-        --arg f "$field_id" --argjson n "$number" \
-        '{query:$q, variables:{projectId:$p, itemId:$i, fieldId:$f, number:$n}}' \
-     | gh api graphql --input - >/dev/null 2>&1; then
+  # `return 1` into the warn path, not `fail`: callers set several fields per
+  # item, and aborting here would leave the item half-written mid-sequence.
+  # set-epic-fields.sh validates up front, so reaching this is a caller bug.
+  estimate_is_valid "$number" || { log "  warn: $ESTIMATE_RULE_MSG, got '$number'"; return 1; }
+  if err=$(number_payload "$field_id" "$number" | gh api graphql --input - 2>&1 >/dev/null); then
     log "  set $field_name=$number"
   else
-    log "  warn: failed to set $field_name=$number"
+    # Keep the API's reason. Without it every failure - stale ID, lost scope,
+    # malformed payload - reads identically and has to be re-diagnosed by hand.
+    err=$(printf '%s' "$err" | tr '\n' ' ' | cut -c1-200)
+    log "  warn: failed to set $field_name=$number${err:+ ($err)}"
     return 1
   fi
 }
