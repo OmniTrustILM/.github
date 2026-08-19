@@ -67,7 +67,7 @@ fi
   CACHE_DIR="$SKILL_DIR/cache"
   GRAPHQL_DOC="$SKILL_DIR/epic-breakdown.graphql"
   SCRIPT_TAG="test"
-  # shellcheck source=/dev/null
+  # shellcheck source-path=SCRIPTDIR source=../_common.sh
   . "$SKILL_DIR/_common.sh"
   PROJECT_ID=PROJ1 ITEM_ID=ITEM1
   for n in 5 0.5 1.25; do
@@ -106,7 +106,7 @@ echo "$out" | grep -q "multiple of 0.25" \
 (
   SKILL_DIR="$HERE/.."
   SCRIPT_TAG="test"
-  # shellcheck source=/dev/null
+  # shellcheck source-path=SCRIPTDIR source=../_common.sh
   . "$SKILL_DIR/_common.sh"
 
   estimate_rationale_ok "## Description
