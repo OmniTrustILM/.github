@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Set Complexity (single-select) and/or Estimate (NUMBER, whole mandays) on an
-# Epic's or child's Project #5 item. epic-breakdown is the sanctioned writer of
-# these per §3.1/§3.5 (Complexity auto-set; Epic Estimate PM-owned, written here
-# behind the breakdown approval gate). Child Estimate is suggest-only and is NOT
-# written by the skill — do not call this for a child's Estimate.
+# Set Complexity (single-select) and/or Estimate (NUMBER, fractional mandays
+# allowed) on an Epic's or child's Project #5 item. epic-breakdown is the
+# sanctioned writer of these per §3.1/§3.5 (Complexity auto-set; Epic Estimate
+# PM-owned, written here behind the breakdown approval gate). Child Estimate is
+# suggest-only: the skill does not write it on its own initiative, though the
+# script permits it when a human explicitly asks.
 #
 # Usage:
-#   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High] [--estimate <int>] [--dry-run]
+#   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High] [--estimate <mandays>] [--dry-run]
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,8 +39,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   log "DRY-RUN — no mutations"
   [ -n "$COMPLEXITY" ] && log "would: set Complexity=$COMPLEXITY on item $ITEM_ID"
   [ -n "$ESTIMATE" ]   && log "would: set Estimate=$ESTIMATE on item $ITEM_ID"
-  # Validate the estimate is a whole number even in dry-run so the preview can't lie.
-  if [ -n "$ESTIMATE" ] && ! [[ "$ESTIMATE" =~ ^[0-9]+$ ]]; then fail "estimate must be a whole number of mandays, got '$ESTIMATE'"; fi
+  # Validate in dry-run too, with the same rule as the live path, so the preview can't lie.
+  if [ -n "$ESTIMATE" ] && ! estimate_is_valid "$ESTIMATE"; then
+    fail "estimate must be a non-negative number with at most two decimals, got '$ESTIMATE'"
+  fi
   exit 0
 fi
 

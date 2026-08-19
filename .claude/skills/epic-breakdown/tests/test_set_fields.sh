@@ -14,20 +14,26 @@ out=$(bash "$SCRIPT" --item-id ITEM1 --complexity High --estimate 5 --dry-run 2>
 echo "$out" | grep -qi "Complexity=High" || { echo "FAIL: complexity not planned"; exit 1; }
 echo "$out" | grep -qi "Estimate=5" || { echo "FAIL: estimate not planned"; exit 1; }
 
-# 2) Non-integer estimate is rejected (even in dry-run).
-if bash "$SCRIPT" --item-id ITEM1 --estimate 3.5 --dry-run >/dev/null 2>&1; then
-  echo "FAIL: fractional estimate accepted"; exit 1
-fi
-if bash "$SCRIPT" --item-id ITEM1 --estimate abc --dry-run >/dev/null 2>&1; then
-  echo "FAIL: non-numeric estimate accepted"; exit 1
-fi
+# 2) Fractional estimates are accepted. The agent-executed basis (§3.5) routinely
+#    produces sub-day numbers, and Estimate is a NUMBER field that stores floats.
+for e in 3.5 0.75 1.25 2 0.5; do
+  bash "$SCRIPT" --item-id ITEM1 --estimate "$e" --dry-run >/dev/null 2>&1 \
+    || { echo "FAIL: estimate '$e' rejected"; exit 1; }
+done
 
-# 3) Missing item-id is rejected.
+# 3) Malformed and out-of-range estimates are still rejected.
+for e in abc 3.456 -1 "" 1e3 .5; do
+  if bash "$SCRIPT" --item-id ITEM1 --estimate "$e" --dry-run >/dev/null 2>&1; then
+    echo "FAIL: estimate '$e' accepted"; exit 1
+  fi
+done
+
+# 4) Missing item-id is rejected.
 if bash "$SCRIPT" --complexity Low --dry-run >/dev/null 2>&1; then
   echo "FAIL: missing item-id accepted"; exit 1
 fi
 
-# 4) Nothing to set is rejected.
+# 5) Nothing to set is rejected.
 if bash "$SCRIPT" --item-id ITEM1 --dry-run >/dev/null 2>&1; then
   echo "FAIL: empty field set accepted"; exit 1
 fi

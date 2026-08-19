@@ -75,18 +75,35 @@ set_single_select() {
 }
 
 # set_number FIELD_NAME INTEGER  (uses PROJECT_ID, ITEM_ID, CACHE_DIR, GRAPHQL_DOC)
-# Estimate is whole mandays (§3.5 heuristics use integer ranges). If fractional
-# mandays are ever needed, switch to a JSON variables payload — gh -F sends
-# non-integers as strings, which a Float! argument would reject.
+# Estimate accepts fractional mandays to at most two decimal places. The §3.5
+# agent-executed basis routinely lands below a day (compressed scaffolding work
+# is genuinely 0.75 or 1.25), and rounding those to whole days either inflates
+# the number or erases the difference between a half-day and a two-day task.
+# The integer-range heuristics in the §3.5 table remain the developer-built
+# baseline they always were.
+#
+# Rejects `.5`, `1e3`, and anything with more than two decimals: a leading-dot
+# or exponent form would reach jq as a valid number but reads as a typo, and
+# precision below 0.01 mandays is noise, not information.
+estimate_is_valid() {
+  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$ ]]
+}
+
 set_number() {
   local field_name="$1" number="$2" field_id dtype
   field_id=$(jq -r --arg f "$field_name" '.fields[$f].id // ""' "$CACHE_DIR/project-fields.json")
   dtype=$(jq -r --arg f "$field_name" '.fields[$f].dataType // ""' "$CACHE_DIR/project-fields.json")
   [ -n "$field_id" ] || { log "  skip: field '$field_name' not in cache"; return 1; }
   [ "$dtype" = "NUMBER" ] || fail "field '$field_name' is '$dtype', not NUMBER"
-  [[ "$number" =~ ^[0-9]+$ ]] || fail "estimate must be a whole number of mandays, got '$number'"
-  if gh api graphql -f query="$(gql_op SetNumberValue)" \
-       -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$field_id" -F number="$number" >/dev/null 2>&1; then
+  estimate_is_valid "$number" \
+    || fail "estimate must be a non-negative number with at most two decimals, got '$number'"
+  # A JSON variables payload, not `gh -F`: -F type-infers, so it sends a
+  # non-integer as a string and the Float! argument rejects it with the
+  # unhelpful "provided invalid value". --argjson keeps it a JSON number.
+  if jq -n --arg q "$(gql_op SetNumberValue)" --arg p "$PROJECT_ID" --arg i "$ITEM_ID" \
+        --arg f "$field_id" --argjson n "$number" \
+        '{query:$q, variables:{projectId:$p, itemId:$i, fieldId:$f, number:$n}}' \
+     | gh api graphql --input - >/dev/null 2>&1; then
     log "  set $field_name=$number"
   else
     log "  warn: failed to set $field_name=$number"
