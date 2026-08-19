@@ -4,6 +4,9 @@
 - name: qa
   color: "14b8a6"
   description: "QA testing framework / automation work"
+- name: testing
+  color: "eab308"
+  description: "Manual or developer testing task — scenarios to verify (not qa, which is test automation / framework work)"
 - name: documentation
   color: "06b6d4"
   description: "Documentation work"
