@@ -93,6 +93,11 @@ ESTIMATE_MAX_CHILD=4
 estimate_quarters() {
   [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
   local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}" q
+  # Bound the integer part before multiplying. Bash arithmetic is 64-bit and
+  # wraps silently, so a huge value can land back inside the cap - 4611686018427387905 * 4
+  # is 4. Count digits rather than comparing: a value past INT64_MAX makes the
+  # comparison itself an arithmetic error.
+  [ "${#whole}" -le 6 ] || return 1
   case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
   case "$frac" in 00) q=0 ;; 25) q=1 ;; 50) q=2 ;; 75) q=3 ;; *) return 1 ;; esac
   printf '%d' $(( whole * 4 + q ))
@@ -112,6 +117,15 @@ estimate_is_valid() {
 
 estimate_rule_msg() {
   printf 'estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most %s' "$1"
+}
+
+# estimate_writable MANDAYS — the guard set_number applies before writing.
+# Deliberately the hard Epic ceiling, never the caller's scope cap: the child
+# cap and its rationale rule are the caller's policy and have already run by
+# here. Re-applying the child cap would make an approved over-cap child
+# unwritable, which is exactly the escape hatch the rationale rule exists for.
+estimate_writable() {
+  estimate_is_valid "$1" "$ESTIMATE_MAX_EPIC"
 }
 
 # estimate_rationale_ok BODY — 0 when the body carries a usable reason.
@@ -171,8 +185,8 @@ set_number() {
   # The quarter-day rule is Estimate's, not every NUMBER field's - a second
   # numeric field must not silently inherit it.
   if [ "$field_name" = "Estimate" ]; then
-    estimate_is_valid "$number" "$ESTIMATE_MAX" \
-      || { log "  warn: $(estimate_rule_msg "$ESTIMATE_MAX"), got '$number'"; return 1; }
+    estimate_writable "$number" \
+      || { log "  warn: $(estimate_rule_msg "$ESTIMATE_MAX_EPIC"), got '$number'"; return 1; }
   else
     [[ "$number" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
       || { log "  warn: $field_name must be numeric, got '$number'"; return 1; }

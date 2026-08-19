@@ -130,4 +130,30 @@ No estimate section here at all."
 too short"
   [ $? -eq 2 ] || { echo "FAIL: stub rationale accepted"; exit 1; }
 ) || exit 1
+# 10) An integer part large enough to wrap 64-bit arithmetic must not land back
+#     inside the cap. 4611686018427387905 * 4 is 4 in bash.
+(
+  SKILL_DIR="$HERE/.."
+  SCRIPT_TAG="test"
+  # shellcheck source-path=SCRIPTDIR source=../_common.sh
+  . "$SKILL_DIR/_common.sh"
+  for v in 4611686018427387905 9223372036854775807 1000000 100000; do
+    if estimate_is_valid "$v" "$ESTIMATE_MAX_EPIC"; then
+      echo "FAIL: oversized estimate '$v' accepted"; exit 1
+    fi
+  done
+
+# 11) set_number's guard is the hard Epic ceiling, not the caller's scope cap.
+#     An over-cap child that cleared the rationale rule must still be writable;
+#     re-applying the child cap here would make the escape hatch dead code.
+  ESTIMATE_MAX=4   # what set-epic-fields.sh sets for --scope child
+  if estimate_is_valid 6 "$ESTIMATE_MAX"; then
+    echo "FAIL: 6 is not over the child cap - test asserts nothing"; exit 1
+  fi
+  estimate_writable 6 || { echo "FAIL: approved over-cap child is not writable"; exit 1; }
+  estimate_writable 100 || { echo "FAIL: 100 not writable"; exit 1; }
+  if estimate_writable 101; then echo "FAIL: 101 writable"; exit 1; fi
+  if estimate_writable 0; then echo "FAIL: 0 writable"; exit 1; fi
+) || exit 1
+
 echo "PASS"
