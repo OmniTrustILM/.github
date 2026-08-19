@@ -1,45 +1,45 @@
-- name: vulnerability
-  color: "e11d48"
-  description: "Security vulnerability or concern"
-- name: qa
-  color: "14b8a6"
-  description: "QA testing framework / automation work"
-- name: testing
-  color: "eab308"
-  description: "Manual or developer testing task — scenarios to verify (not qa, which is test automation / framework work)"
-- name: documentation
-  color: "06b6d4"
-  description: "Documentation work"
-- name: tech-epic
-  color: "4b3e4f"
-  description: "Technical epic - for grouping issues"  
-- name: ignore-for-release
-  color: "6b7280"
-  description: "Exclude from auto-generated release notes"
-- name: new-feature
-  color: "22c55e"
-  description: "Wholly new functionality (for release notes categorization)"
-- name: enhancement
-  color: "3b82f6"
-  description: "Improvement to existing functionality"
 - name: bug
   color: "ef4444"
   description: "Bug fix"
-- name: refactoring
-  color: "8b5cf6"
-  description: "Code quality improvement"
 - name: dependencies
   color: "a855f7"
   description: "Dependency updates"
-- name: performance
-  color: "f97316"
-  description: "Performance related"
-- name: preview
-  color: "a78bfa"
-  description: "Triggers staged/preview environment deployment"
+- name: documentation
+  color: "06b6d4"
+  description: "Documentation work"
+- name: enhancement
+  color: "3b82f6"
+  description: "Improvement to existing functionality"
 - name: good first issue
   color: "7dd3fc"
   description: "Good for newcomers"
 - name: help wanted
   color: "bfdbfe"
   description: "Extra attention needed"
+- name: ignore-for-release
+  color: "6b7280"
+  description: "Exclude from auto-generated release notes"
+- name: new-feature
+  color: "22c55e"
+  description: "Wholly new functionality (for release notes categorization)"
+- name: performance
+  color: "f97316"
+  description: "Performance related"
+- name: preview
+  color: "a78bfa"
+  description: "Triggers staged/preview environment deployment"
+- name: qa
+  color: "14b8a6"
+  description: "QA testing framework / automation work"
+- name: refactoring
+  color: "8b5cf6"
+  description: "Code quality improvement"
+- name: tech-epic
+  color: "4b3e4f"
+  description: "Technical epic - for grouping issues"
+- name: testing
+  color: "eab308"
+  description: "Manual or developer testing task — scenarios to verify (not qa, which is test automation / framework work)"
+- name: vulnerability
+  color: "e11d48"
+  description: "Security vulnerability or concern"
