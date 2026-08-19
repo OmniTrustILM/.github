@@ -1,10 +1,12 @@
 name: Action tests
 
-# Runs the shell test suites for composite actions AND repo scripts (e.g. the
-# resolve-trivy-config security-gate resolver, and repo-template-sync's
-# render-codeowners resolver). ShellCheck lints the scripts; this workflow
-# actually executes their tests so a regression — a silently weakened vuln gate,
-# or a CODEOWNERS resolver that mis-assigns ownership — cannot ship uncaught.
+# Runs the shell test suites in this repo: composite actions (e.g. the
+# resolve-trivy-config security-gate resolver), repo scripts (repo-template-sync's
+# render-codeowners resolver), and Claude Code skills (e.g. pr-hygiene's target
+# resolver). ShellCheck lints those scripts; this workflow actually executes
+# their tests so a regression — a silently weakened vuln gate, a CODEOWNERS
+# resolver that mis-assigns ownership, or a broken skill output contract —
+# cannot ship uncaught.
 
 on:
   push:
@@ -12,11 +14,13 @@ on:
     paths:
       - ".github/actions/**"
       - ".github/scripts/**"
+      - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
   pull_request:
     paths:
       - ".github/actions/**"
       - ".github/scripts/**"
+      - ".claude/skills/**"
       - ".github/workflows/action-tests.yml"
 
 permissions:
@@ -38,12 +42,12 @@ jobs:
         run: |
           shopt -s globstar nullglob
           found=0
-          for t in .github/actions/**/*.test.sh .github/scripts/**/*.test.sh; do
+          for t in .github/actions/**/*.test.sh .github/scripts/**/*.test.sh .claude/skills/**/*.test.sh; do
             found=1
             echo "::group::$t"
             bash "$t"
             echo "::endgroup::"
           done
           if [ "$found" -eq 0 ]; then
-            echo "No *.test.sh suites found under .github/actions/ or .github/scripts/"
+            echo "No *.test.sh suites found under .github/actions/, .github/scripts/, or .claude/skills/"
           fi

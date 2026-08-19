@@ -38,7 +38,7 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 - **epic-breakdown** — requirement → planned Epic + sub-issues (preflight / breakdown / reconcile modes); the sanctioned writer of Complexity/Estimate.
 - **pr-hygiene** — pre-merge comment and log hygiene over the lines a PR adds; proposes before/after edits, applies only on confirm. Not a Project #5 skill: it reads a git diff, and it is run from a clone of the *reviewed* repo rather than from this one.
 
-House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/parsing lives in scripts; every mutation is gated behind human approval (methodics §10). CI lints `.claude/skills/**/*.sh` with ShellCheck. The runtime-discovered gitignored `cache/` and the `read:project`/`project` scopes apply to the Project #5 skills; `pr-hygiene` needs only `repo` and reads a git diff, so it has neither.
+House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/parsing lives in scripts; every mutation is gated behind human approval (methodics §10). CI lints `.claude/skills/**/*.sh` with ShellCheck and runs any `*.test.sh` suite. The runtime-discovered gitignored `cache/` and the `read:project`/`project` scopes apply to the Project #5 skills; `pr-hygiene` needs only `repo` and reads a git diff, so it has neither.
 
 ### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
 - **Bug**: requires `severity`. Recommended: module, priority, version, estimate, assignee.
@@ -74,11 +74,13 @@ Reporting and CI:
 
 - **Project Health Report** (`.github/workflows/project-health-report.yml`) — weekly Monday 05:00 UTC, or manual. Generates a Markdown report of missing-field errors and staleness warnings.
 - **ShellCheck** (`.github/workflows/shellcheck.yml`) — on PRs touching `.github/scripts/**` or `.github/actions/**`. Lints all bash.
-- **Action tests** (`.github/workflows/action-tests.yml`) — on changes to `.github/actions/**` or `.github/scripts/**`. Runs each `*.test.sh` suite under both (e.g. the `resolve-trivy-config` resolver and repo-template-sync's `render-codeowners` tests) so a regression that silently weakened the vuln gate or mis-assigned CODEOWNERS can't ship uncaught.
+- **Action tests** (`.github/workflows/action-tests.yml`) — on changes to `.github/actions/**`, `.github/scripts/**`, or `.claude/skills/**`. Runs every `*.test.sh` suite under all three (e.g. the `resolve-trivy-config` resolver, repo-template-sync's `render-codeowners` tests, and `pr-hygiene`'s target resolver) so a regression that silently weakened the vuln gate, mis-assigned CODEOWNERS, or broke a skill's output contract can't ship uncaught.
 
 Reusable workflows (called by other org repos' caller workflows):
 
 - **Test Docker image** (`.github/workflows/containers-test.yml`) and **Build & push** (`.github/workflows/containers-build-and-push.yml`) — build per-arch images and scan them with Trivy. The vulnerability gate enforces a single org-default policy bundled at `.github/actions/resolve-trivy-config/trivy.yaml` (fails on CRITICAL + HIGH OS/library vulns and leaked secrets). Under the locked default, a repo-local `.trivyignore` is neutralized so it cannot silently suppress findings. A repo may fully replace the policy with its own `trivy-config` file only by passing `allow-trivy-config-override: true` (default `false`); the choice is resolved by the `resolve-trivy-config` action. This override is **self-service** — it is set in the consuming repo's own caller workflow and reviewed there, not centrally gated in this repo — so with override enabled a repo owns its policy (including its own `.trivyignore`) entirely.
+
+  `containers-build-and-push.yml` also accepts `additional-images` — extra repository paths in the same registry, one per line — to publish a single build under several paths. The build and the Trivy scan still run once against `image`; the manifest job creates that same content-addressed manifest under every path, so all of them resolve to one digest that was scanned and signed exactly once. Tags, per-arch cosign signatures and the README go to every path. Prefer this over a second caller job: calling the workflow twice rebuilds the image and yields a *different* digest per path.
 
 ### Composite actions (consumed by caller workflows in target repos)
 
