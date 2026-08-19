@@ -6,6 +6,8 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 render="$here/render-codeowners.sh"
+# shellcheck source=/dev/null
+source "$here/codeowners-sentinel.sh"
 
 command -v yq >/dev/null 2>&1 || { echo "yq required for these tests" >&2; exit 1; }
 
@@ -14,6 +16,7 @@ trap 'rm -f "$map"' EXIT
 cat > "$map" <<'YAML'
 core:
   - core
+  - dual-listed
   - proxy
   - saas-provisioning
 ui:
@@ -27,6 +30,7 @@ qa:
 infra:
   - saas-provisioning
 exclude:
+  - dual-listed
   - figma-test
 YAML
 
@@ -57,6 +61,17 @@ check "multi core+ui+infra"   0 "*  @OmniTrustILM/maintainers-core @OmniTrustILM
 check "qa"                    0 "*  @OmniTrustILM/qa" automated-testing-framework
 check "default maintainers"   0 "*  @OmniTrustILM/maintainers" some-uncurated-repo
 check "excluded -> exit 3"    3 "" figma-test
+# Precedence: exclude wins over a domain match (a repo in both opts out).
+check "exclude beats domain"  3 "" dual-listed
+
+# Header sentinel — sync-all.sh/diff-all.sh match line 1 on it; assert it exactly.
+sentinel_out="$(bash "$render" core "$map")"
+first="$(printf '%s\n' "$sentinel_out" | head -n1)"
+if [ "$first" = "$CODEOWNERS_SENTINEL" ]; then
+  echo "ok   sentinel header"
+else
+  echo "FAIL sentinel: got '$first', expected '$CODEOWNERS_SENTINEL'"; fail=1
+fi
 
 # Preflight: an unparseable / missing map must exit 2, never fall through to default.
 set +e

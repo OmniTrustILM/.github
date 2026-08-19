@@ -11,6 +11,12 @@ name: Repo Template Sync
 # One PR per repo, up to 3 commits (one per task, skipped if no diff).
 # If all tasks are no-op for a repo, no PR is opened.
 #
+# CODEOWNERS precondition: a maintainers-*/qa team is honored as a code owner
+# only if it has write access to the repo. Those team→repo grants are done
+# MANUALLY, per repo, matched to the repos passed to a given dispatch — grant
+# them before (or alongside) dispatching for those repos, or the rendered
+# CODEOWNERS is inert (no reviewer requested, the entry flagged invalid).
+#
 # Self-excludes the .github repo itself.
 #
 # Opt-out levers:

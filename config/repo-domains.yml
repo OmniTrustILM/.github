@@ -2,13 +2,15 @@
 # Domain = OWNER team. Source is curated purpose, never GitHub primaryLanguage
 # (Linguist misreports scaffold/connector repos).
 #
-# Resolution order in the renderer:
-#   1. repo in any domain (core/ui/go/infra) -> @OmniTrustILM/maintainers-<domain>
-#      A repo may appear in SEVERAL domains  -> all those teams become owners
-#      on ONE CODEOWNERS line; an approval from ANY ONE of them satisfies the
-#      code-owner gate (multiple owners on a line = OR, not AND).
-#   2. repo in `qa`                          -> + @OmniTrustILM/qa
-#   3. anything else (common repos)          -> @OmniTrustILM/maintainers  (DEFAULT)
+# Owner resolution (exclude -> domain(s) -> qa -> default maintainers; a repo
+# in several domains gets all those teams on one line, any one's approval = OK)
+# is implemented and documented in the renderer, the single source of truth:
+# .github/scripts/repo-template-sync/render-codeowners.sh
+#
+# Each domain key <k> must have a matching @OmniTrustILM/maintainers-<k> team
+# (and `qa` a @OmniTrustILM/qa team); the renderer emits those slugs verbatim.
+# A key with no matching team yields an inert CODEOWNERS line (GitHub requests
+# no reviewer) — create the team before adding a domain key.
 #
 # The renderer honors an optional `exclude:` list; none is defined today.
 # Two uses: (1) junk repos are removed from the org, not skipped; (2) adding a

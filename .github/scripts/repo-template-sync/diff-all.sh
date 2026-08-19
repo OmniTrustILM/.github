@@ -9,6 +9,9 @@
 # Writes: Markdown report to $GITHUB_STEP_SUMMARY
 set -euo pipefail
 
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/codeowners-sentinel.sh"
+
 FILES=(
   "templates/release.yml:.github/release.yml"
   "templates/caller-workflows/issue-automation.yml:.github/workflows/issue-automation.yml"
@@ -37,7 +40,7 @@ else
   for loc in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
     if [ -f "target/$loc" ]; then existing_co="$loc"; break; fi
   done
-  if [ -n "$existing_co" ] && ! head -n1 "target/$existing_co" | grep -qF "# Synced by repo-template-sync"; then
+  if [ -n "$existing_co" ] && ! head -n1 "target/$existing_co" | grep -qF "$CODEOWNERS_SENTINEL"; then
     co_state="SKIPPED (existing $existing_co not sync-managed)"
   elif [ ! -f target/.github/CODEOWNERS ]; then
     co_state="MISSING (would be created)"

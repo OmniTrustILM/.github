@@ -15,6 +15,9 @@
 # Maintainer opt-out: closed-unmerged PR on that branch → skip.
 set -euo pipefail
 
+# shellcheck source=/dev/null
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/codeowners-sentinel.sh"
+
 cd target
 git config user.name "ilm-project-bot[bot]"
 git config user.email "ilm-project-bot[bot]@users.noreply.github.com"
@@ -86,7 +89,7 @@ if [ "$co_rc" -eq 0 ]; then
   for loc in .github/CODEOWNERS CODEOWNERS docs/CODEOWNERS; do
     if [ -f "$loc" ]; then existing_co="$loc"; break; fi
   done
-  if [ -n "$existing_co" ] && ! head -n1 "$existing_co" | grep -qF "# Synced by repo-template-sync"; then
+  if [ -n "$existing_co" ] && ! head -n1 "$existing_co" | grep -qF "$CODEOWNERS_SENTINEL"; then
     echo "::warning::$REPO_NAME has an existing $existing_co not managed by sync — skipping CODEOWNERS"
     echo "- CODEOWNERS: skipped (existing $existing_co not sync-managed)" >> "$summary_file"
   else

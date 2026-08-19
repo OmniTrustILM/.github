@@ -23,6 +23,9 @@ set -euo pipefail
 repo="${1:?repo name required}"
 map="${2:?path to repo-domains.yml required}"
 
+# shellcheck source=/dev/null
+source "$(dirname "${BASH_SOURCE[0]}")/codeowners-sentinel.sh"
+
 # Preflight: fail loudly rather than falling through to the default owner. If yq
 # were missing or the map unparseable, every `yq -e` lookup below would return
 # non-zero (read as "no match"), owners[] would stay empty, and EVERY repo would
@@ -56,6 +59,6 @@ if [ "${#owners[@]}" -eq 0 ]; then
   owners+=("@OmniTrustILM/maintainers")
 fi
 
-echo "# Synced by repo-template-sync — do not edit by hand."
+echo "$CODEOWNERS_SENTINEL"
 echo "# Owner = domain maintainer team (OmniTrustILM permissions model)."
 echo "*  ${owners[*]}"
