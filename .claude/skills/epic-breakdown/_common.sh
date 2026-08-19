@@ -74,9 +74,12 @@ set_single_select() {
   fi
 }
 
-# Ceiling on a single item's estimate. Guards a fat-fingered 500 for 50; an
-# item genuinely larger than this is an Epic that needs splitting, not a number.
-ESTIMATE_MAX=365
+# Ceiling on a single item's estimate, derived from release capacity rather than
+# picked: a release is a ~10-week development cycle (50 working days) and an
+# Epic is staffed by at most 2 people, so 100 mandays is the largest estimate
+# that can fit one release. Above it the number is either a typo (500 for 50) or
+# an Epic that cannot ship in one cycle and has to be split.
+ESTIMATE_MAX=100
 
 # estimate_is_valid MANDAYS — quarter-day steps only (§3.5).
 # 0.25 is both the minimum and the increment: 0.25, 0.5, 0.75, 1, 1.25 … There
@@ -90,7 +93,12 @@ estimate_is_valid() {
   case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
   case "$frac" in 00|25|50|75) ;; *) return 1 ;; esac
   [ "$whole" = 0 ] && [ "$frac" = 00 ] && return 1
-  [ "$whole" -le "$ESTIMATE_MAX" ] || return 1
+  # The ceiling is on the whole value, so the fractional part has to be checked
+  # at the boundary too - 100.25 is over a limit of 100 even though its integer
+  # part is not.
+  [ "$whole" -gt "$ESTIMATE_MAX" ] && return 1
+  [ "$whole" -eq "$ESTIMATE_MAX" ] && [ "$frac" != 00 ] && return 1
+  return 0
 }
 
 # number_payload FIELD_ID NUMBER  (uses PROJECT_ID, ITEM_ID, GRAPHQL_DOC)

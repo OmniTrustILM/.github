@@ -17,7 +17,7 @@ echo "$out" | grep -qi "Estimate=5" || { echo "FAIL: estimate not planned"; exit
 # 2) Quarter-day estimates are accepted, and the value survives to the preview.
 #    0.25 is both the minimum and the increment; both decimal spellings of a
 #    half day (0.5 and 0.50) are the same step and both pass.
-for e in 0.25 0.5 0.50 0.75 1 1.25 2 3.75 365; do
+for e in 0.25 0.5 0.50 0.75 1 1.25 2 3.75 100; do
   out=$(bash "$SCRIPT" --item-id ITEM1 --estimate "$e" --dry-run 2>&1) \
     || { echo "FAIL: estimate '$e' rejected"; exit 1; }
   echo "$out" | grep -qi "Estimate=$e" || { echo "FAIL: estimate '$e' mangled in preview"; exit 1; }
@@ -28,9 +28,9 @@ done
 #    so these genuinely exercise estimate_is_valid.
 #      0, 0.00  - not an estimate, but would clear the §3.2 gate
 #      0.1, 1.4, 3.456, 0.333 - between the steps
-#      366      - above the ceiling
+#      100.25, 101 - above the release-capacity ceiling
 #      abc, -1, 1e3, .5 - malformed
-for e in 0 0.00 0.1 1.4 3.456 0.333 366 abc -1 1e3 .5; do
+for e in 0 0.00 0.1 1.4 3.456 0.333 100.25 101 abc -1 1e3 .5; do
   out=$(bash "$SCRIPT" --item-id ITEM1 --complexity Low --estimate "$e" --dry-run 2>&1)
   [ $? -ne 0 ] || { echo "FAIL: estimate '$e' accepted"; exit 1; }
   echo "$out" | grep -q "multiple of 0.25" \

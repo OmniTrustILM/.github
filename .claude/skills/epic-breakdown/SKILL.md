@@ -183,7 +183,10 @@ and stop unless confirmed.
    0.25 is both the minimum and the increment; `0`, `0.1`, `0.333` and `1.4` are
    all rejected outright by `set-epic-fields.sh`. Round to the nearest quarter
    day — a value derived by division (a day split three ways → `0.333`) fails
-   the write. Ceiling is 365; anything larger is an Epic that needs splitting.
+   the write. Ceiling is **100** mandays, the release capacity of an Epic (a
+   ~10-week cycle, 50 working days, at most 2 people). An Epic estimated above
+   it cannot ship in one release and has to be split — say so rather than
+   writing the number.
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing

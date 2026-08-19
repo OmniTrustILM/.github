@@ -502,6 +502,12 @@ silences the §3.2 "missing Estimate" warning, so "not yet estimated" and
 Estimate already on an existing child is a developer's number, changed only
 with a before/after diff and explicit approval.
 
+**Estimates are capped at 100 mandays**, which is release capacity rather than
+an arbitrary limit: a release is a ~10-week development cycle (50 working days)
+and an Epic is staffed by at most 2 people. An Epic estimated above 100 cannot
+ship in one release and must be split into Epics that can; a child above it is
+an Epic wearing the wrong issue type.
+
 **Estimates are quarter days — positive multiples of 0.25, nothing finer.**
 Sub-day values are normal under the agent-executed basis: compressed scaffolding
 work is genuinely 0.25 or 0.75 mandays. 0.25 is both the minimum and the
