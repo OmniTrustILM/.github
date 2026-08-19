@@ -28,13 +28,19 @@ inputs:
     description: Emit the findings JSON array and nothing else; makes the run read-only.
     required: false
     example: "--propose-only"
+  - name: PATHS
+    description: >
+      Pathspec after a bare `--` that narrows a --worktree scan to those paths.
+      Ignored for PR and branch targets.
+    required: false
+    example: "-- src/api src/db"
 permissions:
   - cli:gh:read
   - cli:git:read
   - github:contents:read
   - local:files:write
 created_at: 2026-08-14
-updated_at: 2026-08-15
+updated_at: 2026-08-19
 ---
 
 # Skill: PR Hygiene
@@ -44,16 +50,18 @@ Find low-value comments, logging noise, and small code-hygiene issues in the lin
 ## Invocation
 
 ```
-/pr-hygiene [PR url | PR number | branch | --worktree] [--propose-only]
+/pr-hygiene [PR url | PR number | branch | --worktree] [--propose-only] [-- <paths…>]
 ```
 
-Both arguments are optional. With no target, the current branch is used.
+All arguments are optional. With no target, the current branch is used.
 
 `--worktree` scans uncommitted changes against `HEAD` rather than a committed range — for checking code that has just been written, before it becomes a commit. It is a target form, so it composes with `--propose-only` exactly as a PR number does.
 
+Everything after a bare `--` is a pathspec that narrows the scan. It applies to `--worktree` only — with any other target the scan range is the diff itself.
+
 ## Modes
 
-Parse the arguments for the flag `--propose-only` (strip it before resolving the target):
+Parse the arguments for the flag `--propose-only` and for a bare `--` path delimiter (strip both, and everything after `--`, before resolving the target):
 
 - **Default (interactive)** — scan, present the triage table, ask which fixes to apply, then edit the working tree.
 - **`--propose-only`** — scan and emit the **findings JSON array** (schema under `--propose-only` mode: emit JSON, below) and nothing else. No table, no questions, no edits. This is the mode for programmatic callers — a wrapper command, a script, a CI step — so keep the output a clean machine-readable array with no prose around it.
@@ -84,11 +92,13 @@ If the range is empty, stop — in default mode say so plainly; under `--propose
 **A worktree target has no commit pair.** When `diff_to=WORKTREE`, capture the change set from the tree itself:
 
 ```bash
-git --no-pager diff HEAD -- <paths>                    # modified tracked files
-git ls-files --others --exclude-standard -- <paths>    # new files, added in full
+git --no-pager diff HEAD -- <paths…>                    # modified tracked files
+git ls-files --others --exclude-standard -- <paths…>    # new files, added in full
 ```
 
-Treat each untracked file as wholly added. The pathspec is optional and narrows the scan: a caller that knows which files it just wrote passes exactly those, keeping unrelated edits and build side-effects — regenerated sources, rewritten lock files, stray scratch files — out of the scan and out of the findings. With no pathspec the whole tree is in scope. A clean tree is the empty-range case above.
+Treat each untracked file as wholly added. `<paths…>` is whatever followed the `--` delimiter; with none, drop the `-- <paths…>` and the whole tree is in scope. Narrowing keeps unrelated edits and build side-effects — regenerated sources, rewritten lock files, stray scratch files — out of the findings. A clean tree is the empty-range case above.
+
+**Symlinks are out of scope.** A PR scan reads blobs through `git show` and never dereferences; a worktree scan touches files on disk, so following a symlink would read — and on approval write — outside the repository. Drop every path for which `[ -L "$path" ]` holds, tracked or untracked, before scanning. A symlink's content is just its target path and never a hygiene finding.
 
 **Before applying anything in Step 4**, require `git rev-parse HEAD` to equal `head_oid`. If it differs, report the findings and refuse to edit: the working tree is not what was scanned. This holds for branch-only runs too, where `head_oid` is the named branch's commit.
 
