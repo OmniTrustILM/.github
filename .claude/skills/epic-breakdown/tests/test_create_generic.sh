@@ -41,13 +41,12 @@ out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
   --repo "$REPO" --type bug --title "B" --body-file - --severity Major --dry-run 2>&1)
 echo "$out" | grep -qi "Severity=Major" || { echo "FAIL: severity not planned"; exit 1; }
 
-# 6) Regression (PR #42): label-less Task, NON-dry-run, executed with /bin/bash.
+# 6) Regression: label-less Task, NON-dry-run, executed with /bin/bash.
 # Bash 3.2 (macOS /bin/bash) under `set -u` treats an empty-array expansion as an
 # unbound variable, so an unguarded "${LABEL_FLAGS[@]}" crashed the real
 # `gh issue create` line for label-less types. Dry-run exits before that line,
-# hence this stubbed full-sequence run. A stub `gh` on PATH answers the whole
-# creation sequence offline; `jq` stays real. Only reproduces the crash where
-# /bin/bash is 3.2 (macOS) - on Linux it still covers the non-dry-run path.
+# hence this stubbed full-sequence run; `jq` stays real. Only reproduces the
+# crash where /bin/bash is 3.2 (macOS) - on Linux it covers the non-dry-run path.
 STUB_DIR=$(mktemp -d)
 trap 'rm -rf "$STUB_DIR"' EXIT
 cat > "$STUB_DIR/gh" <<'STUB'
