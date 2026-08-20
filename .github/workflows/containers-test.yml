@@ -22,10 +22,7 @@ on:
         description: "Cache namespace shared by the per-arch builds (e.g. core)"
         required: true
         type: string
-      # No namespace validation here, unlike containers-build-and-push.yml: every
-      # artifact below is resolved by exact name on both ends, so this workflow has no
-      # glob for a metacharacter to subvert. A malformed value fails loudly in
-      # actions/upload-artifact instead of silently mis-selecting another call's files.
+      # No namespace validation. Artifacts are resolved by exact name on both ends.
       artifact-namespace:
         description: |
           Prefix for every artifact this workflow writes. REQUIRED when one caller
