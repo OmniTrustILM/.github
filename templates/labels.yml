@@ -30,7 +30,7 @@
   description: "Triggers staged/preview environment deployment"
 - name: qa
   color: "14b8a6"
-  description: "QA testing framework / automation work"
+  description: "Owned by the QA team: automation, framework, QA infrastructure (+ testing when QA-owned)"
 - name: refactoring
   color: "8b5cf6"
   description: "Code quality improvement"
@@ -39,7 +39,7 @@
   description: "Technical epic - for grouping issues"
 - name: testing
   color: "eab308"
-  description: "Manual/developer testing task — scenarios to verify (not qa: test automation/framework)"
+  description: "Testing-related work (manual or automated), by anyone; QA-owned tasks also get qa"
 - name: vulnerability
   color: "e11d48"
   description: "Security vulnerability or concern"
