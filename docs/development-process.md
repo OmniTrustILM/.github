@@ -84,7 +84,8 @@ Five org-level issue types:
 
 **Special-purpose labels** extend issue types without adding type overhead:
 - **Vulnerabilities** use the Bug type with a `vulnerability` label. The Vulnerability template captures security-specific fields (source type, CVE, remediation).
-- **QA work** (testing framework, strategy, automation) uses the Task type with a `qa` label. The QA template captures test-specific fields (test scope, related feature).
+- **QA-owned work** uses the `qa` label — work owned/handled by the QA team: test automation, the testing framework, QA infrastructure. Added on top of `testing` when QA owns a testing task. The QA template captures test-specific fields (test scope, related feature).
+- **Testing work** uses the `testing` label — any testing-related task, manual or automated, and can be done by anyone. `qa` and `testing` are **complementary, not exclusive**: devs' own testing = `testing`; QA manual or automated testing = `testing` + `qa`; QA framework / infrastructure = `qa`.
 - **Documentation** uses the Task type with a `documentation` label. The Documentation template captures doc-specific fields (doc type, related feature, pages to update).
 
 ### Issue Hierarchy
@@ -100,7 +101,7 @@ Release 2.18.0
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
 │   ├── Task+documentation [documentation]: Revocation user guide
-│   ├── Task+qa [automated-testing-framework]: E2E revocation tests
+│   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
 │   └── ...
@@ -519,7 +520,8 @@ Standardized across all repos via `labels.yml` and label-sync automation.
 | Label | Purpose | Applied by |
 |---|---|---|
 | `vulnerability` | Security vulnerability | Template, Mend, Dependabot |
-| `qa` | QA testing framework / automation work | QA template |
+| `qa` | Owned/handled by the QA team (automation, framework, QA infrastructure); combine with `testing` for QA-owned testing | QA template, manual |
+| `testing` | Testing-related work (manual or automated), by anyone; QA-owned tasks also get `qa` | Manual |
 | `documentation` | Documentation work | Documentation template, manual |
 | `tech-epic` | Technical epic — used to mark Epics that group internal technical work (infra, refactors, tooling) rather than customer-facing features | Manual, on Epic issues |
 | `ignore-for-release` | Exclude from release notes | Manual |
