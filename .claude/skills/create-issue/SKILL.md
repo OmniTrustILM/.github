@@ -135,7 +135,7 @@ Fields **never** auto-filled (PM-controlled, set during triage):
 
 - Version (target release)
 - Sprint (iteration)
-- Priority (PM during triage)
+- Prioritization (PM during triage)
 - Start Date / End Date (PM for Epics/Releases)
 - Complexity / Estimate (developer or `/epic-breakdown` skill)
 
@@ -292,5 +292,5 @@ Then exit cleanly. Cache stays warm for the next invocation.
 - The skill is **stateless across invocations** — each invocation reads the cache and starts fresh. Cache is the only persistent artifact.
 - Concurrent `create.sh` invocations are safe — each creates an independent issue. Concurrent `fetch.sh` runs (e.g. two `--refresh` invocations at once) are NOT safe; the second will overwrite the first's `cache.tmp/`. Avoid running two refreshes simultaneously. Normal `create.sh` invocations that hit a warm cache do not race.
 - Rate limits — Project V2 GraphQL is ~5 points per mutation; per invocation we do at most 3 mutations (add + 2 fields). Well below per-hour limits.
-- The skill must NOT touch Version, Sprint, Priority, Start Date, End Date, Complexity, or Estimate fields. Those are PM/triage controlled.
+- The skill must NOT touch Version, Sprint, Prioritization, Start Date, End Date, Complexity, or Estimate fields. Those are PM/triage controlled.
 - Required `gh` token scope: `repo` (write access). If the active token (e.g. `GH_TOKEN` env var) only has `public_repo`, label management on internal/private repos returns 404 with a misleading "label not found" message. Run `gh auth refresh -s repo`, or unset `GH_TOKEN` to fall back to a keyring token that has `repo`.

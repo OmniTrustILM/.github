@@ -1,7 +1,7 @@
 # ILM Development Management Methodics
 
-**Version:** 1.0
-**Date:** 2026-04-15
+**Version:** 1.1
+**Date:** 2026-08-21
 **Organization:** OmniTrustILM (https://github.com/OmniTrustILM)
 **Project:** https://github.com/orgs/OmniTrustILM/projects/5
 
@@ -23,7 +23,7 @@ You've opened this doc. Jump to the section for your role:
 7. Post-merge reopen (regression discovered later): fix in a new PR, full cycle repeats.
 
 ### PM / Tech Lead
-1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Priority/Version/Module/Sprint during planning.
+1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Prioritization/Version/Module/Sprint during planning.
 2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date before moving past Planning.
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
@@ -34,7 +34,7 @@ You've opened this doc. Jump to the section for your role:
 
 ### AI Agent
 1. Autonomous: read issues, generate reports, suggest breakdowns, validate triage, auto-detect Module from description.
-2. Human approval required before: creating issues, modifying fields on existing issues, closing issues, setting Version/Sprint/Priority.
+2. Human approval required before: creating issues, modifying fields on existing issues, closing issues, setting Version/Sprint/Prioritization.
 3. Read Section 10 for the full permission split.
 
 ### "Where do I …?" cheatsheet
@@ -54,7 +54,7 @@ You've opened this doc. Jump to the section for your role:
 
 ## Glossary
 
-Conceptual terms only. For field types and values (Module, Version, Sprint, Priority, Severity, Complexity, Reopen Reason, Estimate, Start/End Date), see Section 3.
+Conceptual terms only. For field types and values (Module, Version, Sprint, Prioritization, Severity, Complexity, Reopen Reason, Estimate, Start/End Date), see Section 3.
 
 | Term | Definition |
 |---|---|
@@ -163,7 +163,7 @@ stateDiagram-v2
 
 > **Pre-development status philosophy:** Planning is the backlog (long-lived, 90-day threshold). Analysis is the active triage/scoping workspace (short-lived, 14-day threshold). Open is the developer-ready queue (21-day threshold). Not all types use all three — the convention table below shows the default path.
 
-> **Analysis is not exclusively PM work.** For Bugs, QA may triage and move to Open. For technically complex issues, the Tech Lead or assigned developer may perform the analysis (root cause identification, correct repo, impact assessment). The PM retains authority over business prioritization (Priority, Version, Sprint) regardless of who performs the technical analysis. For simple items (obvious fix, trivial scope), the person triaging may move from Analysis to Open immediately — Analysis is a triage inbox, not a mandatory waiting period.
+> **Analysis is not exclusively PM work.** For Bugs, QA may triage and move to Open. For technically complex issues, the Tech Lead or assigned developer may perform the analysis (root cause identification, correct repo, impact assessment). The PM retains authority over business prioritization (Prioritization, Version, Sprint) regardless of who performs the technical analysis. For simple items (obvious fix, trivial scope), the person triaging may move from Analysis to Open immediately — Analysis is a triage inbox, not a mandatory waiting period.
 
 > **Key change:** QA testing happens BEFORE merge, not after. The Testing status means "QA is verifying the PR branch." Only after QA approves does the PR get merged and the issue moves to Done. This keeps the main branch stable.
 
@@ -217,7 +217,7 @@ Both paths: issue auto-added to Project #5, status set to Planning (or Analysis 
 1. PM reviews Backlog view (Status: Planning)
 2. Move to Analysis to scope, leave in Planning for later, or close as "not planned"
 3. During Analysis: define acceptance criteria, write user stories (Epics), assess impact (Bugs), create sub-issues
-4. Set Priority, Module, Version, Sprint
+4. Set Prioritization, Module, Version, Sprint
 5. Move to Open when fully scoped
 
 #### External / Community Contributions
@@ -385,7 +385,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Module** | Single-select | 17 platform modules — see table below ¹ | Which functional module of the platform this issue belongs to. Aligned with the platform's audit logging module system. | Human or skill |
 | **Version** | Single-select | Semantic versions (2.13.0, ..., extended as needed) | Which release version this issue is targeted for. Optional in Planning. | PM; propagated by automation |
 | **Sprint** | Iteration | Named sprint iterations | Which sprint this issue is assigned to for execution | PM during sprint planning |
-| **Priority** | Single-select | Low, Normal (default), High, Critical | How important relative to other issues. Normal assumed if unset. | PM during triage; QA can set for Bugs |
+| **Prioritization** | Single-select | Low, Medium (default), High, Urgent | How important relative to other issues. Medium assumed if unset. (Renamed from Priority; Normal → Medium, Critical → Urgent.) | PM during triage; QA can set for Bugs |
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
@@ -438,7 +438,7 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 | Estimate | Epic | Error | Required once past Planning status |
 | Start/End Date | Epic, Release | Error | Required once past Planning status |
 | Version | Release | Error | At creation |
-| Priority | Feature, Bug | Warning | Defaults to Normal if unset; PM or QA escalates during triage |
+| Prioritization | Feature, Bug | Warning | Defaults to Medium if unset; PM or QA escalates during triage |
 | Module | Feature, Epic, Task | Warning | Before Open |
 | Module | Bug | Warning | Optional at creation, set during triage |
 | Version | Bug, Feature, Task | Warning | Before sprint assignment; optional in Planning |
@@ -446,13 +446,13 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 | Assignee | Epic | Warning | Person owning Epic delivery (usually did the analysis) |
 | Estimate | Bug, Feature, Task | Warning | Before sprint assignment |
 
-### 3.3 Priority Definitions
+### 3.3 Prioritization Definitions
 
-| Priority | Definition | Response |
+| Prioritization | Definition | Response |
 |---|---|---|
-| **Critical** | Blocks release, affects production | Immediate — interrupt sprint |
+| **Urgent** | Blocks release, affects production | Immediate — interrupt sprint |
 | **High** | Important for current release | Current or next sprint |
-| **Normal** | Standard work (implicit default when Priority is unset) | Schedule based on capacity |
+| **Medium** | Standard work (implicit default when Prioritization is unset) | Schedule based on capacity |
 | **Low** | Nice to have | When capacity allows |
 
 ### 3.4 Severity Definitions (Bugs only)
@@ -787,7 +787,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 
 - Creates Releases and Epics
 - Triages backlog: moves issues through Planning → Analysis → Open
-- Sets **Version**, **Sprint**, **Module** (if not set at creation), **Priority** for issues
+- Sets **Version**, **Sprint**, **Module** (if not set at creation), **Prioritization** for issues
 - Sets **Complexity**, **Estimate**, **Start Date**, **End Date** on Epics before they move past Planning (required per §3.2)
 - Decides release scope — accepts or defers known bugs
 - Reviews all sub-issues proposed by `/epic-breakdown` skill
@@ -818,7 +818,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 
 - **Testing:** Tests PR branches before merge (locally or via `preview` environment). Approves or rejects PRs.
 - **Status control:** Testing → Done (approve) or → In Progress (reject/reopen). Sets Reopen Reason on rejection.
-- **Bug triage:** Can move Bugs from Analysis → Open after verifying reproduction and assessing impact. Can close Bugs as "not planned" (not reproducible, expected behavior). Can set Priority for Bugs.
+- **Bug triage:** Can move Bugs from Analysis → Open after verifying reproduction and assessing impact. Can close Bugs as "not planned" (not reproducible, expected behavior). Can set Prioritization for Bugs.
 - **Epic review:** Reviews Task+qa sub-issues proposed by `/epic-breakdown` for testing coverage adequacy.
 - **Release sign-off:** Lead QA confirms smoke + regression tests pass and no open Blockers before release.
 - **Regression:** Reviews daily regression test results. Creates Bug issues for regressions found.
@@ -834,7 +834,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Epic breakdown, project triage, issue creation (`/create-issue`)
 - References this document for process decisions
 - **Autonomous:** triage reporting, field validation, issue analysis, suggesting breakdowns, proposing sub-issues
-- **Requires user approval:** creating issues, modifying fields on existing issues, closing issues, setting Version/Sprint/Priority
+- **Requires user approval:** creating issues, modifying fields on existing issues, closing issues, setting Version/Sprint/Prioritization
 
 ---
 
@@ -868,7 +868,7 @@ All centralized config lives in the `OmniTrustILM/.github` repo: https://github.
 
 | To change... | How |
 |---|---|
-| Status / Module / Version / Priority / Severity (Bugs only) options | Project #5 → Settings → field, or `gh project field-edit` |
+| Status / Module / Version / Prioritization / Severity (Bugs only) options | Project #5 → Settings → field, or `gh project field-edit` |
 | Sprint iterations | Project #5 → Settings → Sprint field |
 | Built-in workflows (PR linked, merged, etc.) | Project #5 → Settings → Workflows |
 | Views | Project #5 → Views (manual) |
