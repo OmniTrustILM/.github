@@ -22,6 +22,10 @@ on:
         description: "Cache namespace shared by the per-arch builds (e.g. core)"
         required: true
         type: string
+      # No namespace validation here, unlike containers-build-and-push.yml: every
+      # artifact below is resolved by exact name on both ends, so this workflow has no
+      # glob for a metacharacter to subvert. A malformed value fails loudly in
+      # actions/upload-artifact instead of silently mis-selecting another call's files.
       artifact-namespace:
         description: |
           Prefix for every artifact this workflow writes. REQUIRED when one caller
@@ -83,6 +87,8 @@ jobs:
     name: Build app artifacts (once)
     if: ${{ inputs.pre-build == 'maven' }}
     runs-on: ubuntu-latest
+    env:
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,7 +122,7 @@ jobs:
       - name: Upload artifact (tar)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
+          name: ${{ env.ARTIFACT_PREFIX }}app-data
           path: app-data.tar
           if-no-files-found: error
           retention-days: 1
@@ -137,6 +143,8 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
             platform: linux/arm64
+    env:
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -150,7 +158,7 @@ jobs:
         if: ${{ inputs.pre-build == 'maven' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
+          name: ${{ env.ARTIFACT_PREFIX }}app-data
 
       - name: Extract artifacts (preserve perms)
         if: ${{ inputs.pre-build == 'maven' }}
@@ -192,7 +200,7 @@ jobs:
       - name: Upload vulnerability report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}trivy-report-${{ matrix.arch }}
+          name: ${{ env.ARTIFACT_PREFIX }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
       - name: Fail build on vulnerabilities
