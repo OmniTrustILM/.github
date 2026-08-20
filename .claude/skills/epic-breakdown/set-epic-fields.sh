@@ -8,11 +8,14 @@
 #
 # Usage:
 #   set-epic-fields.sh --item-id <projectItemId> [--complexity Low|Medium|High]
-#                      [--estimate <mandays>] [--scope epic|child] [--dry-run]
+#                      [--estimate <mandays>] [--scope epic|child]
+#                      [--basis agent-executed|developer-built] [--dry-run]
 #
-# --scope selects the estimate ceiling (epic 100, child 4 - see §3.5). Defaults
-# to epic. A child over its cap needs an '### Estimate' section in the issue
-# body explaining why it cannot be split.
+# --scope selects the estimate ceiling (epic 100; child 4 agent-executed, or 10
+# developer-built - see §3.5). It is REQUIRED whenever --estimate is given, so
+# the ceiling can never be picked by omission. --basis defaults to agent-executed
+# and only affects the child ceiling. A child over its cap needs an '### Estimate'
+# section in the issue body explaining why it cannot be split.
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,21 +27,41 @@ SCRIPT_TAG="fields"
 
 [ -f "$CACHE_DIR/project-fields.json" ] || fail "missing $CACHE_DIR/project-fields.json — run fetch.sh first"
 
-ITEM_ID="" COMPLEXITY="" ESTIMATE="" ESTIMATE_SET=0 SCOPE=epic DRY_RUN=0
+ITEM_ID="" COMPLEXITY="" ESTIMATE="" ESTIMATE_SET=0 SCOPE="" BASIS=agent-executed DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --item-id)    ITEM_ID="${2:-}"; shift 2 ;;
     --complexity) COMPLEXITY="${2:-}"; shift 2 ;;
     --estimate)   ESTIMATE="${2:-}"; ESTIMATE_SET=1; shift 2 ;;
     --scope)      SCOPE="${2:-}"; shift 2 ;;
+    --basis)      BASIS="${2:-}"; shift 2 ;;
     --dry-run)    DRY_RUN=1; shift ;;
     *)            fail "unknown arg: $1" ;;
   esac
 done
 
+# --scope is mandatory when an estimate is written, so the ceiling is never
+# picked by omission (a child write missing the flag would otherwise validate
+# against the 100-manday Epic ceiling and skip the rationale check). Without an
+# estimate it defaults to epic — the ceiling is unused in that case.
+if [ "$ESTIMATE_SET" -eq 1 ] && [ -z "$SCOPE" ]; then
+  fail "--scope is required when --estimate is given (epic or child)"
+fi
+[ -n "$SCOPE" ] || SCOPE=epic
+
+case "$BASIS" in
+  agent-executed|developer-built) ;;
+  *) fail "--basis must be agent-executed or developer-built, got '$BASIS'" ;;
+esac
+
 case "$SCOPE" in
   epic)  ESTIMATE_MAX="$ESTIMATE_MAX_EPIC" ;;
-  child) ESTIMATE_MAX="$ESTIMATE_MAX_CHILD" ;;
+  child)
+    if [ "$BASIS" = developer-built ]; then
+      ESTIMATE_MAX="$ESTIMATE_MAX_CHILD_DEVBUILT"
+    else
+      ESTIMATE_MAX="$ESTIMATE_MAX_CHILD"
+    fi ;;
   *)     fail "--scope must be epic or child, got '$SCOPE'" ;;
 esac
 
@@ -66,7 +89,7 @@ if [ -n "$ESTIMATE" ]; then
     if [ "$DRY_RUN" -eq 1 ]; then
       log "note: ${ESTIMATE} exceeds the ${ESTIMATE_MAX}-manday child cap; the live run requires an '### Estimate' section in the issue body"
     else
-      require_estimate_rationale "$ITEM_ID" "$ESTIMATE"
+      require_estimate_rationale "$ITEM_ID" "$ESTIMATE" "$ESTIMATE_MAX"
       log "  note: ${ESTIMATE} exceeds the ${ESTIMATE_MAX}-manday child cap; accepted on the issue's stated rationale"
     fi
   fi

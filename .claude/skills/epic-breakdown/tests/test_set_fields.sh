@@ -10,7 +10,7 @@ if [ ! -f "$CACHE/project-fields.json" ]; then
 fi
 
 # 1) Dry-run prints both planned writes.
-out=$(bash "$SCRIPT" --item-id ITEM1 --complexity High --estimate 5 --dry-run 2>&1)
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope epic --complexity High --estimate 5 --dry-run 2>&1)
 echo "$out" | grep -qi "Complexity=High" || { echo "FAIL: complexity not planned"; exit 1; }
 echo "$out" | grep -qi "Estimate=5" || { echo "FAIL: estimate not planned"; exit 1; }
 
@@ -18,7 +18,7 @@ echo "$out" | grep -qi "Estimate=5" || { echo "FAIL: estimate not planned"; exit
 #    0.25 is both the minimum and the increment; both decimal spellings of a
 #    half day (0.5 and 0.50) are the same step and both pass.
 for e in 0.25 0.5 0.50 0.75 1 1.25 2 3.75 100; do
-  out=$(bash "$SCRIPT" --item-id ITEM1 --estimate "$e" --dry-run 2>&1) \
+  out=$(bash "$SCRIPT" --item-id ITEM1 --scope epic --estimate "$e" --dry-run 2>&1) \
     || { echo "FAIL: estimate '$e' rejected"; exit 1; }
   echo "$out" | grep -qi "Estimate=$e" || { echo "FAIL: estimate '$e' mangled in preview"; exit 1; }
 done
@@ -31,7 +31,7 @@ done
 #      100.25, 101 - above the release-capacity ceiling
 #      abc, -1, 1e3, .5 - malformed
 for e in 0 0.00 0.1 1.4 3.456 0.333 100.25 101 abc -1 1e3 .5; do
-  out=$(bash "$SCRIPT" --item-id ITEM1 --complexity Low --estimate "$e" --dry-run 2>&1)
+  out=$(bash "$SCRIPT" --item-id ITEM1 --scope epic --complexity Low --estimate "$e" --dry-run 2>&1)
   [ $? -ne 0 ] || { echo "FAIL: estimate '$e' accepted"; exit 1; }
   echo "$out" | grep -q "multiple of 0.25" \
     || { echo "FAIL: estimate '$e' rejected for the wrong reason: $out"; exit 1; }
@@ -41,7 +41,7 @@ done
 
 # 4) An explicitly-passed empty estimate is its own error, distinct from
 #    omitting the flag - breakdown passes --estimate for every child.
-out=$(bash "$SCRIPT" --item-id ITEM1 --complexity Low --estimate "" --dry-run 2>&1)
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope epic --complexity Low --estimate "" --dry-run 2>&1)
 [ $? -ne 0 ] || { echo "FAIL: empty --estimate accepted"; exit 1; }
 echo "$out" | grep -q -- "--estimate requires a value" \
   || { echo "FAIL: empty --estimate gave the wrong error: $out"; exit 1; }
@@ -56,7 +56,11 @@ if bash "$SCRIPT" --item-id ITEM1 --dry-run >/dev/null 2>&1; then
   echo "FAIL: empty field set accepted"; exit 1
 fi
 
-
+# 6b) --scope is mandatory when --estimate is given, so the ceiling is never
+#     picked by omission (a child write missing the flag must not default to epic).
+if bash "$SCRIPT" --item-id ITEM1 --estimate 40 --dry-run >/dev/null 2>&1; then
+  echo "FAIL: --estimate without --scope accepted"; exit 1
+fi
 
 # 7) The GraphQL payload carries `number` as a JSON number, not a string.
 #    This is the transport the fractional change exists to fix; every other case
@@ -82,7 +86,7 @@ fi
 ) || exit 1
 
 
-# 8) Scope selects the estimate ceiling (§3.5): epic 100, child 4.
+# 8) Scope selects the estimate ceiling (§3.5): epic 100, child 4 (agent-executed).
 bash "$SCRIPT" --item-id ITEM1 --scope child --estimate 4 --dry-run >/dev/null 2>&1 \
   || { echo "FAIL: 4 rejected at child scope"; exit 1; }
 bash "$SCRIPT" --item-id ITEM1 --scope epic --estimate 100 --dry-run >/dev/null 2>&1 \
@@ -101,6 +105,17 @@ echo "$out" | grep -q "exceeds the 4-manday child cap" \
 out=$(bash "$SCRIPT" --item-id ITEM1 --scope child --estimate 5.3 --dry-run 2>&1)
 echo "$out" | grep -q "multiple of 0.25" \
   || { echo "FAIL: off-grid child failed for the wrong reason: $out"; exit 1; }
+
+# 8b) developer-built basis raises the child cap to 10: 8 is under cap (no flag),
+#     11 is over cap (flagged against the 10-manday ceiling), bogus basis rejected.
+bash "$SCRIPT" --item-id ITEM1 --scope child --basis developer-built --estimate 8 --dry-run >/dev/null 2>&1 \
+  || { echo "FAIL: 8 rejected under developer-built child cap"; exit 1; }
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope child --basis developer-built --estimate 11 --dry-run 2>&1) \
+  || { echo "FAIL: over-cap developer-built child rejected outright in dry-run"; exit 1; }
+echo "$out" | grep -q "exceeds the 10-manday child cap" \
+  || { echo "FAIL: developer-built over-cap not flagged against 10: $out"; exit 1; }
+out=$(bash "$SCRIPT" --item-id ITEM1 --scope child --basis banana --estimate 1 --dry-run 2>&1)
+[ $? -ne 0 ] || { echo "FAIL: bogus basis accepted"; exit 1; }
 
 # 9) The over-cap rationale is read from the issue body, not taken on trust.
 (
@@ -142,11 +157,17 @@ too short"
       echo "FAIL: oversized estimate '$v' accepted"; exit 1
     fi
   done
+) || exit 1
 
 # 11) set_number's guard is the hard Epic ceiling, not the caller's scope cap.
 #     An over-cap child that cleared the rationale rule must still be writable;
 #     re-applying the child cap here would make the escape hatch dead code.
-  ESTIMATE_MAX=4   # what set-epic-fields.sh sets for --scope child
+(
+  SKILL_DIR="$HERE/.."
+  SCRIPT_TAG="test"
+  # shellcheck source-path=SCRIPTDIR source=../_common.sh
+  . "$SKILL_DIR/_common.sh"
+  ESTIMATE_MAX=4   # what set-epic-fields.sh sets for --scope child (agent-executed)
   if estimate_is_valid 6 "$ESTIMATE_MAX"; then
     echo "FAIL: 6 is not over the child cap - test asserts nothing"; exit 1
   fi

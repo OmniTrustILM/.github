@@ -84,8 +84,14 @@ set_single_select() {
 # A child above it is usually an Epic wearing the wrong issue type - but not
 # always, so it is allowed when the issue body says why it cannot be split
 # (§3.5). That justification is enforced, not requested; see require_estimate_rationale.
+#
+# The 4-manday child cap is the agent-executed basis (the default), where the
+# Estimate is only the remaining human effort. A developer-built Epic declares
+# full developer mandays, so its children follow the Complexity table's ranges
+# (High = 5-10); the cap rises to 10 to match, still capping a child at ~2 weeks.
 ESTIMATE_MAX_EPIC=100
 ESTIMATE_MAX_CHILD=4
+ESTIMATE_MAX_CHILD_DEVBUILT=10
 
 # estimate_quarters MANDAYS — echo the value in whole quarter-day units.
 # Everything downstream compares integers, so a value at a decimal boundary
@@ -107,7 +113,8 @@ estimate_quarters() {
 # 0.25 is both the minimum and the increment: 0.25, 0.5, 0.75, 1, 1.25 … There
 # is no finer granularity. Anything between the steps is false precision on a
 # number that already carries a review buffer, and 0 is not an estimate - it
-# would clear the §3.2 required-field gate while saying nothing.
+# carries no information (and project-triage still reports a 0 Estimate as
+# missing, since eval.py treats 0 as falsy).
 estimate_is_valid() {
   local q max="${2:-$ESTIMATE_MAX_EPIC}"
   q=$(estimate_quarters "$1") || return 1
@@ -133,7 +140,9 @@ estimate_writable() {
 # to be a reason. Pure so it can be tested without touching a live issue.
 estimate_rationale_ok() {
   local body="$1" rationale
-  printf '%s' "$body" | grep -qiE '^#{2,4}[[:space:]]*Estimate[[:space:]]*$' || return 1
+  # Detection and extraction must agree on case: both accept only the [Ee]stimate
+  # spellings, so a `### ESTIMATE` heading is not detected-then-refused as empty.
+  printf '%s' "$body" | grep -qE '^#{2,4}[[:space:]]*[Ee]stimate[[:space:]]*$' || return 1
   rationale=$(printf '%s' "$body" \
     | sed -n '/^#\{2,4\}[[:space:]]*[Ee]stimate[[:space:]]*$/,$p' \
     | sed '1d' | sed -n '/^#\{2,4\}[[:space:]]/q;p' | tr -d '[:space:]')
@@ -146,18 +155,27 @@ estimate_rationale_ok() {
 # flag: the body is what a reviewer reads six months later, and a flag would let
 # the two drift. Silence here means the child should have been decomposed.
 require_estimate_rationale() {
-  local item="$1" mandays="$2" body rc=0
-  body=$(gh api graphql -f id="$item" -f query='
+  local item="$1" mandays="$2" cap="${3:-$ESTIMATE_MAX_CHILD}" body rc=0 err_file reason
+  # Capture stderr so a query failure keeps the API's reason (like set_number),
+  # instead of collapsing every failure into one message via 2>/dev/null.
+  err_file=$(mktemp)
+  if ! body=$(gh api graphql -f id="$item" -f query='
     query($id:ID!){ node(id:$id){ ... on ProjectV2Item {
       content { ... on Issue { body } } } } }' \
-    -q '.data.node.content.body // ""' 2>/dev/null) \
-    || fail "could not read the issue body for item $item to check the estimate rationale"
+    -q '.data.node.content.body // ""' 2>"$err_file"); then
+    reason=$(tr '\n' ' ' < "$err_file" | cut -c1-200); rm -f "$err_file"
+    fail "could not read the issue body for item $item to check the estimate rationale${reason:+ ($reason)}"
+  fi
+  rm -f "$err_file"
+  # An empty body is a distinct outcome — item not found, a draft item, or a repo
+  # the token cannot read — not a present-but-inadequate rationale section.
+  [ -n "$body" ] || fail "could not read the issue body for item $item (item not found, a draft item, or no readable issue content) — cannot check the estimate rationale"
 
   estimate_rationale_ok "$body" || rc=$?
   case "$rc" in
     0) ;;
-    1) fail "child estimate ${mandays} exceeds ${ESTIMATE_MAX_CHILD} mandays: split it, or add an '### Estimate' section to the issue body saying why it cannot be split (§3.5)" ;;
-    2) fail "the '### Estimate' section is empty or too short to be a reason; state why ${mandays} mandays cannot be split (§3.5)" ;;
+    1) fail "child estimate ${mandays} exceeds ${cap} mandays: split it, or add an '### Estimate' section to the issue body saying why it cannot be split (§3.5)" ;;
+    2) fail "the '### Estimate' section is empty or too short (needs at least 20 characters of prose); state why ${mandays} mandays cannot be split (§3.5)" ;;
   esac
 }
 
@@ -181,13 +199,13 @@ set_number() {
   [ "$dtype" = "NUMBER" ] || fail "field '$field_name' is '$dtype', not NUMBER"
   # `return 1` into the warn path, not `fail`: callers set several fields per
   # item, and aborting here would leave the item half-written mid-sequence.
-  # set-epic-fields.sh validates up front, so reaching this is a caller bug.
-  # The quarter-day rule is Estimate's, not every NUMBER field's - a second
-  # numeric field must not silently inherit it.
+  # set-epic-fields.sh validates up front, so reaching either warn is a caller bug.
   if [ "$field_name" = "Estimate" ]; then
     estimate_writable "$number" \
       || { log "  warn: $(estimate_rule_msg "$ESTIMATE_MAX_EPIC"), got '$number'"; return 1; }
   else
+    # The quarter-day rule is Estimate's, not every NUMBER field's - a second
+    # numeric field must not silently inherit it.
     [[ "$number" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
       || { log "  warn: $field_name must be numeric, got '$number'"; return 1; }
   fi

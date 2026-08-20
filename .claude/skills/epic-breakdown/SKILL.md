@@ -187,13 +187,17 @@ and stop unless confirmed.
    **Two ceilings.** An **Epic** caps at **100** mandays: a ~10-week cycle, 50
    working days, at most 2 people. Above it the Epic cannot ship in one release
    — say so rather than writing the number.
-   A **child** caps at **4** mandays, so it stays deliverable inside one week
-   with reserve. Prefer splitting. When a child genuinely cannot be split, it is
+   A **child** caps at **4** mandays (agent-executed basis), so it stays
+   deliverable inside one week with reserve; on a **developer-built** Epic the
+   child cap is **10** mandays, matching the Complexity table's developer-built
+   High range. Prefer splitting. When a child genuinely cannot be split, it is
    allowed over the cap **only** if its body carries an `### Estimate` section
    saying why — `set-epic-fields.sh --scope child` reads that section from the
-   issue and refuses the write without it. Put the reason in the body you build
-   in step 7.1, and surface it in the preview so it is approved along with
-   everything else:
+   issue and refuses the write without it (needs at least 20 characters of
+   prose). The section carries **only the reason** the work cannot be split —
+   never restate the number (the Estimate field is the single source, §3.5). Put
+   the reason in the body you build in step 7.1, and surface it in the preview so
+   it is approved along with everything else:
 
    ```markdown
    ### Estimate
@@ -220,7 +224,7 @@ and stop unless confirmed.
    1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M>` (add `--severity <S>` for Bug children) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
    2. `link.sh --parent-node-id <epic> --child-node-id <child>` to attach the child.
    3. `link.sh --issue-node-id <child> --blocked-by-node-id <blocker>` for each dependency.
-   4. `set-epic-fields.sh --item-id <child item> --scope child --complexity <C> --estimate <E>`.
+   4. `set-epic-fields.sh --item-id <child item> --scope child --basis <agent-executed|developer-built> --complexity <C> --estimate <E>` (`--basis` matches the Epic's declared basis; omit it to default to agent-executed).
    5. After all children: `set-epic-fields.sh --item-id <epic item> --scope epic --complexity <C> --estimate <E>` for the Epic.
    6. `enrich-epic.sh --repo <r> --number <epic#> --enriched-file -` to rewrite the Epic body.
    - **Leave child Version blank** so `version-propagation` automation copies it from the parent. Status stays Planning.
@@ -248,7 +252,8 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    each mutation, re-check current state and skip with a warning if it changed.
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
    showing the before→after diff and getting that change approved.** Apply
-   approved changes with the same scripts as breakdown.
+   approved changes with the same scripts as breakdown — a child Estimate write
+   is `set-epic-fields.sh --item-id <child item> --scope child --basis <basis> --estimate <E>`; `--scope child` is mandatory with `--estimate` (the script refuses the write otherwise), so the child cap and rationale rule always run.
 5. **Never** set Version/Sprint/Priority/dates, force Status, or close issues.
    Propose status nudges to the human (§7.3 rule 4). Child Estimate may be set
    on children this run *creates*, as in breakdown; an Estimate already on an
