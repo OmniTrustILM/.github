@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Fixture-driven `gh` for tests. Matches the joined argument list against
+# substrings in $GH_FIXTURE_DIR/map.txt and prints the mapped fixture.
+#
+# An unmatched call is an error rather than empty output: a test that silently
+# received nothing would assert against a blank string and usually pass.
+set -euo pipefail
+args="$*"
+map="${GH_FIXTURE_DIR:-}/map.txt"
+[ -f "$map" ] || { echo "stub gh: no fixture map at $map" >&2; exit 1; }
+while IFS=$'\t' read -r pattern file; do
+  [ -n "$pattern" ] || continue
+  case "$args" in
+    *"$pattern"*) cat "$GH_FIXTURE_DIR/$file"; exit 0 ;;
+  esac
+done < "$map"
+echo "stub gh: no fixture matches: $args" >&2
+exit 1
