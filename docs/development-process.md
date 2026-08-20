@@ -84,7 +84,8 @@ Five org-level issue types:
 
 **Special-purpose labels** extend issue types without adding type overhead:
 - **Vulnerabilities** use the Bug type with a `vulnerability` label. The Vulnerability template captures security-specific fields (source type, CVE, remediation).
-- **QA work** (testing framework, strategy, automation) uses the Task type with a `qa` label. The QA template captures test-specific fields (test scope, related feature).
+- **QA-owned work** uses the `qa` label — work owned/handled by the QA team: test automation, the testing framework, QA infrastructure. Added on top of `testing` when QA owns a testing task. The QA template captures test-specific fields (test scope, related feature).
+- **Testing work** uses the `testing` label — any testing-related task, manual or automated, and can be done by anyone. `qa` and `testing` are **complementary, not exclusive**: devs' own testing = `testing`; QA manual or automated testing = `testing` + `qa`; QA framework / infrastructure = `qa`.
 - **Documentation** uses the Task type with a `documentation` label. The Documentation template captures doc-specific fields (doc type, related feature, pages to update).
 
 ### Issue Hierarchy
@@ -100,7 +101,7 @@ Release 2.18.0
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
 │   ├── Task+documentation [documentation]: Revocation user guide
-│   ├── Task+qa [automated-testing-framework]: E2E revocation tests
+│   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
 │   └── ...
@@ -526,7 +527,8 @@ Standardized across all repos via `labels.yml` and label-sync automation.
 | Label | Purpose | Applied by |
 |---|---|---|
 | `vulnerability` | Security vulnerability | Template, Mend, Dependabot |
-| `qa` | QA testing framework / automation work | QA template |
+| `qa` | Owned/handled by the QA team (automation, framework, QA infrastructure); combine with `testing` for QA-owned testing | QA template, manual |
+| `testing` | Testing-related work (manual or automated), by anyone; QA-owned tasks also get `qa` | Manual |
 | `documentation` | Documentation work | Documentation template, manual |
 | `tech-epic` | Technical epic — used to mark Epics that group internal technical work (infra, refactors, tooling) rather than customer-facing features | Manual, on Epic issues |
 | `ignore-for-release` | Exclude from release notes | Manual |
@@ -694,7 +696,7 @@ Automation is split across three categories (see the design spec Section 7 for t
 | 7 | `release.published` (stable only) | target repo's `release-automation.yml` | Calls **post-release-stamping** composite action: stamp Version on closed Done issues in the **releasing repo** that were closed after the previous release's `published_at` and don't yet have a Version. Prereleases are skipped. **Limitation:** only issues in the releasing repo are stamped; sub-issues living in other repos (common in cross-repo Epics) will not be stamped. Primary mechanism for Version is PM assignment during sprint planning (§2.9) — this automation is a safety net, not a substitute. |
 | 8 | Weekly cron (Mon 05:00 UTC) or manual | `.github` repo's `project-health-report.yml` | Health report as GHA artifact. Evaluates triage rules from `config/project-triage-rules.yml`. Report-only. |
 | 9 | Push to `templates/labels.yml` on main | `.github` repo's `label-sync.yml` | Sync standard labels to all non-archived org repos (additive — does not delete). |
-| 10 | Manual dispatch | `.github` repo's `repo-template-sync.yml` | Aligns every target repo with the org templates (release.yml + caller workflows) in one PR per repo (up to 2 commits, skipped if no drift). |
+| 10 | Manual dispatch | `.github` repo's `repo-template-sync.yml` | Aligns every target repo with the org templates (release.yml + caller workflows + CODEOWNERS) in one PR per repo (up to 3 commits, skipped if no drift). CODEOWNERS is rendered per repo from `config/repo-domains.yml`. |
 | 11 | Manual dispatch | `.github` repo's `release-yml-sync.yml` | Focused sync — opens PRs to adopt `templates/release.yml` as `.github/release.yml` in target repos (release.yml-only hotfix path). |
 
 **Delivery to a target repo:** A maintainer dispatches `repo-template-sync.yml` from the `.github` repo Actions tab with `target_repos: all` (or a comma-separated subset) and `dry_run: false`. The workflow opens a PR in each target repo; once merged, the caller workflows fire on subsequent `issues`/`release` events.
@@ -858,13 +860,14 @@ All centralized config lives in the `OmniTrustILM/.github` repo: https://github.
 | Template chooser | `config.yml` | `.github/ISSUE_TEMPLATE/config.yml` |
 | Standard labels (synced to all repos) | `labels.yml` | `templates/labels.yml` |
 | Triage rules | `project-triage-rules.yml` | `config/project-triage-rules.yml` |
+| Repo→domain owner mapping (drives per-repo CODEOWNERS) | `repo-domains.yml` | `config/repo-domains.yml` |
 | Release notes categories (synced to all repos) | `release.yml` | `templates/release.yml` |
 | Caller workflows (deployed to all org repos) | `issue-automation.yml`, `release-automation.yml` | `templates/caller-workflows/` |
 | Composite actions (consumed by caller workflows) | `action.yml` + shell script per action | `.github/actions/<name>/` (e.g. `auto-add-to-project/`, `reopen-tracking/`) |
-| Workflows that run in `.github` repo | `*.yml` | `.github/workflows/` (`label-sync.yml`, `release-yml-sync.yml`, `repo-template-sync.yml`, `project-health-report.yml`, `shellcheck.yml`) |
+| Workflows that run in `.github` repo | `*.yml` | `.github/workflows/` (`label-sync.yml`, `release-yml-sync.yml`, `repo-template-sync.yml`, `project-health-report.yml`, `shellcheck.yml`, `action-tests.yml`) |
 | Bash scripts used by in-repo workflows | `*.sh` | `.github/scripts/<workflow-basename>/` |
 
-**Propagation to target repos:** changes to `templates/labels.yml` propagate automatically via `label-sync.yml` on push to main. Changes to `templates/release.yml` and `templates/caller-workflows/*.yml` are distributed by manual dispatch of `repo-template-sync.yml` (opens one PR per target repo with up to 2 commits; skips repos with no drift). For release.yml-only hotfixes, `release-yml-sync.yml` dispatches a focused rollout.
+**Propagation to target repos:** changes to `templates/labels.yml` propagate automatically via `label-sync.yml` on push to main. Changes to `templates/release.yml` and `templates/caller-workflows/*.yml`, plus the per-repo `.github/CODEOWNERS` rendered from `config/repo-domains.yml`, are distributed by manual dispatch of `repo-template-sync.yml` (opens one PR per target repo with up to 3 commits; skips repos with no drift). For release.yml-only hotfixes, `release-yml-sync.yml` dispatches a focused rollout.
 
 **Composite-action versioning:** `issue-automation-v1` and `release-automation-v1` are moving tags. To roll out a bug fix: merge the fix to main, then move the tag (`git tag -f -a <tag> <sha> && git push -f origin <tag>`). All target repos pick up the fix on the next event. To roll out a breaking change: cut `-v2`, update the caller templates in `templates/caller-workflows/`, and dispatch `repo-template-sync.yml`.
 
@@ -892,7 +895,7 @@ These skills live in `.claude/skills/` in this repo (see `.claude/skills/README.
 | `/project-triage` | Available | Project health report on Project #5 — required-field gaps, stale issues, consistency violations, with optional per-finding auto-fixes. Validates issues against Module values. |
 | `/create-issue` | Available | Create well-formed OmniTrustILM issue from natural-language description. Supports Bug, Feature, Task, Documentation, QA. Auto-detects Module from description keywords and target repo, and links a new bug under the active `Bugs x.y.z` cycle (§2, Issue Hierarchy). Skip for Epic, Release, Vulnerability — use form templates. |
 | `/epic-breakdown` | Available | Read an Epic (or a requirement), explore repos and existing issues, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, and propose sub-issues by work stream with Module/Complexity set, dependencies, and a suggested Estimate — all behind a human-approval gate. Adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). Sanctioned writer of Complexity/Estimate (§3.1, §3.5). |
-| `/pr-hygiene` | Available | Pre-merge comment and log hygiene over the lines a PR adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — proposed as before/after edits and applied only on confirm. Not a Project #5 skill: it reads a git diff, touches no issues or project fields, and is run from a clone of the reviewed repo rather than from this one. |
+| `/pr-hygiene` | Available | Pre-merge comment and log hygiene over the lines a PR adds, or over uncommitted working-tree changes with `--worktree` — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — proposed as before/after edits and applied only on confirm. Not a Project #5 skill: it reads a git diff, touches no issues or project fields, and is run from a clone of the reviewed repo rather than from this one. |
 
 For Module identification, use the Module table in Section 3.1 — match repo name and issue content to the "Key repos" and "What it covers" columns. For Core repo issues, use `@AuditLogged` annotations in controllers (Module.java enum, in the `core` repo) to determine the correct sub-module.
 

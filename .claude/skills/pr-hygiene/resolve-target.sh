@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Resolve a /pr-hygiene target into the refs the scan needs and print them as
-# key=value lines. The target is a PR URL, a bare PR number, a branch name, or
-# empty (current branch).
+# key=value lines. The target is a PR URL, a bare PR number, a branch name,
+# --worktree (uncommitted changes), or empty (current branch).
 #
 # Output keys: is_pr, number, url, base, head_ref, head_oid, diff_from, diff_to
 # On a branch-only target, number and url are empty and is_pr=false, but
 # head_ref and head_oid are still resolved so the caller's apply gate has
 # something to compare the working tree against.
+#
+# A --worktree target prints the same eight keys with diff_to=WORKTREE, a
+# sentinel rather than a revision: the caller diffs against the tree itself.
 #
 # Refuses a PR whose repository is not this clone's origin: the metadata would
 # come from one repo and the diff from another.
@@ -19,9 +22,34 @@ TARGET="${1-}"
 log()  { echo "[pr-hygiene] $*" >&2; }
 fail() { echo "error: $*" >&2; exit 1; }
 
+git rev-parse --git-dir >/dev/null 2>&1 || fail "not inside a git repository"
+
+# --worktree: scan uncommitted changes against HEAD instead of a committed
+# range. Nothing to resolve and no remote to reach, so this path deliberately
+# runs before the gh/jq checks - it stays usable in a repo with no GitHub
+# remote, and with neither tool installed.
+if [ "$TARGET" = "--worktree" ]; then
+  git rev-parse --verify --quiet HEAD >/dev/null \
+    || fail "no commits on HEAD; nothing to diff uncommitted changes against"
+  head_oid="$(git rev-parse HEAD)"
+  if [ -z "$(git status --porcelain)" ]; then
+    log "warn: working tree is clean (nothing uncommitted to scan)"
+  fi
+  cat <<EOF
+is_pr=false
+number=
+url=
+base=
+head_ref=$(git rev-parse --abbrev-ref HEAD)
+head_oid=$head_oid
+diff_from=$head_oid
+diff_to=WORKTREE
+EOF
+  exit 0
+fi
+
 command -v gh  >/dev/null 2>&1 || fail "gh not found on PATH"
 command -v jq  >/dev/null 2>&1 || fail "jq not found on PATH"
-git rev-parse --git-dir >/dev/null 2>&1 || fail "not inside a git repository"
 
 PR_FIELDS='number,url,baseRefName,headRefName,headRefOid'
 

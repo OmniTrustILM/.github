@@ -1,8 +1,13 @@
 name: QA Issue
-description: "Testing framework or automation work (QA team only)"
+description: "Work owned by the QA team (test automation, framework, QA infrastructure)"
 type: Task
 labels: ["qa"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        QA-team-owned work. For a QA **testing** task (manual or automated), also add the
+        `testing` label; use `qa` alone for framework or QA infrastructure.
   - type: textarea
     id: description
     attributes:

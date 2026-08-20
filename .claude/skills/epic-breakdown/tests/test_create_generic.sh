@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests create-issue-generic.sh dry-run + the form-token race guard.
+# Tests create-issue-generic.sh: dry-run planning, the form-token race guard,
+# and one stubbed non-dry-run creation.
 # Requires a warm cache (run.sh seeds it from create-issue for offline runs).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -40,5 +41,36 @@ fi
 out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
   --repo "$REPO" --type bug --title "B" --body-file - --severity Major --dry-run 2>&1)
 echo "$out" | grep -qi "Severity=Major" || { echo "FAIL: severity not planned"; exit 1; }
+
+# 6) Regression: label-less Task, NON-dry-run, executed with /bin/bash.
+# Bash 3.2 (macOS /bin/bash) under `set -u` treats an empty-array expansion as an
+# unbound variable, so an unguarded "${LABEL_FLAGS[@]}" crashed the real
+# `gh issue create` line for label-less types. Dry-run exits before that line,
+# hence this stubbed full-sequence run; `jq` stays real. Only reproduces the
+# crash where /bin/bash is 3.2 (macOS) - on Linux it covers the non-dry-run path.
+STUB_DIR=$(mktemp -d)
+trap 'rm -rf "$STUB_DIR"' EXIT
+cat > "$STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+  auth)  exit 0 ;;  # no "Token scopes:" line -> require_project_scope passes
+  issue) echo "https://github.com/OmniTrustILM/stub/issues/999" ;;
+  api)
+    if [ "${2:-}" = "graphql" ]; then
+      echo '{"data":{"addProjectV2ItemById":{"item":{"id":"PVTI_stub"}}}}'
+    else
+      echo "I_stubnode"  # repos/.../issues/999 node_id lookup
+    fi ;;
+esac
+exit 0
+STUB
+chmod +x "$STUB_DIR/gh"
+out=$(printf '### Description\n\nx\n' | PATH="$STUB_DIR:$PATH" /bin/bash "$SCRIPT" \
+  --repo "$REPO" --type task --title "Label-less regression" --body-file - 2>&1)
+rc=$?
+[ "$rc" -eq 0 ] || { echo "FAIL: label-less non-dry-run creation exited $rc:"; echo "$out"; exit 1; }
+echo "$out" | grep -q "url=https://github.com/OmniTrustILM/stub/issues/999" \
+  || { echo "FAIL: no url output from stubbed creation"; echo "$out"; exit 1; }
+echo "$out" | grep -q "node_id=I_stubnode" || { echo "FAIL: no node_id output"; echo "$out"; exit 1; }
 
 echo "PASS"

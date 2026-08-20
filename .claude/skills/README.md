@@ -13,7 +13,7 @@ issues. All of them operate across all org repos.
 | [`create-issue`](create-issue/) | Turn a natural-language description into a well-formed Bug / Feature / Task / Documentation / QA issue, set its project fields, add it to Project #5, and link a bug under the active `Bugs x.y.z` cycle. | Creates one issue and links it under its parent (on confirm). |
 | [`project-triage`](project-triage/) | Health report on Project #5 — required-field gaps, staleness, consistency violations — with optional per-finding auto-fixes. | Read-only by default; fixes only on per-finding confirmation. |
 | [`epic-breakdown`](epic-breakdown/) | Turn a requirement into a planned Epic + sub-issues, enrich an existing Epic, or reconcile an Epic against current progress. The ILM architect "buddy". | Creates/links sub-issues and sets fields only on confirm. |
-| [`pr-hygiene`](pr-hygiene/) | Scan a PR or branch diff for comment and log noise over the lines it adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — and propose before/after edits. | Edits the local working tree only on confirm; never commits, pushes or stages. |
+| [`pr-hygiene`](pr-hygiene/) | Scan a PR diff, a branch diff, or the uncommitted working tree for comment and log noise over the lines it adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — and propose before/after edits. | Edits the local working tree only on confirm; never commits, pushes or stages. |
 
 ## Shared conventions
 
@@ -53,6 +53,10 @@ apply edits unless your working tree is on that same commit. It also refuses a
 PR belonging to another repository, since the diff can only come from the local
 clone. Deploy it (below) and run it from a clone of the reviewed repo.
 
+`--worktree` is the exception within that exception: it scans your uncommitted
+changes in place, so the checked-out tree *is* the target and the commit gate
+does not apply.
+
 ### Deploying for use from any repo
 
 The canonical, reviewed copies live here. To use the skills while working inside
@@ -70,8 +74,10 @@ use in each location, so it does not need copying.)
 
 ## Contributing
 
-Shell scripts must pass ShellCheck (CI lints `.claude/skills/**/*.sh`). The
-`epic-breakdown` skill ships an offline test suite: `bash
-.claude/skills/epic-breakdown/tests/run.sh`. Keep `SKILL.md` aligned with the
+Shell scripts must pass ShellCheck (CI lints `.claude/skills/**/*.sh`). A file
+named `*.test.sh` is run by the Action tests workflow, so name new suites that
+way to have them enforced — `pr-hygiene/resolve-target.test.sh` is the example.
+The `epic-breakdown` skill ships an offline suite under its own entry point:
+`bash .claude/skills/epic-breakdown/tests/run.sh`. Keep `SKILL.md` aligned with the
 methodics — if the process changes, update `docs/development-process.md` first,
 then the skills.
