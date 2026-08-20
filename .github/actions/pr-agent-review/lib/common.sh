@@ -18,9 +18,14 @@ set_output() { printf '%s=%s\n' "$1" "$2" >> "$GITHUB_OUTPUT"; }
 #
 # The line number is deliberately not an input. A finding keeps its identity
 # when the code around it moves, which is exactly what a re-review needs.
+#
+# SHA-256 rather than SHA-1. The use is not cryptographic - this is a dedup key,
+# and truncating either to six hex characters gives the same collision odds - but
+# there is no reason to reach for a broken primitive, and this repository's own
+# review prompts tell the agent to flag exactly that on a PKI platform.
 fingerprint() {
   local file="$1" category="$2" what="$3" norm
   norm=$(printf '%s' "$what" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ' \
          | sed 's/^ //; s/ $//')
-  printf '%s|%s|%s' "$file" "$category" "$norm" | sha1sum | cut -c1-6
+  printf '%s|%s|%s' "$file" "$category" "$norm" | sha256sum | cut -c1-6
 }
