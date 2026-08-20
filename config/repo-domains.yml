@@ -1,0 +1,77 @@
+# Drives per-repo CODEOWNERS sync (and documents domain ownership).
+# Domain = OWNER team. Source is curated purpose, never GitHub primaryLanguage
+# (Linguist misreports scaffold/connector repos).
+#
+# Owner resolution (exclude -> domain(s) -> qa -> default maintainers; a repo
+# in several domains gets all those teams on one line, any one's approval = OK)
+# is implemented and documented in the renderer, the single source of truth:
+# .github/scripts/repo-template-sync/render-codeowners.sh
+#
+# Each domain key <k> must have a matching @OmniTrustILM/maintainers-<k> team
+# (and `qa` a @OmniTrustILM/qa team); the renderer emits those slugs verbatim.
+# A key with no matching team yields an inert CODEOWNERS line (GitHub requests
+# no reviewer) — create the team before adding a domain key.
+#
+# The renderer honors an optional `exclude:` list; none is defined today.
+# Adding a repo here is the per-repo opt-out from managed CODEOWNERS ONLY —
+# release.yml and workflows still sync (closing the sync PR opts out of
+# everything instead). The `.github` repo is self-excluded by the resolve step.
+#
+# Convention: domains in order core, ui, go, qa, infra; repos alphabetical.
+
+core:
+  - auth
+  - cert-manager-issuer
+  - core
+  - dependencies
+  - helm-charts
+  - interface-documentation
+  - interfaces
+  - mcp-server
+  - operator
+  - provisioning-rabbitmq
+  - proxy
+  - saas-provisioning
+  - scheduler
+
+ui:
+  - fe-administrator
+  - saas-provisioning
+
+go:
+  - cbom-lens
+  - cbom-repository
+  - cert-manager-issuer
+  - go-sdk
+  - hashicorp-vault-connector
+  - otpki-connector
+  - proxy
+
+qa:
+  - automated-testing-framework
+
+infra:
+  - ansible-role-helm
+  - ansible-role-http-proxy
+  - ansible-role-ilm
+  - ansible-role-ilm-branding
+  - ansible-role-postgres
+  - ansible-role-rke2
+  - ansible-role-systemd-timesyncd
+  - appliance
+  - appliance-tools
+  - debian-repository
+  - development-environment
+  - helm-charts
+  - keycloak-optimized
+  - keycloak-theme
+  - saas-infrastructure
+  - saas-provisioning
+  - saas-shared-infrastructure
+  - saas-tenant-deployment
+  - saas-tenant-pipeline
+
+# Everything NOT in a domain above or `qa` falls to the DEFAULT owner
+# @OmniTrustILM/maintainers — e.g. documentation, pm-reporting, ilm (umbrella),
+# .allstar, auth-opa-policies, ui-design, and connector/provider repos not
+# individually curated into a domain.

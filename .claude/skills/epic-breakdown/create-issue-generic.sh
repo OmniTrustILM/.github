@@ -102,7 +102,7 @@ require_project_scope
 
 # --- Create the issue ---
 log "creating $TEMPLATE_TYPE in $ORG/$REPO"
-ISSUE_URL=$(gh issue create --repo "$ORG/$REPO" --title "$TITLE" --body-file "$BODY_FILE" "${LABEL_FLAGS[@]}") \
+ISSUE_URL=$(gh issue create --repo "$ORG/$REPO" --title "$TITLE" --body-file "$BODY_FILE" ${LABEL_FLAGS[@]:+"${LABEL_FLAGS[@]}"}) \
   || fail "gh issue create failed (see stderr above)"
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 [ -n "$ISSUE_NUMBER" ] || fail "could not extract issue number from URL: $ISSUE_URL"
