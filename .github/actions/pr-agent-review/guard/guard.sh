@@ -37,7 +37,7 @@ case "${GITHUB_EVENT_NAME:-}" in
     [ "$draft" = "false" ] || stop "pull request is a draft"
 
     # Automatic reviews of dependency PRs are not worth their cost. This gates
-    # the automatic path only - an explicit /review below is a deliberate
+    # the automatic path only - an explicit /ilm-review is a deliberate
     # request and overrides it, the same way it overrides the draft check.
     for bot in "${SKIP_AUTHORS[@]}"; do
       [ "$author" = "$bot" ] && stop "author is on the skip list: $author"
@@ -65,13 +65,14 @@ case "${GITHUB_EVENT_NAME:-}" in
     [ "$allowed" = true ] || stop "commenter association '${assoc:-none}' may not start a review"
 
     # Only the first line is the command. [[:space:]] matches newlines, so
-    # without this a comment whose body merely opens with /review would parse,
-    # and a browser-submitted comment carries a trailing CR.
+    # without this a word on the second line of a comment that opens with the
+    # command would be read as the effort, and a browser-submitted comment
+    # carries a trailing CR.
     body=$(jq -r '.comment.body' "$GITHUB_EVENT_PATH")
     body=${body%%$'\n'*}
     body=${body%$'\r'}
 
-    [[ "$body" =~ ^/review([[:space:]]+([A-Za-z]+))?([[:space:]]+full)?[[:space:]]*$ ]] \
+    [[ "$body" =~ ^/ilm-review([[:space:]]+([A-Za-z]+))?([[:space:]]+full)?[[:space:]]*$ ]] \
       || stop "comment is not the review command"
 
     requested="${BASH_REMATCH[2]:-}"
@@ -87,8 +88,8 @@ case "${GITHUB_EVENT_NAME:-}" in
       else
         # An unrecognised effort is a typo; running `standard` silently would
         # review at a different depth than was asked for. Matched
-        # case-insensitively so `/review Deep` lands here, not on the vaguer
-        # "not the review command".
+        # case-insensitively so `/ilm-review Deep` lands here, not on the
+        # vaguer "not the review command".
         case "${requested,,}" in
           light|standard|deep) effort="${requested,,}" ;;
           *) stop "unknown effort '${requested}' - use light, standard or deep" ;;

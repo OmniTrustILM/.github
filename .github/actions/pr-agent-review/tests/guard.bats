@@ -61,14 +61,14 @@ event() {
   [ "$(out proceed)" = "false" ]
 }
 
-@test "/review proceeds at the default effort" {
+@test "/ilm-review proceeds at the default effort" {
   event issue_comment comment_plain.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out proceed)" = "true" ]
   [ "$(out effort)" = "standard" ]
 }
 
-@test "/review deep overrides the effort and resolves every output" {
+@test "/ilm-review deep overrides the effort and resolves every output" {
   # The issue_comment path derives these from the API response rather than the
   # event payload, so a jq typo here would otherwise pass the whole suite.
   event issue_comment comment_deep.json
@@ -80,7 +80,7 @@ event() {
   [ "$(out base-ref)" = "main" ]
 }
 
-@test "/review full sets the full flag without consuming the effort slot" {
+@test "/ilm-review full sets the full flag without consuming the effort slot" {
   event issue_comment comment_full.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out proceed)" = "true" ]
@@ -88,20 +88,20 @@ event() {
   [ "$(out effort)" = "standard" ]
 }
 
-@test "/review deep full sets both" {
+@test "/ilm-review deep full sets both" {
   event issue_comment comment_deepfull.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out effort)" = "deep" ]
   [ "$(out full)" = "true" ]
 }
 
-@test "/review light parses the one effort the default never produces" {
+@test "/ilm-review light parses the one effort the default never produces" {
   event issue_comment comment_light.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out effort)" = "light" ]
 }
 
-@test "/review full full is rejected as malformed" {
+@test "/ilm-review full full is rejected as malformed" {
   event issue_comment comment_fullfull.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$status" -eq 0 ]
@@ -135,13 +135,13 @@ event() {
   [ "$(out proceed)" = "false" ]
 }
 
-@test "an explicit /review overrides the bot-author skip" {
+@test "an explicit /ilm-review overrides the bot-author skip" {
   event issue_comment comment_botpr.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out proceed)" = "true" ]
 }
 
-@test "/reviewers is not the review command" {
+@test "a near-miss on the command name does not trigger" {
   event issue_comment comment_reviewers.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$status" -eq 0 ]
@@ -167,6 +167,16 @@ event() {
   # GITHUB_TOKEN to resolve a pull request, which is a different credential.
   run grep -nE "create-github-app-token|APP_ID|PRIVATE_KEY" "$ACTION_DIR/guard/guard.sh"
   [ -z "$output" ] || { echo "guard touches credentials: $output"; false; }
+}
+
+@test "the generic /review does not trigger this reviewer" {
+  # The command is namespaced so a bare /review - which other tooling and
+  # people use conversationally - never reaches the guard's grammar, and the
+  # workflow prefilter never starts a runner for it.
+  event issue_comment comment_generic.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "false" ]
 }
 
 @test "the bot skip survives a filename matching its glob" {
