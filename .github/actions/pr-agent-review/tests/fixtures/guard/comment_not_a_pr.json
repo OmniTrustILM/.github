@@ -1,0 +1,12 @@
+{
+  "issue": {
+    "number": 4242
+  },
+  "comment": {
+    "body": "/review",
+    "user": {
+      "login": "l"
+    },
+    "author_association": "MEMBER"
+  }
+}

@@ -56,11 +56,12 @@ setup() {
   grep -qx 'pr-number=2087' "$GITHUB_OUTPUT"
 }
 
-@test "the gh stub answers from fixtures and fails loudly when unmatched" {
+@test "the gh stub matches whole invocations, not substrings" {
   export GH_FIXTURE_DIR="$BATS_TEST_TMPDIR/fx"
   mkdir -p "$GH_FIXTURE_DIR"
   echo '{"ok":true}' > "$GH_FIXTURE_DIR/hit.json"
-  printf 'pulls/7\thit.json\n' > "$GH_FIXTURE_DIR/map.txt"
+  tab=$'\t'
+  printf '%s\n' "api repos/x/y/pulls/7${tab}hit.json" > "$GH_FIXTURE_DIR/map.txt"
   export PATH="$BATS_TEST_DIRNAME/stubs:$PATH"
 
   run gh api repos/x/y/pulls/7
@@ -68,5 +69,12 @@ setup() {
   [[ "$output" == *'"ok":true'* ]]
 
   run gh api repos/x/y/pulls/999
+  [ "$status" -ne 0 ]
+
+  # Substring matching used to let pulls/7 answer these too, so fixtures would
+  # shadow each other as soon as a sub-endpoint appeared.
+  run gh api repos/x/y/pulls/70
+  [ "$status" -ne 0 ]
+  run gh api repos/x/y/pulls/7/comments
   [ "$status" -ne 0 ]
 }

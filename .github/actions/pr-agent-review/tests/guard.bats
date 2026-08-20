@@ -41,12 +41,14 @@ event() {
 @test "a fork head does not proceed" {
   event pull_request pr_fork.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
 @test "a bot-authored pull request does not proceed" {
   event pull_request pr_renovate.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
@@ -55,6 +57,7 @@ event() {
   # cannot live only on the pull_request path.
   event issue_comment comment_fork.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
@@ -65,42 +68,114 @@ event() {
   [ "$(out effort)" = "standard" ]
 }
 
-@test "/review deep overrides the effort" {
+@test "/review deep overrides the effort and resolves every output" {
+  # The issue_comment path derives these from the API response rather than the
+  # event payload, so a jq typo here would otherwise pass the whole suite.
   event issue_comment comment_deep.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out proceed)" = "true" ]
   [ "$(out effort)" = "deep" ]
+  [ "$(out pr-number)" = "2087" ]
+  [ "$(out head-sha)" = "a3f9c21deadbeef" ]
+  [ "$(out base-ref)" = "main" ]
 }
 
-@test "/review full sets the full flag" {
+@test "/review full sets the full flag without consuming the effort slot" {
   event issue_comment comment_full.json
   run "$ACTION_DIR/guard/guard.sh"
   [ "$(out proceed)" = "true" ]
   [ "$(out full)" = "true" ]
+  [ "$(out effort)" = "standard" ]
+}
+
+@test "/review deep full sets both" {
+  event issue_comment comment_deepfull.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$(out effort)" = "deep" ]
+  [ "$(out full)" = "true" ]
+}
+
+@test "/review light parses the one effort the default never produces" {
+  event issue_comment comment_light.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$(out effort)" = "light" ]
+}
+
+@test "/review full full is rejected as malformed" {
+  event issue_comment comment_fullfull.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "false" ]
+}
+
+@test "only the first line of a comment is the command" {
+  # /review followed by an explanation should work, but [[:space:]] matches
+  # newlines - so without trimming, a word on the second line would be read as
+  # the effort. The fixture body is /review on line one, deep on line two.
+  event issue_comment comment_multiline.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "true" ]
+  [ "$(out effort)" = "standard" ]
+}
+
+@test "a comment from outside the org does not start a review" {
+  # The dangerous path: issue_comment runs with the full secret set, and on a
+  # public repo anyone can comment.
+  event issue_comment comment_outsider.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "false" ]
+}
+
+@test "a comment on a plain issue skips cleanly rather than crashing" {
+  event issue_comment comment_not_a_pr.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "false" ]
+}
+
+@test "an explicit /review overrides the bot-author skip" {
+  event issue_comment comment_botpr.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$(out proceed)" = "true" ]
 }
 
 @test "/reviewers is not the review command" {
-  # The workflow if: can only do startsWith, so the real grammar is enforced
-  # here - otherwise "/reviewers please look" would spend credits.
   event issue_comment comment_reviewers.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
 @test "a comment on a closed pull request does not proceed" {
   event issue_comment comment_closed.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
 @test "an unknown effort is rejected rather than silently defaulted" {
   event issue_comment comment_badeffort.json
   run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
   [ "$(out proceed)" = "false" ]
 }
 
-@test "the guard never mints or reads a token" {
-  # Its whole purpose is to run before credentials exist.
+@test "the guard never mints an App token" {
+  # It runs before the App token exists. It does read the workflow's own
+  # GITHUB_TOKEN to resolve a pull request, which is a different credential.
   run grep -nE "create-github-app-token|APP_ID|PRIVATE_KEY" "$ACTION_DIR/guard/guard.sh"
   [ -z "$output" ] || { echo "guard touches credentials: $output"; false; }
+}
+
+@test "the bot skip survives a filename matching its glob" {
+  # renovate[bot] is a valid glob pattern. Unquoted, it expands to a matching
+  # filename in the working directory and the skip silently fails open.
+  cd "$BATS_TEST_TMPDIR"
+  touch renovateb
+  event pull_request pr_renovate.json
+  run "$ACTION_DIR/guard/guard.sh"
+  [ "$status" -eq 0 ]
+  [ "$(out proceed)" = "false" ]
 }

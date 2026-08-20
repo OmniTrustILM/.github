@@ -1,0 +1,15 @@
+{
+  "issue": {
+    "number": 2087,
+    "pull_request": {
+      "url": "x"
+    }
+  },
+  "comment": {
+    "body": "/review\ndeep",
+    "user": {
+      "login": "l"
+    },
+    "author_association": "MEMBER"
+  }
+}
