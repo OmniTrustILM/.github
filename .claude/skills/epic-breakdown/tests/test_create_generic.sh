@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests create-issue-generic.sh dry-run + the form-token race guard.
+# Tests create-issue-generic.sh: dry-run planning, the form-token race guard,
+# and one stubbed non-dry-run creation.
 # Requires a warm cache (run.sh seeds it from create-issue for offline runs).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
