@@ -157,9 +157,7 @@ on:
 
 jobs:
   # Runs before anything writes an artifact, so a bad namespace fails here with a
-  # readable message rather than inside actions/upload-artifact. The regex also keeps
-  # glob characters out of publish_manifest's Minimatch `pattern`, where they would
-  # mis-select another call's digests.
+  # readable message rather than inside actions/upload-artifact.
   validate_inputs:
     name: Validate inputs
     runs-on: ubuntu-latest
