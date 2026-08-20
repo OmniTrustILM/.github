@@ -9,7 +9,7 @@
 #
 # Vulnerability defaults (when `vulnerability` label present):
 #   - Severity → Critical (if reporter didn't set it)
-#   - Priority → High (if empty)
+#   - Prioritization → High (if empty)
 #
 # Defensive: if extraction fails, fields are left empty. The triage
 # skill catches missing fields later.
@@ -38,10 +38,10 @@ if printf '%s' ",$ISSUE_LABELS," | grep -q ",vulnerability,"; then
     echo "Vulnerability without Severity — defaulting to Critical"
   fi
   PRIORITY="High"
-  echo "Vulnerability — defaulting Priority to High"
+  echo "Vulnerability — defaulting Prioritization to High"
 fi
 
-echo "Parsed — Severity: ${SEVERITY:-empty}, Module: ${MODULE:-empty}, Version: ${VERSION:-empty}, Priority: ${PRIORITY:-empty}"
+echo "Parsed — Severity: ${SEVERITY:-empty}, Module: ${MODULE:-empty}, Version: ${VERSION:-empty}, Prioritization: ${PRIORITY:-empty}"
 
 if [ -z "$SEVERITY" ] && [ -z "$MODULE" ] && [ -z "$PRIORITY" ] && [ -z "$VERSION" ]; then
   echo "No fields to set, exiting."
@@ -133,5 +133,5 @@ set_field() {
 
 set_field "Severity" "$SEVERITY"
 set_field "Module" "$MODULE"
-set_field "Priority" "$PRIORITY"
+set_field "Prioritization" "$PRIORITY"
 set_field "Version" "$VERSION"

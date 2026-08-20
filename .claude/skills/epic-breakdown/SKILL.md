@@ -203,7 +203,7 @@ and stop unless confirmed.
    - **Leave child Version blank** so `version-propagation` automation copies it from the parent. Status stays Planning.
    - **Mid-sequence failure:** stop, and print three lists — completed (with URLs), the failing step (with the error), and not-yet-started. Created-but-unlinked children are also in `cache/orphans.log`. Never silently continue.
 8. **Confirm to the user** every created URL, what was set, and what remains:
-   **PM** — Version, Sprint, Priority, Start/End Date, moving Status to Open;
+   **PM** — Version, Sprint, Prioritization, Start/End Date, moving Status to Open;
    **Developer** — the child Estimate field (the suggested value is shown, not written).
 
 ---
@@ -226,7 +226,7 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
    showing the before→after diff and getting that change approved.** Apply
    approved changes with the same scripts as breakdown.
-5. **Never** set Version/Sprint/Priority/dates, force Status, write child
+5. **Never** set Version/Sprint/Prioritization/dates, force Status, write child
    Estimate, or close issues. Propose status nudges to the human (§7.3 rule 4).
 
 **Rule coverage.** `reconcile.py` checks the Epic-and-children consistency rules
@@ -247,7 +247,7 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
 - **Writes (on approval):** Epic Complexity, Epic Estimate, child Complexity,
   child Module, Epic body, sub-issue links, blocked-by deps, sub-issue creation.
 - **Suggest-only:** child Estimate (Developer-owned, §3.1/§10/§3.5).
-- **Never autonomously:** Version, Sprint, Priority, Start/End Date; forcing
+- **Never autonomously:** Version, Sprint, Prioritization, Start/End Date; forcing
   Status; the deprecated Component/Developer fields; closing issues.
 
 ---
