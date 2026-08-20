@@ -21,15 +21,10 @@ name: Publish Harbor image (reusable)
 # Adding a new architecture later means adding one entry to the matrix - the
 # manifest job picks up any digests-* artifacts of its own namespace it finds.
 #
-# `artifact-namespace` is required when one caller invokes this workflow more than
-# once in a single run - a per-variant matrix over `uses:`, say. Artifacts are
-# scoped to the caller's RUN, not to the call, so two calls would both write
-# `digests-amd64` and the second upload would fail on the duplicate name. Worse,
-# each call's manifest job downloads `digests-*` with merge-multiple, so it would
-# build its manifest from the other call's digests, under its own image path.
-# Pass a distinct namespace per call (the variant name) and every artifact this
-# workflow writes is prefixed with it. Empty (the default) keeps the historical
-# names, so single-call callers need no change.
+# `artifact-namespace` namespaces every artifact this workflow writes; the input's
+# own description says when to pass it. The half worth spelling out is the manifest
+# job: it downloads `digests-*` with merge-multiple, so without a namespace one
+# call builds its manifest from another call's digests, under its own image path.
 #
 # `additional-images` publishes one build under several repository paths in the
 # same registry. The build and the Trivy scan run once, against `image`.
@@ -199,7 +194,6 @@ jobs:
       - name: Upload artifact (tar)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          # Run-scoped name: prefixed so parallel calls in one run stay apart.
           name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
           path: app-data.tar
           if-no-files-found: error

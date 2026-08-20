@@ -10,12 +10,6 @@ name: Test Docker image (reusable)
 #                            artifact. Use this when the Dockerfile expects the
 #                            JARs to already exist on disk.
 #   - pre-build: 'none'   -> builds entirely inside the Dockerfile (default).
-#
-# `artifact-namespace` is required when one caller invokes this workflow more than
-# once in a single run (a per-variant matrix over `uses:`, say): artifacts are
-# scoped to the caller's RUN, not to the call, so two calls would both write
-# `app-data` and the second upload would fail on the duplicate name. Pass a
-# distinct namespace per call; empty (the default) keeps the historical names.
 
 on:
   workflow_call:
@@ -122,7 +116,6 @@ jobs:
       - name: Upload artifact (tar)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          # Run-scoped name: prefixed so parallel calls in one run stay apart.
           name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
           path: app-data.tar
           if-no-files-found: error
