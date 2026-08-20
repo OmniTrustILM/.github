@@ -10,6 +10,12 @@ name: Test Docker image (reusable)
 #                            artifact. Use this when the Dockerfile expects the
 #                            JARs to already exist on disk.
 #   - pre-build: 'none'   -> builds entirely inside the Dockerfile (default).
+#
+# `artifact-namespace` is required when one caller invokes this workflow more than
+# once in a single run (a per-variant matrix over `uses:`, say): artifacts are
+# scoped to the caller's RUN, not to the call, so two calls would both write
+# `app-data` and the second upload would fail on the duplicate name. Pass a
+# distinct namespace per call; empty (the default) keeps the historical names.
 
 on:
   workflow_call:
@@ -22,6 +28,16 @@ on:
         description: "Cache namespace shared by the per-arch builds (e.g. core)"
         required: true
         type: string
+      artifact-namespace:
+        description: |
+          Prefix for every artifact this workflow writes. REQUIRED when one caller
+          invokes this workflow more than once in the same run (e.g. a matrix over
+          `uses:`), because artifact names are run-scoped: without it the calls
+          collide on `app-data`. Empty (the default) keeps the historical
+          unprefixed names.
+        required: false
+        type: string
+        default: ''
       registry:
         description: "Container registry hostname"
         required: false
@@ -106,7 +122,8 @@ jobs:
       - name: Upload artifact (tar)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-data
+          # Run-scoped name: prefixed so parallel calls in one run stay apart.
+          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
           path: app-data.tar
           if-no-files-found: error
           retention-days: 1
@@ -140,7 +157,7 @@ jobs:
         if: ${{ inputs.pre-build == 'maven' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: app-data
+          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}app-data
 
       - name: Extract artifacts (preserve perms)
         if: ${{ inputs.pre-build == 'maven' }}
@@ -182,7 +199,7 @@ jobs:
       - name: Upload vulnerability report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: trivy-report-${{ matrix.arch }}
+          name: ${{ inputs.artifact-namespace && format('{0}-', inputs.artifact-namespace) || '' }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
       - name: Fail build on vulnerabilities
