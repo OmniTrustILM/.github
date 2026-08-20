@@ -74,7 +74,7 @@ set_single_select() {
   fi
 }
 
-# Two ceilings, both derived from delivery capacity rather than picked.
+# Two ceilings, both derived from delivery capacity.
 #
 # Epic: a release is a ~10-week development cycle (50 working days) and an Epic
 # is staffed by at most 2 people, so 100 mandays is the largest estimate that
@@ -99,10 +99,9 @@ ESTIMATE_MAX_CHILD_DEVBUILT=10
 estimate_quarters() {
   [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
   local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}" q
-  # Bound the integer part before multiplying. Bash arithmetic is 64-bit and
-  # wraps silently, so a huge value can land back inside the cap - 4611686018427387905 * 4
-  # is 4. Count digits rather than comparing: a value past INT64_MAX makes the
-  # comparison itself an arithmetic error.
+  # Bound the integer part before multiplying: bash's 64-bit arithmetic wraps
+  # silently, so a value past INT64_MAX can land back inside the cap
+  # (4611686018427387905 * 4 == 4). Count digits — comparing would itself overflow.
   [ "${#whole}" -le 6 ] || return 1
   case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
   case "$frac" in 00) q=0 ;; 25) q=1 ;; 50) q=2 ;; 75) q=3 ;; *) return 1 ;; esac
@@ -110,11 +109,10 @@ estimate_quarters() {
 }
 
 # estimate_is_valid MANDAYS MAX_MANDAYS — quarter-day steps only (§3.5).
-# 0.25 is both the minimum and the increment: 0.25, 0.5, 0.75, 1, 1.25 … There
-# is no finer granularity. Anything between the steps is false precision on a
-# number that already carries a review buffer, and 0 is not an estimate - it
-# carries no information (and project-triage still reports a 0 Estimate as
-# missing, since eval.py treats 0 as falsy).
+# 0.25 is both the minimum and the increment; anything between the steps is
+# false precision on a number that already carries a review buffer. 0 is not an
+# estimate — it carries no information (and project-triage reports a 0 Estimate
+# as missing, since eval.py treats 0 as falsy).
 estimate_is_valid() {
   local q max="${2:-$ESTIMATE_MAX_EPIC}"
   q=$(estimate_quarters "$1") || return 1

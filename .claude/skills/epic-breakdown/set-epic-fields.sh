@@ -40,10 +40,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-# --scope is mandatory when an estimate is written, so the ceiling is never
-# picked by omission (a child write missing the flag would otherwise validate
-# against the 100-manday Epic ceiling and skip the rationale check). Without an
-# estimate it defaults to epic — the ceiling is unused in that case.
+# Require --scope with --estimate: a child write missing the flag would else
+# validate against the 100-manday Epic ceiling and skip the rationale check.
+# Without an estimate it defaults to epic (the ceiling is then unused).
 if [ "$ESTIMATE_SET" -eq 1 ] && [ -z "$SCOPE" ]; then
   fail "--scope is required when --estimate is given (epic or child)"
 fi
