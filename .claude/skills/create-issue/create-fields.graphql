@@ -33,6 +33,28 @@ mutation SetIssueType($issueId: ID!, $issueTypeId: ID!) {
   }
 }
 
+# Read the parent's own Project #5 single-select values, so create.sh can copy
+# Version (and Module) down after the sub-issue link exists.
+query ParentFieldValues($parentId: ID!) {
+  node(id: $parentId) {
+    ... on Issue {
+      projectItems(first: 10) {
+        nodes {
+          project { id }
+          fieldValues(first: 30) {
+            nodes {
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                field { ... on ProjectV2SingleSelectField { name } }
+                name
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 mutation AddSubIssue($issueId: ID!, $subIssueId: ID!) {
   addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId }) {
     issue { number }

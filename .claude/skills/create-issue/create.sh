@@ -214,17 +214,63 @@ if [ -n "$MODULE" ];   then set_single_select "Module"   "$MODULE";   fi
 PARENT_LINKED="false"
 if [ -n "$PARENT_ID" ]; then
   ADD_SUB_QUERY="$(awk '/^mutation AddSubIssue/,/^}$/' "$GRAPHQL_DOC")"
+  # Keep the API's own error: a full parent (100 sub-issues) and a permission
+  # refusal both surface as "link failed", and only the message tells them apart.
+  LINK_ERR_FILE=$(mktemp)
   if gh api graphql -f query="$ADD_SUB_QUERY" \
       -f issueId="$PARENT_ID" \
-      -f subIssueId="$ISSUE_NODE_ID" >/dev/null 2>&1; then
+      -f subIssueId="$ISSUE_NODE_ID" >/dev/null 2>"$LINK_ERR_FILE"; then
     PARENT_LINKED="true"
     log "  linked under parent $PARENT_ID"
   else
-    printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ISSUE_URL" "addSubIssue->$PARENT_ID failed" \
-      >> "$CACHE_DIR/orphans.log"
-    log "  warn: failed to link under parent $PARENT_ID (logged to $CACHE_DIR/orphans.log)"
-    log "  hint: addSubIssue writes to the *parent's* repo — this needs push access there, not on $REPO"
+    # `|| true`: a non-JSON stderr (network error, gh usage message) makes jq
+    # exit non-zero, and under `set -e` that would kill the script here — right
+    # where it is supposed to be reporting a problem it already survived.
+    LINK_ERR=$(jq -r '[.errors[]?.message] | join("; ") | select(. != "")' "$LINK_ERR_FILE" 2>/dev/null || true)
+    [ -n "$LINK_ERR" ] || LINK_ERR=$(tr -d '\n' < "$LINK_ERR_FILE" | head -c 300)
+    [ -n "$LINK_ERR" ] || LINK_ERR="(no error message returned)"
+    printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ISSUE_URL" \
+      "addSubIssue->$PARENT_ID failed: $LINK_ERR" >> "$CACHE_DIR/orphans.log"
+    log "  warn: failed to link under parent $PARENT_ID: $LINK_ERR"
+    log "  (logged to $CACHE_DIR/orphans.log)"
+    # Only guess at the cause when the message did not already give one.
+    if ! printf '%s' "$LINK_ERR" | grep -qiE 'limit|maximum|too many|permission|access|resolve'; then
+      log "  hint: addSubIssue writes to the *parent's* repo — this needs push access there, not on $REPO"
+    fi
     log "  manual fix: gh api graphql -f query='mutation{addSubIssue(input:{issueId:\"$PARENT_ID\",subIssueId:\"$ISSUE_NODE_ID\"}){issue{number}}}'"
+  fi
+  rm -f "$LINK_ERR_FILE"
+fi
+
+# --- Inherit Version / Module from the parent ---
+# The org-wide version-propagation action would normally do this, but it runs on
+# `issues.opened` — which fired above, while the issue was still parentless — so
+# it found no parent and exited. Left alone, every issue this script links lands
+# without the Version its parent carries, which methodics §7.2 makes an error.
+# Same empty-only rule as the action, so neither can overwrite a real value.
+if [ "$PARENT_LINKED" = "true" ]; then
+  PARENT_FIELDS_QUERY="$(awk '/^query ParentFieldValues/,/^}$/' "$GRAPHQL_DOC")"
+  if PARENT_ITEM=$(gh api graphql -f query="$PARENT_FIELDS_QUERY" \
+      -f parentId="$PARENT_ID" 2>/dev/null); then
+    PARENT_VALUES=$(printf '%s' "$PARENT_ITEM" | jq --arg pid "$PROJECT_ID" '
+      [ .data.node.projectItems.nodes[]? | select(.project.id == $pid)
+        | .fieldValues.nodes[]? | select(.name != null)
+        | { key: .field.name, value: .name } ] | from_entries')
+
+    # Only fields this run left blank. Version is never set here (PM-owned per
+    # phase 6), Module only when --module was passed.
+    for field in Version Module; do
+      case "$field" in
+        Module) [ -z "$MODULE" ] || continue ;;
+      esac
+      parent_value=$(printf '%s' "$PARENT_VALUES" | jq -r --arg f "$field" '.[$f] // ""')
+      if [ -n "$parent_value" ]; then
+        log "  inheriting $field=$parent_value from parent"
+        set_single_select "$field" "$parent_value"
+      fi
+    done
+  else
+    log "  warn: could not read parent's fields; Version/Module not inherited"
   fi
 fi
 

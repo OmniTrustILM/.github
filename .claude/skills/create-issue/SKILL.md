@@ -129,21 +129,29 @@ For multi-repo descriptions (description spans both UI and API or two providers)
 
 ILM tracks each bug cycle as a `Bugs x.y.z` issue in `OmniTrustILM/ilm`, with the cycle's bugs linked under it as sub-issues. A bug that is not linked has to be attached by hand later, so the skill links it.
 
-Run `bash $SKILL_DIR/resolve-parent.sh --cycles`. It returns the open cycles, sorted numerically per version component, plus `parent_writable`.
+Run `bash $SKILL_DIR/resolve-parent.sh --cycles`. It returns the open cycles, sorted numerically per version component, each with its `sub_issues` count and a `full` flag, plus `parent_writable` and `sub_issue_limit`.
 
 **Never infer the active cycle from which issues are open.** Whether a `Bugs x.y.z` issue is open is an organisational decision, not a technical signal. A shipped cycle can stay open for weeks while its remaining sub-issues are closed off, and a future cycle is opened as a placeholder long before work starts. Neither "lowest open" nor "newest open" is reliable. So:
 
-- **Exactly one cycle open** → that is the cycle. Take it silently.
+- **Exactly one cycle open** → that is the cycle. Take it without a separate prompt: with one candidate there is nothing to infer, and phase 7 still renders it on the `Parent:` line with its title, where `confirm` gates it like every other field.
 - **More than one open** → **ask**, listing each candidate with its sub-issue count and offering the lowest as the default:
   *"Open bug cycles: `Bugs {version}` (ilm#{n}, {count} sub-issues), `Bugs {later version}` (ilm#{m}, {count} sub-issues). Which cycle does this bug belong to? [default: {version}, the lowest]"*
   Wait for the answer. Never pick one and carry on. More than one cycle open is the normal state, not a rare one, so expect to ask.
 - **None open** → say so and ask whether to file the bug with no parent.
 
+**A cycle with `full: true` has no room left.** GitHub caps a parent at `sub_issue_limit` (100) sub-issues, and the link
+happens *after* `gh issue create` — so a full cycle means a created issue that cannot be linked. Never take a full cycle
+without asking, not even as the only candidate, and mark it in any candidate list:
+*"`Bugs {version}` (ilm#{n}) is full — 100/100 sub-issues, GitHub's limit."*
+Offer the concrete ways out, in this order: file under the next open cycle, ask the PM to open one, or create with no
+parent and link by hand later. This is a capacity problem, so do **not** show the push-access warning below for it —
+that would name the wrong cause. Cycles run large in practice, so treat the cap as reachable, not remote.
+
 The sort is numeric per component, so a two-digit minor cannot sort before a single-digit one — `3.9.0` stays below `3.10.0`. It exists to make the candidate list readable and never chooses for you.
 
-**The cycle is for bugs only.** A feature or a documentation task does not belong under a bug cycle. For every other type, ask once — *"Link this {type} under a parent issue? (no / `Bugs {version}` / an issue number)"* — and default to `no` if the answer is unclear.
+**The cycle is for bugs only.** A feature or a documentation task does not belong under a bug cycle. For every other type, ask once — *"Link this {type} under a parent issue? (no / an issue number)"* — and default to `no` if the answer is unclear. The cycles are deliberately absent from that prompt. If the number given for a non-bug type resolves to a title matching `^Bugs \d+\.\d+\.\d+$`, refuse it — *"ilm#{n} is the {version} bug cycle, which takes bugs only. Another parent, or none?"* — and ask again.
 
-Given an issue number, resolve it with `bash $SKILL_DIR/resolve-parent.sh --issue <n> [--repo <name>]`. **Show the returned title in the preview**, so a mistyped number is caught by eye rather than parenting the issue under something unrelated. If the script reports the issue does not exist, say so and ask again rather than silently creating an unparented issue.
+Given an issue number, resolve it with `bash $SKILL_DIR/resolve-parent.sh --issue <n> [--repo <name>]`. **Show the returned title in the preview**, so a mistyped number is caught by eye rather than parenting the issue under something unrelated. If the script reports the issue does not exist, say so and ask again rather than silently creating an unparented issue. `parent_full=true` means that parent is at the sub-issue cap too — same treatment as a full cycle: say so and ask for another parent rather than creating an issue that cannot be linked.
 
 `--parent none` skips this phase entirely. `--parent <n>` resolves that number directly, for any type.
 
@@ -169,7 +177,8 @@ For each field, decide its provenance:
 
 Fields **never** auto-filled (PM-controlled, set during triage):
 
-- Version (target release)
+- Version (target release) — never *inferred* from the description. It is still inherited from the parent after linking,
+  the same copy the org-wide version-propagation action performs; see phase 9.
 - Sprint (iteration)
 - Priority (PM during triage)
 - Start Date / End Date (PM for Epics/Releases)
@@ -212,6 +221,7 @@ The `Parent:` line is what phase 5 established. For a bug that is the active cyc
 Parent:              (none)
 Parent:              OmniTrustILM/ilm#{n} "<the parent's own title>"
 Parent:              OmniTrustILM/ilm#{n} "Bugs {version}"   ⚠ no push access on ilm — link will fail
+Parent:              OmniTrustILM/ilm#{n} "Bugs {version}"   ⚠ full (100/100 sub-issues) — link will fail
 ```
 
 **Tag rules in the rendered preview:**
@@ -296,7 +306,9 @@ If `create.sh` exits non-zero with output containing `addProjectV2ItemById faile
 
 If `create.sh` exits 0 but the field-set log shows `warn: failed to set <field>=<value>`, surface that line to the user too — the issue is in the project but a field is blank.
 
-If `create.sh` exits 0 with `parent_linked=false` after a parent was passed, the issue exists and is in the project but hangs outside its cycle. Surface the script's `manual fix:` line verbatim. The usual cause is no push access on the parent's repo, which phase 5 warns about before anything is created.
+If `create.sh` exits 0 with `parent_linked=false` after a parent was passed, the issue exists and is in the project but hangs outside its cycle. Surface the script's `warn:` line — it carries the API's own reason, which distinguishes a full parent from a permission refusal — together with the `manual fix:` line verbatim. Both causes are ones phase 5 warns about before anything is created.
+
+On a successful link the script then copies the parent's **Version** (and Module, if this run left it blank) onto the new issue, logging `inheriting Version=<v> from parent`. This is not redundant with the org-wide version-propagation action: that action runs on `issues.opened`, which fires while the issue is still parentless, so it always skips. Without this step every issue the skill links would start with an empty Version against a parent that has one — a §7.2 consistency error. If the log shows `warn: could not read parent's fields`, tell the user Version was not inherited and needs setting by hand.
 
 ## Phase 10 — Confirm to user
 

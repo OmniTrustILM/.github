@@ -104,11 +104,18 @@ Release 2.18.0
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
 │   └── ...
+├── Epic [ilm]: Bugs 2.18.0
+│   ├── Bug [core]: Revocation reason not persisted
+│   └── Bug [fe-administrator]: Filter resets when paging
 ├── Bug [fe-administrator]: Standalone bug
 └── Task [helm-charts]: Standalone task
 ```
 
 - Releases contain Epics and optionally standalone issues
+- **Bug cycles.** Each release carries a `Bugs x.y.z` Epic in `ilm`, parented under that Release, and the bugs fixed in
+  the cycle are its sub-issues. It is an ordinary Epic in an ordinary place in the hierarchy — no separate rules apply to
+  it. Bugs found during the cycle go here rather than directly under the Release, which keeps the Release's own children
+  down to Epics. The `/create-issue` skill links a new bug under the active cycle automatically (§2.5).
 - Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks)
 - Features can contain Tasks and Bugs as implementation details (small sub-work discovered during development). **A Feature must NOT contain sub-Features** — this signals the Epic is too large and should be split.
 - Sub-issues receive Version and Module from parent at creation time (automation copies if child's fields are empty; does not update if parent changes later — see Section 6, Rule #2)
@@ -352,9 +359,9 @@ This section provides a brief overview. For full details, see `docs/release-proc
 **Known open bugs:**
 If a release has known open bugs that are accepted (not blocking release):
 - PM documents them in the Release issue's "Known Issues" section with links and rationale
-- Each known bug is reparented from the current Release to the next Release issue (or made standalone if no next Release exists yet), and its Version field is updated to the next release
+- Each known bug is reparented from the current cycle's `Bugs x.y.z` Epic to the next cycle's (or made standalone if the next cycle's Epic does not exist yet), and its Version field is updated to the next release
 - The decision to ship with known issues is made by PM with QA input, documented on the Release issue
-- This avoids triggering the "Version mismatch" consistency rule — deferred bugs always match their parent Release's Version
+- This avoids triggering the "Version mismatch" consistency rule — deferred bugs always match their parent cycle's Version
 
 ---
 
@@ -883,7 +890,7 @@ These skills live in `.claude/skills/` in this repo (see `.claude/skills/README.
 | Skill | Status | Scope |
 |---|---|---|
 | `/project-triage` | Available | Project health report on Project #5 — required-field gaps, stale issues, consistency violations, with optional per-finding auto-fixes. Validates issues against Module values. |
-| `/create-issue` | Available | Create well-formed OmniTrustILM issue from natural-language description. Supports Bug, Feature, Task, Documentation, QA. Auto-detects Module from description keywords and target repo. Skip for Epic, Release, Vulnerability — use form templates. |
+| `/create-issue` | Available | Create well-formed OmniTrustILM issue from natural-language description. Supports Bug, Feature, Task, Documentation, QA. Auto-detects Module from description keywords and target repo, and links a new bug under the active `Bugs x.y.z` cycle (§2, Issue Hierarchy). Skip for Epic, Release, Vulnerability — use form templates. |
 | `/epic-breakdown` | Available | Read an Epic (or a requirement), explore repos and existing issues, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, and propose sub-issues by work stream with Module/Complexity set, dependencies, and a suggested Estimate — all behind a human-approval gate. Adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). Sanctioned writer of Complexity/Estimate (§3.1, §3.5). |
 | `/pr-hygiene` | Available | Pre-merge comment and log hygiene over the lines a PR adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — proposed as before/after edits and applied only on confirm. Not a Project #5 skill: it reads a git diff, touches no issues or project fields, and is run from a clone of the reviewed repo rather than from this one. |
 
