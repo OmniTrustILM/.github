@@ -178,6 +178,33 @@ and stop unless confirmed.
    Complexity scale; use the developer-built basis only when the Epic declares
    it, and **never repeat estimates inside a child body**), blocked-by
    dependencies, and a suggested assignee.
+   **Estimate granularity — quarter days, nothing finer.** Every estimate is a
+   positive multiple of **0.25** mandays: `0.25`, `0.5`, `0.75`, `1`, `1.25`, …
+   0.25 is both the minimum and the increment; `0`, `0.1`, `0.333` and `1.4` are
+   all rejected outright by `set-epic-fields.sh`. Round to the nearest quarter
+   day — a value derived by division (a day split three ways → `0.333`) fails
+   the write.
+   **Two ceilings.** An **Epic** caps at **100** mandays: a ~10-week cycle, 50
+   working days, at most 2 people. Above it the Epic cannot ship in one release
+   — say so rather than writing the number.
+   A **child** caps at **4** mandays (agent-executed basis), so it stays
+   deliverable inside one week with reserve; on a **developer-built** Epic the
+   child cap is **10** mandays, matching the Complexity table's developer-built
+   High range. Prefer splitting. When a child genuinely cannot be split, it is
+   allowed over the cap **only** if its body carries an `### Estimate` section
+   saying why — `set-epic-fields.sh --scope child` reads that section from the
+   issue and refuses the write without it (needs at least 20 characters of
+   prose). The section carries **only the reason** the work cannot be split —
+   never restate the number (the Estimate field is the single source, §3.5). Put
+   the reason in the body you build in step 7.1, and surface it in the preview so
+   it is approved along with everything else:
+
+   ```markdown
+   ### Estimate
+
+   Single Flyway migration; applying it in halves would leave the schema
+   inconsistent between steps, so it cannot be split across sub-issues.
+   ```
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing
@@ -197,14 +224,14 @@ and stop unless confirmed.
    1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M>` (add `--severity <S>` for Bug children) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
    2. `link.sh --parent-node-id <epic> --child-node-id <child>` to attach the child.
    3. `link.sh --issue-node-id <child> --blocked-by-node-id <blocker>` for each dependency.
-   4. `set-epic-fields.sh --item-id <child item> --complexity <C>` (child Complexity only — **not** child Estimate).
-   5. After all children: `set-epic-fields.sh --item-id <epic item> --complexity <C> --estimate <E>` for the Epic.
+   4. `set-epic-fields.sh --item-id <child item> --scope child --basis <agent-executed|developer-built> --complexity <C> --estimate <E>` (`--basis` matches the Epic's declared basis; omit it to default to agent-executed).
+   5. After all children: `set-epic-fields.sh --item-id <epic item> --scope epic --complexity <C> --estimate <E>` for the Epic.
    6. `enrich-epic.sh --repo <r> --number <epic#> --enriched-file -` to rewrite the Epic body.
    - **Leave child Version blank** so `version-propagation` automation copies it from the parent. Status stays Planning.
    - **Mid-sequence failure:** stop, and print three lists — completed (with URLs), the failing step (with the error), and not-yet-started. Created-but-unlinked children are also in `cache/orphans.log`. Never silently continue.
 8. **Confirm to the user** every created URL, what was set, and what remains:
    **PM** — Version, Sprint, Priority, Start/End Date, moving Status to Open;
-   **Developer** — the child Estimate field (the suggested value is shown, not written).
+   **Developer** — reviewing the written child Estimates; an override is final (§3.5).
 
 ---
 
@@ -225,9 +252,13 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    each mutation, re-check current state and skip with a warning if it changed.
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
    showing the before→after diff and getting that change approved.** Apply
-   approved changes with the same scripts as breakdown.
-5. **Never** set Version/Sprint/Priority/dates, force Status, write child
-   Estimate, or close issues. Propose status nudges to the human (§7.3 rule 4).
+   approved changes with the same scripts as breakdown — a child Estimate write
+   is `set-epic-fields.sh --item-id <child item> --scope child --basis <basis> --estimate <E>`; `--scope child` is mandatory with `--estimate` (the script refuses the write otherwise), so the child cap and rationale rule always run.
+5. **Never** set Version/Sprint/Priority/dates, force Status, or close issues.
+   Propose status nudges to the human (§7.3 rule 4). Child Estimate may be set
+   on children this run *creates*, as in breakdown; an Estimate already on an
+   existing child is a developer's number and falls under the overwrite rule
+   above — diff and approval, never a silent replacement.
 
 **Rule coverage.** `reconcile.py` checks the Epic-and-children consistency rules
 (using the same rule names as `project-triage`'s `eval.py`): `empty_epic_no_sub_issues`,
@@ -245,8 +276,12 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
 
 - **Propose freely; require explicit human approval before ANY create/mutation.**
 - **Writes (on approval):** Epic Complexity, Epic Estimate, child Complexity,
-  child Module, Epic body, sub-issue links, blocked-by deps, sub-issue creation.
-- **Suggest-only:** child Estimate (Developer-owned, §3.1/§10/§3.5).
+  child Estimate, child Module, Epic body, sub-issue links, blocked-by deps,
+  sub-issue creation.
+  Child Estimate is written as the *suggested* value the preview showed; the
+  Developer owns the field and an override is final. Rationale and the
+  board-visibility trade-off are in §3.5. (The granularity and caps are in
+  step 4 above, where estimates are produced.)
 - **Never autonomously:** Version, Sprint, Priority, Start/End Date; forcing
   Status; the deprecated Component/Developer fields; closing issues.
 
