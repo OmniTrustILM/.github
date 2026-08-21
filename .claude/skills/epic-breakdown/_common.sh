@@ -74,22 +74,146 @@ set_single_select() {
   fi
 }
 
-# set_number FIELD_NAME INTEGER  (uses PROJECT_ID, ITEM_ID, CACHE_DIR, GRAPHQL_DOC)
-# Estimate is whole mandays (§3.5 heuristics use integer ranges). If fractional
-# mandays are ever needed, switch to a JSON variables payload — gh -F sends
-# non-integers as strings, which a Float! argument would reject.
+# Two ceilings, both derived from delivery capacity.
+#
+# Epic: a release is a ~10-week development cycle (50 working days) and an Epic
+# is staffed by at most 2 people, so 100 mandays is the largest estimate that
+# can fit one release. Above it the Epic has to be split.
+#
+# Child: 4 mandays keeps a sub-issue deliverable inside one week with reserve.
+# A child above it is usually an Epic wearing the wrong issue type - but not
+# always, so it is allowed when the issue body says why it cannot be split
+# (§3.5). That justification is enforced, not requested; see require_estimate_rationale.
+#
+# The 4-manday child cap is the agent-executed basis (the default), where the
+# Estimate is only the remaining human effort. A developer-built Epic declares
+# full developer mandays, so its children follow the Complexity table's ranges
+# (High = 5-10); the cap rises to 10 to match, still capping a child at ~2 weeks.
+ESTIMATE_MAX_EPIC=100
+ESTIMATE_MAX_CHILD=4
+ESTIMATE_MAX_CHILD_DEVBUILT=10
+
+# estimate_quarters MANDAYS — echo the value in whole quarter-day units.
+# Everything downstream compares integers, so a value at a decimal boundary
+# cannot be got subtly wrong.
+estimate_quarters() {
+  [[ "$1" =~ ^(0|[1-9][0-9]*)(\.([0-9]{1,2}))?$ ]] || return 1
+  local whole="${BASH_REMATCH[1]}" frac="${BASH_REMATCH[3]}" q
+  # Bound the integer part before multiplying: bash's 64-bit arithmetic wraps
+  # silently, so a value past INT64_MAX can land back inside the cap
+  # (4611686018427387905 * 4 == 4). Count digits — comparing would itself overflow.
+  [ "${#whole}" -le 6 ] || return 1
+  case "${#frac}" in 0) frac=00 ;; 1) frac="${frac}0" ;; esac
+  case "$frac" in 00) q=0 ;; 25) q=1 ;; 50) q=2 ;; 75) q=3 ;; *) return 1 ;; esac
+  printf '%d' $(( whole * 4 + q ))
+}
+
+# estimate_is_valid MANDAYS MAX_MANDAYS — quarter-day steps only (§3.5).
+# 0.25 is both the minimum and the increment; anything between the steps is
+# false precision on a number that already carries a review buffer. 0 is not an
+# estimate — it carries no information (and project-triage reports a 0 Estimate
+# as missing, since eval.py treats 0 as falsy).
+estimate_is_valid() {
+  local q max="${2:-$ESTIMATE_MAX_EPIC}"
+  q=$(estimate_quarters "$1") || return 1
+  [ "$q" -gt 0 ] || return 1
+  [ "$q" -le $(( max * 4 )) ] || return 1
+}
+
+estimate_rule_msg() {
+  printf 'estimate must be a positive multiple of 0.25 mandays (0.25, 0.5, 0.75, 1, 1.25 ...), at most %s' "$1"
+}
+
+# estimate_writable MANDAYS — the guard set_number applies before writing.
+# Deliberately the hard Epic ceiling, never the caller's scope cap: the child
+# cap and its rationale rule are the caller's policy and have already run by
+# here. Re-applying the child cap would make an approved over-cap child
+# unwritable, which is exactly the escape hatch the rationale rule exists for.
+estimate_writable() {
+  estimate_is_valid "$1" "$ESTIMATE_MAX_EPIC"
+}
+
+# estimate_rationale_ok BODY — 0 when the body carries a usable reason.
+# Exit 1 = no '### Estimate' section, 2 = section present but empty or too short
+# to be a reason. Pure so it can be tested without touching a live issue.
+estimate_rationale_ok() {
+  local body="$1" rationale
+  # Detection and extraction must agree on case: both accept only the [Ee]stimate
+  # spellings, so a `### ESTIMATE` heading is not detected-then-refused as empty.
+  printf '%s' "$body" | grep -qE '^#{2,4}[[:space:]]*[Ee]stimate[[:space:]]*$' || return 1
+  rationale=$(printf '%s' "$body" \
+    | sed -n '/^#\{2,4\}[[:space:]]*[Ee]stimate[[:space:]]*$/,$p' \
+    | sed '1d' | sed -n '/^#\{2,4\}[[:space:]]/q;p' | tr -d '[:space:]')
+  [ "${#rationale}" -ge 20 ] || return 2
+}
+
+# require_estimate_rationale ITEM_ID MANDAYS
+# A child over ESTIMATE_MAX_CHILD is allowed only when its issue body explains
+# why it cannot be split. Read that from the body rather than taking it as a
+# flag: the body is what a reviewer reads six months later, and a flag would let
+# the two drift. Silence here means the child should have been decomposed.
+require_estimate_rationale() {
+  local item="$1" mandays="$2" cap="${3:-$ESTIMATE_MAX_CHILD}" body rc=0 err_file reason
+  # Capture stderr so a query failure keeps the API's reason (like set_number),
+  # instead of collapsing every failure into one message via 2>/dev/null.
+  err_file=$(mktemp)
+  if ! body=$(gh api graphql -f id="$item" -f query='
+    query($id:ID!){ node(id:$id){ ... on ProjectV2Item {
+      content { ... on Issue { body } } } } }' \
+    -q '.data.node.content.body // ""' 2>"$err_file"); then
+    reason=$(tr '\n' ' ' < "$err_file" | cut -c1-200); rm -f "$err_file"
+    fail "could not read the issue body for item $item to check the estimate rationale${reason:+ ($reason)}"
+  fi
+  rm -f "$err_file"
+  # An empty body is a distinct outcome — item not found, a draft item, or a repo
+  # the token cannot read — not a present-but-inadequate rationale section.
+  [ -n "$body" ] || fail "could not read the issue body for item $item (item not found, a draft item, or no readable issue content) — cannot check the estimate rationale"
+
+  estimate_rationale_ok "$body" || rc=$?
+  case "$rc" in
+    0) ;;
+    1) fail "child estimate ${mandays} exceeds ${cap} mandays: split it, or add an '### Estimate' section to the issue body saying why it cannot be split (§3.5)" ;;
+    2) fail "the '### Estimate' section is empty or too short (needs at least 20 characters of prose); state why ${mandays} mandays cannot be split (§3.5)" ;;
+  esac
+}
+
+# number_payload FIELD_ID NUMBER  (uses PROJECT_ID, ITEM_ID, GRAPHQL_DOC)
+# Separated from the mutation so a test can assert the payload shape offline —
+# specifically that `variables.number` leaves as a JSON number. `gh -F`
+# type-infers and sends a non-integer as a string, which `Float!` rejects with
+# the unhelpful "provided invalid value"; `--argjson` keeps the type.
+number_payload() {
+  jq -n --arg q "$(gql_op SetNumberValue)" --arg p "$PROJECT_ID" --arg i "$ITEM_ID" \
+        --arg f "$1" --argjson n "$2" \
+        '{query:$q, variables:{projectId:$p, itemId:$i, fieldId:$f, number:$n}}'
+}
+
+# set_number FIELD_NAME MANDAYS  (uses PROJECT_ID, ITEM_ID, CACHE_DIR, GRAPHQL_DOC)
 set_number() {
   local field_name="$1" number="$2" field_id dtype
   field_id=$(jq -r --arg f "$field_name" '.fields[$f].id // ""' "$CACHE_DIR/project-fields.json")
   dtype=$(jq -r --arg f "$field_name" '.fields[$f].dataType // ""' "$CACHE_DIR/project-fields.json")
   [ -n "$field_id" ] || { log "  skip: field '$field_name' not in cache"; return 1; }
   [ "$dtype" = "NUMBER" ] || fail "field '$field_name' is '$dtype', not NUMBER"
-  [[ "$number" =~ ^[0-9]+$ ]] || fail "estimate must be a whole number of mandays, got '$number'"
-  if gh api graphql -f query="$(gql_op SetNumberValue)" \
-       -f projectId="$PROJECT_ID" -f itemId="$ITEM_ID" -f fieldId="$field_id" -F number="$number" >/dev/null 2>&1; then
+  # `return 1` into the warn path, not `fail`: callers set several fields per
+  # item, and aborting here would leave the item half-written mid-sequence.
+  # set-epic-fields.sh validates up front, so reaching either warn is a caller bug.
+  if [ "$field_name" = "Estimate" ]; then
+    estimate_writable "$number" \
+      || { log "  warn: $(estimate_rule_msg "$ESTIMATE_MAX_EPIC"), got '$number'"; return 1; }
+  else
+    # The quarter-day rule is Estimate's, not every NUMBER field's - a second
+    # numeric field must not silently inherit it.
+    [[ "$number" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
+      || { log "  warn: $field_name must be numeric, got '$number'"; return 1; }
+  fi
+  if err=$(number_payload "$field_id" "$number" | gh api graphql --input - 2>&1 >/dev/null); then
     log "  set $field_name=$number"
   else
-    log "  warn: failed to set $field_name=$number"
+    # Keep the API's reason. Without it every failure - stale ID, lost scope,
+    # malformed payload - reads identically and has to be re-diagnosed by hand.
+    err=$(printf '%s' "$err" | tr '\n' ' ' | cut -c1-200)
+    log "  warn: failed to set $field_name=$number${err:+ ($err)}"
     return 1
   fi
 }

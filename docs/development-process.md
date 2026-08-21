@@ -264,7 +264,7 @@ Three-phase process with PM and QA review:
 
 **Phase 1 — Human writes the Epic:** PM, Tech Lead, or Product Owner creates Epic via template. Fills in User Story, Use Cases, Constraints, Out of Scope, Testing Scope.
 
-**Phase 2 — AI skill proposes breakdown:** `/epic-breakdown` reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, suggested Estimate (with review buffer), blocked-by relationships, suggested assignee.
+**Phase 2 — AI skill proposes breakdown:** `/epic-breakdown` reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, an Estimate the skill writes as a seed the Developer owns (with review buffer), blocked-by relationships, suggested assignee.
 
 **Phase 3 — Review and approval (collaborative):**
 1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
@@ -396,7 +396,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Severity** | Single-select | Minor, Major, Critical, Blocker | How severe the impact of a bug is (Bugs only) | Reporter at creation |
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
-| **Estimate** | Number | Mandays | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate. Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics |
+| **Estimate** | Number | Mandays in quarter-day steps — positive multiples of 0.25 (0.25, 0.5, 0.75, 1, 1.25 …) | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate, seeded by the Epic breakdown skill from the approved breakdown (§3.5). Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics; breakdown skill seeds children |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -499,6 +499,55 @@ Children inherit that basis and **do not repeat estimates in their bodies** —
 the Estimate field is the single source per child, and a developer's override of
 it is always final (§3.1). A child reassigned to hand-building is simply
 re-estimated by that developer.
+
+**`/epic-breakdown` writes the suggested child Estimate** when you approve the
+breakdown. The values are **seeds, not verdicts** — the Developer owns the field
+and an override is final. Two consequences worth knowing: a pre-filled Estimate
+silences the §3.2 "missing Estimate" warning, so "not yet estimated" and
+"estimate accepted" look alike on the board; and in *reconcile* mode an
+Estimate already on an existing child is a developer's number, changed only
+with a before/after diff and explicit approval.
+
+**Estimate ceilings come from delivery capacity.**
+
+| Scope | Cap | Why |
+|---|---|---|
+| **Epic** | 100 mandays | A release is a ~10-week development cycle (50 working days) and an Epic is staffed by at most 2 people. An Epic above 100 cannot ship in one release and must be split into Epics that can. |
+| **Sub-issue** | 4 mandays (agent-executed) / 10 (developer-built) | Keeps a child deliverable inside one week with reserve. A child above the cap is usually an Epic wearing the wrong issue type. |
+
+**The child cap depends on the estimate basis.** Under the default
+**agent-executed** basis the Estimate is only the remaining human effort, so a
+child caps at **4** mandays. On a **developer-built** Epic the field holds full
+developer mandays and the Complexity table applies directly (Medium 3-5, High
+5-10), so the child cap rises to **10** — the table's High upper bound, still
+about two weeks. A developer-built Medium or High child therefore does *not*
+trip the cap; the ranges in the Complexity table are usable child estimates
+under that basis, not values that each need a rationale.
+
+**A child over its cap needs a stated reason.** Prefer splitting it. When the
+work genuinely cannot be split, the issue body must carry an `### Estimate`
+section explaining why it has to be delivered whole — a single migration that
+would leave the schema inconsistent if applied in halves, a third-party
+integration with one atomic cutover, and so on. The section carries **only the
+reason** — never restate the number (the Estimate field is the single source per
+child), and it needs **at least 20 characters** of prose. `/epic-breakdown`
+reads that section from the issue and refuses to write an over-cap child estimate
+without it, so the justification lives where a reviewer will find it months later
+rather than in a planning conversation nobody kept.
+
+Sub-day values are normal under the agent-executed basis: compressed scaffolding
+work is genuinely 0.25 or 0.75 mandays. Since 0.25 is the minimum, `0` is not a
+valid estimate — it carries no information (and `/project-triage` still reports a
+`0` Estimate as *missing*, since its check treats `0` as falsy). Anything between
+the steps is false precision on a number that already includes a review buffer.
+The integer ranges in the Complexity table above are the developer-built
+baseline, not a constraint on what the field may hold.
+
+These value rules — quarter-day steps and the ceilings — are enforced by
+`/epic-breakdown` on the write path. A PM or Developer typing a value straight
+into Project #5 is not machine-checked against them (`config/project-triage-rules.yml`
+checks presence, not shape), so treat the rules as the convention for
+hand-entered values too.
 
 **What compresses under agent execution** — not uniform, so estimate per child
 rather than applying a blanket factor:
@@ -894,7 +943,7 @@ These skills live in `.claude/skills/` in this repo (see `.claude/skills/README.
 |---|---|---|
 | `/project-triage` | Available | Project health report on Project #5 — required-field gaps, stale issues, consistency violations, with optional per-finding auto-fixes. Validates issues against Module values. |
 | `/create-issue` | Available | Create well-formed OmniTrustILM issue from natural-language description. Supports Bug, Feature, Task, Documentation, QA. Auto-detects Module from description keywords and target repo, and links a new bug under the active `Bugs x.y.z` cycle (§2, Issue Hierarchy). Skip for Epic, Release, Vulnerability — use form templates. |
-| `/epic-breakdown` | Available | Read an Epic (or a requirement), explore repos and existing issues, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, and propose sub-issues by work stream with Module/Complexity set, dependencies, and a suggested Estimate — all behind a human-approval gate. Adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). Sanctioned writer of Complexity/Estimate (§3.1, §3.5). |
+| `/epic-breakdown` | Available | Read an Epic (or a requirement), explore repos and existing issues, generate Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, and propose sub-issues by work stream with Module/Complexity set, dependencies, and a seed Estimate the Developer owns (an override is final) — all behind a human-approval gate. Adds a *preflight* mode (analysis + blocking questions when the design is undecided) and a *reconcile* mode (sync an Epic with current progress). Sanctioned writer of Complexity/Estimate (§3.1, §3.5). |
 | `/pr-hygiene` | Available | Pre-merge comment and log hygiene over the lines a PR adds, or over uncommitted working-tree changes with `--worktree` — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — proposed as before/after edits and applied only on confirm. Not a Project #5 skill: it reads a git diff, touches no issues or project fields, and is run from a clone of the reviewed repo rather than from this one. |
 
 For Module identification, use the Module table in Section 3.1 — match repo name and issue content to the "Key repos" and "What it covers" columns. For Core repo issues, use `@AuditLogged` annotations in controllers (Module.java enum, in the `core` repo) to determine the correct sub-module.
