@@ -1,7 +1,7 @@
 # ILM Development Management Methodics
 
-**Version:** 1.0
-**Date:** 2026-04-15
+**Version:** 1.1
+**Date:** 2026-08-16
 **Organization:** OmniTrustILM (https://github.com/OmniTrustILM)
 **Project:** https://github.com/orgs/OmniTrustILM/projects/5
 
@@ -24,7 +24,7 @@ You've opened this doc. Jump to the section for your role:
 
 ### PM / Tech Lead
 1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Priority/Version/Module/Sprint during planning.
-2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date before moving past Planning.
+2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date during breakdown (Analysis) — required before the Epic moves to Open.
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
 ### QA
@@ -183,7 +183,7 @@ stateDiagram-v2
 | **Task** (non-code) | Planning → Open → In Progress → Done | No Review/Testing needed |
 | **Task** (code / QA) | Planning → Open → In Progress → Review → Testing → Done | Fuller lifecycle; QA-labeled Tasks follow this path |
 | **Task** (documentation) | Planning → Open → In Progress → Done | No Review/Testing unless docs require PR review |
-| **Epic** | Planning → Open → In Progress → Done | Breakdown happens **during Planning** (see §2.6): PM writes/refines User Story and Use Cases, enriches Acceptance Criteria and Technical Analysis (via `/epic-breakdown`), creates sub-issues. PM moves to Open when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2 before leaving Planning). PM moves to In Progress when the first child starts development. Done when all children complete. All transitions manual. |
+| **Epic** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Status is **derived from the children** (full rules: [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md)). **Planning** while the Epic is being written (User Story, Use Cases — §2.6 Phase 1). **Analysis** while breakdown & estimates are in progress (via `/epic-breakdown`; ≥ 1 child in Analysis, none started). **Open** when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2). **In Progress** when the first child starts development. **Review** / **Testing** when *all* children reached that stage or beyond. **Done** when all children complete (children closed as *not planned* / *duplicate* count as complete). All transitions manual (PM / Epic Owner); the release dashboard's Health tab flags Epics whose Status disagrees with the derivation. |
 | **Release** | Planning → In Progress → Done | PM sets **Start Date** and **End Date** before moving past Planning (required by §3.2). PM moves to In Progress when development begins. PM moves to Done after QA sign-off (see Section 2.9). All transitions manual. |
 
 **These are conventions, not hard enforcement.** The full pipeline is available for all types. For Tasks specifically: if a PR is linked, automation moves the Task through Review and Testing naturally. If no PR is involved (documentation, configuration via UI), the developer moves it directly to Done after completion.
@@ -440,10 +440,11 @@ One consolidated table. **Error** = blocks triage. **Warning** = flagged but not
 | Acceptance Criteria | Feature | Error | Before Open |
 | User Story | Epic | Error | Before Open |
 | Use Cases | Epic | Error | Before Open |
-| Empty Epic (no sub-issues) | Epic | Error | Before moving to Open (sub-issues created during Planning) |
-| Complexity | Epic | Error | Required once past Planning status |
-| Estimate | Epic | Error | Required once past Planning status |
-| Start/End Date | Epic, Release | Error | Required once past Planning status |
+| Empty Epic (no sub-issues) | Epic | Error | Before moving to Open (sub-issues created during breakdown — Analysis) |
+| Complexity | Epic | Error | Required from Open on (set during breakdown — Analysis) |
+| Estimate | Epic | Error | Required from Open on (set during breakdown — Analysis) |
+| Start/End Date | Epic | Error | Required from Open on (set during breakdown — Analysis) |
+| Start/End Date | Release | Error | Required once past Planning status |
 | Version | Release | Error | At creation |
 | Priority | Feature, Bug | Warning | Defaults to Normal if unset; PM or QA escalates during triage |
 | Module | Feature, Epic, Task | Warning | Before Open |
@@ -739,6 +740,8 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 | Epic status ahead of children | Warning | Epic is in In Progress but all child issues are still in Open or Planning. Epic may have been moved prematurely. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
 
+> **Note:** the exact Epic-status rules are defined in [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (status derived from the children; see §2.2 Epic row) and are checked daily by the release dashboard's Health tab. The three Epic-status rows above are the triage report's simplified approximation and are pending alignment with §5.1.
+
 ### 7.3 Rule precedence
 
 When multiple rules fire on the same issue, resolve conflicts in this order:
@@ -795,7 +798,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Creates Releases and Epics
 - Triages backlog: moves issues through Planning → Analysis → Open
 - Sets **Version**, **Sprint**, **Module** (if not set at creation), **Priority** for issues
-- Sets **Complexity**, **Estimate**, **Start Date**, **End Date** on Epics before they move past Planning (required per §3.2)
+- Sets **Complexity**, **Estimate**, **Start Date**, **End Date** on Epics during breakdown (Analysis) — required before the Epic moves to Open (per §3.2)
 - Decides release scope — accepts or defers known bugs
 - Reviews all sub-issues proposed by `/epic-breakdown` skill
 - Reassigns reopened issues if the original assignee is unavailable
