@@ -28,8 +28,7 @@ on:
           Prefix for every artifact this workflow writes. REQUIRED when one caller
           invokes this workflow more than once in the same run (e.g. a matrix over
           `uses:`), because artifact names are run-scoped: without it the calls
-          collide on `app-data`. Empty (the default) keeps the historical
-          unprefixed names.
+          collide on `app-data`. Empty (the default) keeps the historical unprefixed names.
         required: false
         type: string
         default: ''
@@ -85,7 +84,7 @@ jobs:
     if: ${{ inputs.pre-build == 'maven' }}
     runs-on: ubuntu-latest
     env:
-      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -141,7 +140,7 @@ jobs:
             runner: ubuntu-24.04-arm
             platform: linux/arm64
     env:
-      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

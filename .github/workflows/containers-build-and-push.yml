@@ -21,9 +21,10 @@ name: Publish Harbor image (reusable)
 # Adding a new architecture later means adding one entry to the matrix - the
 # manifest job picks up any digests-* artifacts of its own namespace it finds.
 #
-# `artifact-namespace` prefixes every artifact this workflow writes. The manifest job
-# downloads `digests-*` with merge-multiple, so without a namespace one call builds
-# its manifest from another call's digests, under its own image path.
+# `artifact-namespace` prefixes every artifact this workflow writes, joined by a
+# reserved `~`. The manifest job downloads `digests-*` with merge-multiple, so
+# without a namespace one call builds its manifest from another call's digests,
+# under its own image path.
 #
 # `additional-images` publishes one build under several repository paths in the
 # same registry. The build and the Trivy scan run once, against `image`.
@@ -178,7 +179,7 @@ jobs:
     if: ${{ inputs.pre-build == 'maven' }}
     runs-on: ubuntu-latest
     env:
-      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -233,7 +234,7 @@ jobs:
             runner: ubuntu-24.04-arm
             platform: linux/arm64
     env:
-      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -333,7 +334,7 @@ jobs:
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     env:
       IMAGE: ${{ inputs.registry }}/${{ inputs.image }}
-      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}-', inputs.artifact-namespace) || '' }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     outputs:
       # JSON array of every published image path, consumed by push_readme.
       images: ${{ steps.targets.outputs.json }}
@@ -347,7 +348,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ${{ runner.temp }}/digests
-          # Namespaced pattern: never collect another call's digests.
+          # `~` cannot appear in a namespace, so this matches exactly one of them.
           pattern: ${{ env.ARTIFACT_PREFIX }}digests-*
           merge-multiple: true
 
