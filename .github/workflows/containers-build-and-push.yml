@@ -19,7 +19,12 @@ name: Publish Harbor image (reusable)
 #                                   image path, when `push-readme` is enabled.
 #
 # Adding a new architecture later means adding one entry to the matrix - the
-# manifest job picks up any digests-* artifacts it finds.
+# manifest job picks up any digests-* artifacts of its own namespace it finds.
+#
+# `artifact-namespace` prefixes every artifact this workflow writes, joined by a
+# reserved `~`. The manifest job downloads `digests-*` with merge-multiple, so
+# without a namespace one call builds its manifest from another call's digests,
+# under its own image path.
 #
 # `additional-images` publishes one build under several repository paths in the
 # same registry. The build and the Trivy scan run once, against `image`.
@@ -51,6 +56,16 @@ on:
         description: "Cache namespace shared by the per-arch builds (e.g. core)"
         required: true
         type: string
+      artifact-namespace:
+        description: |
+          Prefix for every artifact this workflow writes. REQUIRED when one caller
+          invokes this workflow more than once in the same run (e.g. a matrix over
+          `uses:`), because artifact names are run-scoped: without it the calls
+          collide on `digests-<arch>` and the manifest job mixes their digests.
+          Empty (the default) keeps the historical unprefixed names.
+        required: false
+        type: string
+        default: ''
       registry:
         description: "Container registry hostname"
         required: false
@@ -142,10 +157,29 @@ on:
         required: false
 
 jobs:
+  # Runs before anything writes an artifact, so a bad namespace fails here with a
+  # readable message rather than inside actions/upload-artifact.
+  validate_inputs:
+    name: Validate inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate artifact-namespace
+        if: ${{ inputs.artifact-namespace != '' }}
+        env:
+          NS: ${{ inputs.artifact-namespace }}
+        run: |
+          if [[ ! "$NS" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            echo "::error::artifact-namespace must match ^[A-Za-z0-9][A-Za-z0-9._-]*\$ (got '$NS')"
+            exit 1
+          fi
+
   build_artifacts:
     name: Build app artifacts (once)
+    needs: [validate_inputs]
     if: ${{ inputs.pre-build == 'maven' }}
     runs-on: ubuntu-latest
+    env:
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -179,15 +213,15 @@ jobs:
       - name: Upload artifact (tar)
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: app-data
+          name: ${{ env.ARTIFACT_PREFIX }}app-data
           path: app-data.tar
           if-no-files-found: error
           retention-days: 1
 
   build:
     name: Build & push (${{ matrix.arch }})
-    needs: [build_artifacts]
-    if: ${{ always() && (needs.build_artifacts.result == 'success' || needs.build_artifacts.result == 'skipped') }}
+    needs: [validate_inputs, build_artifacts]
+    if: ${{ always() && needs.validate_inputs.result == 'success' && (needs.build_artifacts.result == 'success' || needs.build_artifacts.result == 'skipped') }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -199,6 +233,8 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
             platform: linux/arm64
+    env:
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -212,7 +248,7 @@ jobs:
         if: ${{ inputs.pre-build == 'maven' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: app-data
+          name: ${{ env.ARTIFACT_PREFIX }}app-data
 
       - name: Extract artifacts (preserve perms)
         if: ${{ inputs.pre-build == 'maven' }}
@@ -248,7 +284,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: digests-${{ matrix.arch }}
+          name: ${{ env.ARTIFACT_PREFIX }}digests-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -278,7 +314,7 @@ jobs:
       - name: Upload vulnerability report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: trivy-report-${{ matrix.arch }}
+          name: ${{ env.ARTIFACT_PREFIX }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
       - name: Fail build on vulnerabilities
@@ -298,6 +334,7 @@ jobs:
     if: ${{ !cancelled() && needs.build.result == 'success' }}
     env:
       IMAGE: ${{ inputs.registry }}/${{ inputs.image }}
+      ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     outputs:
       # JSON array of every published image path, consumed by push_readme.
       images: ${{ steps.targets.outputs.json }}
@@ -311,7 +348,8 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: ${{ runner.temp }}/digests
-          pattern: digests-*
+          # `~` cannot appear in a namespace, so this matches exactly one of them.
+          pattern: ${{ env.ARTIFACT_PREFIX }}digests-*
           merge-multiple: true
 
       - name: Set up Docker Buildx
