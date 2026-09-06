@@ -1,0 +1,29 @@
+name: PR agent review - guard
+description: >
+  Credential-free gate. Resolves the pull request from either event shape,
+  rejects fork heads, unauthorized commenters and bot-authored pull requests,
+  validates the review command, and reports whether the run should continue.
+  Invoked before any App token is minted.
+inputs:
+  github-token:
+    description: >
+      Read token for resolving a pull request on the issue_comment path. The
+      workflow's own GITHUB_TOKEN is enough and is the default; never the App
+      token, which this action must run before.
+    required: false
+    default: ${{ github.token }}
+outputs:
+  proceed:   { description: "true when the run should continue",   value: "${{ steps.guard.outputs.proceed }}" }
+  pr-number: { description: "Pull request number",                 value: "${{ steps.guard.outputs.pr-number }}" }
+  head-sha:  { description: "Head commit SHA",                     value: "${{ steps.guard.outputs.head-sha }}" }
+  base-ref:  { description: "Base branch name",                    value: "${{ steps.guard.outputs.base-ref }}" }
+  effort:    { description: "light | standard | deep",             value: "${{ steps.guard.outputs.effort }}" }
+  full:      { description: "true when a full pass was requested", value: "${{ steps.guard.outputs.full }}" }
+runs:
+  using: composite
+  steps:
+    - id: guard
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: ${{ github.action_path }}/guard.sh

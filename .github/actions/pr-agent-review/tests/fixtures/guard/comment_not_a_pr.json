@@ -1,0 +1,12 @@
+{
+  "issue": {
+    "number": 4242
+  },
+  "comment": {
+    "body": "/ilm-review",
+    "user": {
+      "login": "l"
+    },
+    "author_association": "MEMBER"
+  }
+}
