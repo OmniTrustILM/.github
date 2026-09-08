@@ -201,7 +201,11 @@ dispatched pointer-event sequences, not plain synthetic clicks. The quick
 "Add iteration" button reuses the last duration set in the More options
 dialog, not the previous iteration's. Always re-run Phase 8 verification
 after saving — a Save that looks successful can still have dropped the
-renames.
+renames. When a rename keeps reverting (DOM shows the new name but the
+saved config keeps the old one, and Save stays disabled), focus the input
+with a native triple-click at its coordinates instead of JS focus/select,
+then type — the Save button turning enabled is the signal React actually
+registered the edit.
 
 ## Phase 8 — Verify (repeatable)
 
