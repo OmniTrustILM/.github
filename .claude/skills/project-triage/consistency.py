@@ -7,7 +7,11 @@ names match epic-breakdown/reconcile.py so the two skills share one vocabulary.
 
 The Epic's expected Status is derived from its children per Release
 Management §5.1 (the same ladder as PM_reporting's health check):
-Done = all children done; Testing / Review = all children at that stage or
+Done = all children have Status Done — closing an issue only ends
+development and hands it to QA (the automation moves it to Testing), so a
+closed child ranks by its Status field, floored at Testing; only children
+cancelled as not planned / duplicate (or closed with no project Status)
+count as Done outright. Testing / Review = all children at that stage or
 beyond; In Progress = any child started; otherwise Open once the breakdown
 is complete (Complexity, Estimate, Start/End Date set on the Epic — §3.2),
 Analysis while a child is still being scoped, else Planning.
@@ -37,23 +41,35 @@ def within_window(closed_at_iso, now, days):
     return 0 <= (now - dt).days <= days
 
 
+def _child_rank(status, state, state_reason):
+    """Ladder rank of one child, or None when nothing is derivable. Closing
+    an issue only ends development and hands it to QA (the automation moves
+    it to Testing), so a CLOSED child ranks by its Status field, floored at
+    Testing — Done comes only from QA setting Status Done. Children
+    cancelled as not planned / duplicate (and closed ones with no project
+    Status) count as Done outright: cancelled work must not hold the Epic
+    open."""
+    rank = _RANK.get(status)
+    if (state or "").upper() != "CLOSED":
+        return rank
+    if (state_reason or "").upper() in ("NOT_PLANNED", "DUPLICATE") or rank is None:
+        return _RANK["Done"]
+    return max(rank, _RANK["Testing"])
+
+
 def expected_epic_status(children, breakdown_done):
     """The Status an Epic should have, derived from its children — the
     Release Management §5.1 ladder (most advanced rule wins).
 
-    children       — list of (project_status, github_state) tuples, one per
-                     child. A CLOSED child counts as Done regardless of its
-                     Status — including "not planned"/duplicate closes:
-                     cancelled work must not hold the Epic open.
+    children       — list of (project_status, github_state, state_reason)
+                     triples, one per child, ranked by _child_rank above.
     breakdown_done — True when Complexity, Estimate, Start Date and End Date
                      are all set on the Epic (§3.2: the fields the breakdown
                      must produce before the Epic may move to Open).
 
     Returns None when nothing can be derived (no child has a usable state).
     """
-    ranked = [_RANK["Done"] if (state or "").upper() == "CLOSED" else _RANK[status]
-              for status, state in children
-              if (state or "").upper() == "CLOSED" or status in _RANK]
+    ranked = [r for c in children if (r := _child_rank(*c)) is not None]
     if not ranked:
         return None
     if min(ranked) >= _RANK["Done"]:
@@ -78,10 +94,11 @@ def epic_status_findings(status, children, breakdown_done):
     """Return a list of (level, rule, msg) for the §7.2 Epic-status rules.
 
     status         — the Epic's project Status field value.
-    children       — list of (project_status, github_state) tuples per child.
+    children       — list of (project_status, github_state, state_reason)
+                     triples per child.
     breakdown_done — see expected_epic_status().
     """
-    open_count = sum(1 for _, state in children if (state or "").upper() == "OPEN")
+    open_count = sum(1 for c in children if (c[1] or "").upper() == "OPEN")
     if status == "Done" and open_count > 0:
         # §7.3 rule 5: this Error outranks (and replaces) the mismatch Warning
         return [("Error", "epic_done_with_open_children",
@@ -96,12 +113,15 @@ def epic_status_findings(status, children, breakdown_done):
 def closed_but_not_done_finding(state, state_reason, status):
     """Return (level, rule, msg) or None.
 
-    Fires when an issue is CLOSED as COMPLETED but its Status never reached Done.
-    Closes marked NOT_PLANNED / DUPLICATE are legitimate terminal states and are
-    excluded (§7.3 rule 2)."""
+    Fires when an issue is CLOSED as COMPLETED but its Status is neither
+    Testing nor Done. Closing hands the issue to QA and the automation moves
+    it to Testing, so closed-with-Testing is the normal QA queue and Done is
+    the QA-approved end state — anything lower means the automation was
+    bypassed. Closes marked NOT_PLANNED / DUPLICATE are legitimate terminal
+    states and are excluded (§7.3 rule 2)."""
     if (state or "").upper() == "CLOSED" \
             and (state_reason or "").upper() == "COMPLETED" \
-            and status != "Done":
+            and status not in ("Testing", "Done"):
         return ("Warning", "closed_but_not_done",
-                "Closed as completed but Status never reached Done")
+                "Closed as completed but Status never reached Testing/Done")
     return None

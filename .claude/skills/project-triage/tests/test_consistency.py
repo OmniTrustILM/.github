@@ -18,8 +18,8 @@ _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
 BD, NBD = True, False  # breakdown done / not done
 
 
-def kid(status, state="OPEN"):
-    return (status, state)
+def kid(status, state="OPEN", reason=None):
+    return (status, state, reason or ("COMPLETED" if state == "CLOSED" else None))
 
 
 def rules_of(findings):
@@ -29,11 +29,31 @@ def rules_of(findings):
 # ---- expected_epic_status: the RM §5.1 ladder ----
 
 def test_expected_all_done_children():
+    # a closed child with no project Status cannot hold the Epic either
     assert expected_epic_status([kid("Done"), kid(None, "CLOSED")], BD) == "Done"
 
 
 def test_expected_closed_not_planned_counts_as_done():
-    assert expected_epic_status([kid("Done"), kid("Open", "CLOSED")], BD) == "Done"
+    assert expected_epic_status(
+        [kid("Done"), kid("Open", "CLOSED", "NOT_PLANNED")], BD) == "Done"
+
+
+def test_expected_closed_duplicate_counts_as_done():
+    assert expected_epic_status(
+        [kid("Done"), kid("In Progress", "CLOSED", "DUPLICATE")], BD) == "Done"
+
+
+def test_expected_closed_completed_ranks_by_status():
+    # closing hands the issue to QA: Status Testing on a closed child keeps
+    # the Epic in Testing — Done comes only from QA setting Status Done
+    assert expected_epic_status([kid("Testing", "CLOSED")], BD) == "Testing"
+    assert expected_epic_status(
+        [kid("Done"), kid("Testing", "CLOSED")], BD) == "Testing"
+
+
+def test_expected_closed_completed_floored_at_testing():
+    # a closed child whose Status lags behind still counts as at least Testing
+    assert expected_epic_status([kid("In Progress", "CLOSED")], BD) == "Testing"
 
 
 def test_expected_all_testing_or_beyond():
@@ -106,6 +126,10 @@ def test_closed_but_not_done_fires():
 
 def test_closed_and_done_no_finding():
     assert closed_but_not_done_finding("CLOSED", "COMPLETED", "Done") is None
+
+
+def test_closed_in_testing_is_the_normal_qa_queue():
+    assert closed_but_not_done_finding("CLOSED", "COMPLETED", "Testing") is None
 
 
 def test_closed_not_planned_excluded():

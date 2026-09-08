@@ -93,6 +93,7 @@ query EpicState($owner: String!, $repo: String!, $number: Int!) {
           number
           title
           state
+          stateReason
           issueType { name }
           labels(first: 30) { nodes { name } }
           repository { nameWithOwner }

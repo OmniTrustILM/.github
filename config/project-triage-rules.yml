@@ -39,7 +39,7 @@ consistency_rules:
   orphaned_sub_issues: true
   blocked_but_in_progress: true
   done_but_open_state: true
-  closed_but_not_done: true            # Excludes "not planned" and "duplicate" closes
+  closed_but_not_done: true            # Status below Testing on a completed close; Testing = the QA queue. Excludes "not planned"/"duplicate"
   reopened_without_reason: true
   release_epic_by_non_org_member: true
   epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
