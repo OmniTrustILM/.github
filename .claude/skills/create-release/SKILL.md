@@ -192,6 +192,17 @@ Manual steps in https://github.com/orgs/OmniTrustILM/projects/5/settings:
 Tell me when you're done and I'll verify and finish the field setup.
 ```
 
+The checklist may also be executed by Claude driving the project settings UI
+in a browser the user has signed into. Lessons from doing that (2026-09-08):
+the React controls ignore programmatic value sets — iteration *names* must be
+typed with real keystrokes (JS-set values render but silently revert on Save),
+and some buttons (Edit date range, More options, Units) only respond to
+dispatched pointer-event sequences, not plain synthetic clicks. The quick
+"Add iteration" button reuses the last duration set in the More options
+dialog, not the previous iteration's. Always re-run Phase 8 verification
+after saving — a Save that looks successful can still have dropped the
+renames.
+
 ## Phase 8 — Verify (repeatable)
 
 When the user says done (or asks for a check), run:
