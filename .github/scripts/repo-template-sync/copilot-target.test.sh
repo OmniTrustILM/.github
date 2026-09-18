@@ -84,9 +84,13 @@ check "a map entry is an error"                   2 core       "$mapentry"
 check "an empty entry is an error"                2 core       "$blank"
 
 # The missing-yq preflight is the branch this script leads with; assert it
-# rather than trusting the comment. PATH is stripped so yq cannot be found.
+# rather than trusting the comment. PATH points nowhere real, so yq cannot be
+# found wherever the runner happens to install it - `/usr/bin:/bin` is not
+# empty enough, the GitHub runner has yq on exactly that path. bash is invoked
+# by absolute path because env resolves the command with the PATH it sets.
+bash_bin=$(command -v bash)
 set +e
-env PATH=/usr/bin:/bin bash "$gate" core "$cfg" >/dev/null 2>&1; rc=$?
+env PATH=/nonexistent "$bash_bin" "$gate" core "$cfg" >/dev/null 2>&1; rc=$?
 set -e
 if [ "$rc" -ne 2 ]; then
   echo "FAIL: a missing yq is an error - expected rc=2, got rc=$rc"
