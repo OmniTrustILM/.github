@@ -113,6 +113,32 @@ else
 fi
 rm -f "$co_tmp"
 
+# ---------- Task 4: Copilot review instructions ----------
+# Gated on config/copilot-repos.yml, not on the dispatch argument: every other
+# task runs for whatever repos the dispatch names, so without this an `all` run
+# for release.yml would seed Copilot instructions org-wide.
+set +e
+bash ../source/.github/scripts/repo-template-sync/copilot-target.sh   "$REPO_NAME" ../source/config/copilot-repos.yml
+cp_rc=$?
+set -e
+if [ "$cp_rc" -eq 0 ]; then
+  mkdir -p .github
+  cp ../source/templates/copilot-instructions.md .github/copilot-instructions.md
+  git add .github/copilot-instructions.md
+  if ! git diff --cached --quiet; then
+    git commit -m "chore: sync .github/copilot-instructions.md from org template"
+    commits_made=$((commits_made + 1))
+    echo "- copilot-instructions.md: synced" >> "$summary_file"
+  else
+    echo "- copilot-instructions.md: no change" >> "$summary_file"
+  fi
+elif [ "$cp_rc" -eq 3 ]; then
+  echo "- copilot-instructions.md: skipped (not in copilot-repos.yml)" >> "$summary_file"
+else
+  echo "::error::copilot-target.sh failed for $REPO_NAME (rc=$cp_rc)"
+  exit "$cp_rc"
+fi
+
 # ---------- Skip PR if no commits ----------
 if [ "$commits_made" -eq 0 ]; then
   {

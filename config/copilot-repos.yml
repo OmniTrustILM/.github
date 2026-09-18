@@ -1,0 +1,19 @@
+# Repos that receive .github/copilot-instructions.md from templates/.
+#
+# This list is the gate, not the dispatch argument. sync-all.sh runs every task
+# for every repo a dispatch names, so without it a routine `target_repos: all`
+# run for release.yml would seed Copilot instructions across the whole org.
+# It doubles as the per-task opt-out: dropping a repo here stops the Copilot
+# file syncing while release.yml, the caller workflows and CODEOWNERS continue
+# (closing the sync PR opts out of everything instead).
+#
+# The file steers GitHub's native Copilot code review - what it reports, and
+# whether a finding is an inline thread or a row in the review summary. It is
+# under pilot; widen only on the pilot readout (ilm#351). Removing a repo here
+# stops future syncs but does not delete a copy already synced.
+#
+# Convention: repos alphabetical.
+
+repos:
+  - core
+  - interfaces
