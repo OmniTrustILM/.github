@@ -20,19 +20,44 @@ command -v yq >/dev/null 2>&1 || { echo "copilot-target: yq not found on PATH" >
 yq -e '.' "$cfg" >/dev/null 2>&1 || { echo "copilot-target: cannot parse $cfg" >&2; exit 2; }
 yq -e 'has("repos")' "$cfg" >/dev/null 2>&1 || { echo "copilot-target: $cfg has no repos key" >&2; exit 2; }
 
-# An empty list is a legitimate state (every repo opted out), but an empty
-# *scalar* where a list belongs is a typo that would otherwise match nothing.
+# Reject unknown top-level keys, as render-codeowners.sh does for the same
+# reason. A maintainer mirroring the CODEOWNERS lever writes `exclude:` here,
+# gets no error and no effect, and the repo stays in scope still receiving the
+# file.
+while IFS= read -r key; do
+  case "$key" in
+    repos) ;;
+    *) echo "copilot-target: unknown top-level key '$key' in $cfg" >&2; exit 2 ;;
+  esac
+done < <(yq 'keys | .[]' "$cfg")
+
+# `repos: []` is the legitimate "everyone opted out" state and reaches the match
+# below with no candidates. A bare `repos:` with no value parses as null and is
+# indistinguishable from a truncated or half-saved file, so it errors rather
+# than silently skipping every repo in the org.
 kind=$(yq '.repos | tag' "$cfg")
 case "$kind" in
   '!!seq') ;;
-  '!!null') exit 3 ;;
+  '!!null') echo "copilot-target: repos has no entries; write 'repos: []' to opt every repo out" >&2; exit 2 ;;
   *) echo "copilot-target: repos must be a list, got $kind" >&2; exit 2 ;;
 esac
 
-# grep -qx over the rendered list rather than a yq expression with an
-# interpolated repo name: a name containing a yq metacharacter would otherwise
-# change the expression instead of being compared.
-if yq '.repos[]' "$cfg" | grep -qxF -- "$repo"; then
+# Entries must be plain repo names. `- name: core` parses cleanly, renders as
+# text no repo name matches, and would skip that repo with no signal.
+bad=$(yq '.repos[] | tag' "$cfg" | grep -v '^!!str$' || true)
+[ -z "$bad" ] || { echo "copilot-target: repos entries must be plain repo names, got $bad" >&2; exit 2; }
+# Counted, not rendered: an empty entry renders as an empty line, which command
+# substitution strips, so the check would pass on exactly the input it guards.
+blank=$(yq '[.repos[] | select(. == "")] | length' "$cfg")
+[ "$blank" -eq 0 ] || { echo "copilot-target: repos contains an empty entry" >&2; exit 2; }
+
+# Rendered to a variable rather than piped: under `set -o pipefail` a `grep -q`
+# that exits on its first match can hand the pipeline yq's SIGPIPE status, and
+# any mid-stream yq failure would read as "not in scope" - the silent skip the
+# preflight above exists to prevent. grep -qxF, so a name carrying a regex or
+# yq metacharacter is compared rather than interpreted.
+listed=$(yq '.repos[]' "$cfg")
+if grep -qxF -- "$repo" <<<"$listed"; then
   exit 0
 fi
 exit 3

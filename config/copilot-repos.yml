@@ -9,7 +9,8 @@
 #
 # The file steers GitHub's native Copilot code review - what it reports, and
 # whether a finding is an inline thread or a row in the review summary. It is
-# piloted on core and interfaces; widen only on the pilot readout (ilm#351).
+# under pilot; widen only on the pilot readout (ilm#351). Removing a repo here
+# stops future syncs but does not delete a copy already synced.
 #
 # Convention: repos alphabetical.
 

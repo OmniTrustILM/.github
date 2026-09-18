@@ -18,8 +18,6 @@ FILES=(
   "templates/caller-workflows/release-automation.yml:.github/workflows/release-automation.yml"
 )
 
-# CODEOWNERS is rendered (not a static template), so compute its drift
-# separately by rendering the expected content and comparing.
 # Copilot instructions are gated on the allowlist, so report their state the
 # same way the sync decides it rather than always diffing the file.
 set +e
@@ -41,6 +39,8 @@ else
   cp_state="DIFFERS (would be updated)"
 fi
 
+# CODEOWNERS is rendered (not a static template), so compute its drift
+# separately by rendering the expected content and comparing.
 co_tmp=$(mktemp)
 set +e
 bash source/.github/scripts/repo-template-sync/render-codeowners.sh \
