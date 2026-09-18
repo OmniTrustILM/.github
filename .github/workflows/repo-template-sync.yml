@@ -7,8 +7,11 @@ name: Repo Template Sync
 #             release-automation.yml       ← templates/caller-workflows/...
 #   Task 3: .github/CODEOWNERS             ← rendered from config/repo-domains.yml
 #             (domain maintainer team per repo; excluded repos untouched)
+#   Task 4: .github/copilot-instructions.md ← templates/copilot-instructions.md
+#             (ONLY for repos listed in config/copilot-repos.yml; all others
+#              untouched, including on a `target_repos: all` dispatch)
 #
-# One PR per repo, up to 3 commits (one per task, skipped if no diff).
+# One PR per repo, up to 4 commits (one per task, skipped if no diff).
 # If all tasks are no-op for a repo, no PR is opened.
 #
 # CODEOWNERS precondition: a maintainers-*/qa team is honored as a code owner
@@ -23,7 +26,10 @@ name: Repo Template Sync
 #   - Close the bot's sync PR without merging → opts the repo out of ALL
 #     tasks (release.yml + workflows + CODEOWNERS); respected on later runs.
 #   - Add the repo to `exclude:` in config/repo-domains.yml → opts out of the
-#     CODEOWNERS task ONLY; release.yml + workflows still sync. Use this for a
+#     CODEOWNERS task ONLY; release.yml + workflows still sync.
+#   - Remove the repo from config/copilot-repos.yml → opts out of the Copilot
+#     instructions task ONLY; every other task still syncs. A repo absent from
+#     that list never receives the file in the first place. Use this for a
 #     repo that hand-maintains its own CODEOWNERS. (A pre-existing non-sync
 #     CODEOWNERS is also auto-skipped, but exclude: makes the intent explicit.)
 
