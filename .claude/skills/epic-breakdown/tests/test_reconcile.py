@@ -50,18 +50,39 @@ def test_done_with_open_children_is_error():
 
 def test_done_open_children_suppresses_status_and_orphan_warnings():
     # §7.3: the error outranks Epic-level warnings about the same situation.
-    epic = _epic(status="Done", state="CLOSED", children_status=["Planning"],
-                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["qa", "documentation"]}])
+    epic = _epic(status="Done", state="CLOSED",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Planning",
+                             "labels": ["qa", "documentation"]}])
     rules = {f["rule"] for f in diff(epic)}
     assert "epic_done_with_open_children" in rules
-    assert "epic_status_ahead_of_children" not in rules
+    assert "epic_status_mismatch" not in rules
     assert "orphaned_sub_issues" not in rules
 
 
-def test_status_lags_children_warns():
-    epic = _epic(status="Open", children_status=["In Progress"],
-                 subIssues=[{"number": 2, "labels": ["qa"]}, {"number": 3, "labels": ["documentation"]}])
-    assert any(f["rule"] == "epic_status_lags_children" for f in diff(epic))
+def test_status_mismatch_warns_when_child_started():
+    # Open Epic with a started child: RM §5.1 derives In Progress.
+    epic = _epic(status="Open",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "In Progress", "labels": ["qa"]},
+                            {"number": 3, "state": "OPEN", "status": "Open", "labels": ["documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "In Progress" in f["detail"]
+
+
+def test_status_matching_derivation_no_mismatch():
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "In Progress", "labels": ["qa"]},
+                            {"number": 3, "state": "OPEN", "status": "Planning", "labels": ["documentation"]}])
+    assert not any(f["rule"] == "epic_status_mismatch" for f in diff(epic))
+
+
+def test_status_open_expected_when_breakdown_done():
+    # Children not started + breakdown fields set on the Epic → Open expected.
+    epic = _epic(status="Planning", complexity="Medium", estimate=8,
+                 start_date="2026-08-01", end_date="2026-09-01",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Planning",
+                             "labels": ["qa", "documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "Open" in f["detail"]
 
 
 def test_orphaned_when_epic_closed_child_open():

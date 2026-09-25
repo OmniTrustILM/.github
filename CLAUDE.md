@@ -43,7 +43,7 @@ House style: `SKILL.md` is orchestration prose only; deterministic `gh`/GraphQL/
 ### Issue Types and Their Constraints (from `config/project-triage-rules.yml`)
 - **Bug**: requires `severity`. Recommended: module, priority, version, estimate, assignee.
 - **Feature**: requires `acceptance_criteria`. Recommended: module, priority, version, estimate, assignee.
-- **Epic**: requires `user_story`, `use_cases`, `acceptance_criteria`. Once past Planning status, also requires `complexity`, `estimate`, `start_date`, `end_date`. Epics without sub-issues or without a QA sub-issue are flagged.
+- **Epic**: requires `user_story`, `use_cases`, `acceptance_criteria`. From Open on (the breakdown produces them during Analysis), also requires `complexity`, `estimate`, `start_date`, `end_date`. Status must match the value derived from the children (Release Management §5.1). Epics without sub-issues or without a QA sub-issue are flagged.
 - **Release**: requires `version`. Past Planning: requires `start_date`, `end_date`.
 
 ### Labels

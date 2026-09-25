@@ -23,7 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from consistency import epic_status_findings, closed_but_not_done_finding, within_window  # noqa: E402
+from consistency import (  # noqa: E402
+    epic_status_findings, closed_but_not_done_finding, within_window,
+    version_reference, tree_has_qa,
+)
 
 BASE = Path(os.environ.get('TRIAGE_DIR', '.triage')).resolve()
 NOW = datetime.now(timezone.utc)
@@ -116,6 +119,20 @@ for it in items:
         continue
     lookup[(c['repository']['name'], c['number'])] = it
 
+# the project's issue tree, for the any-depth rules (version_mismatch,
+# epic_without_qa_sub_issue); only items that are in Project #5 are known
+parent_of, children_of, type_of, labels_of = {}, {}, {}, {}
+for key, it in lookup.items():
+    c = it['content']
+    type_of[key] = (c.get('issueType') or {}).get('name')
+    labels_of[key] = {l.get('name', '').lower()
+                      for l in (c.get('labels') or {}).get('nodes') or []}
+    p = c.get('parent')
+    if p:
+        pkey = (p['repository']['name'], p['number'])
+        parent_of[key] = pkey
+        children_of.setdefault(pkey, []).append(key)
+
 
 def load_sub_issues(repo, num):
     p = BASE / f'subs-{repo}-{num}.json'
@@ -186,6 +203,13 @@ for it in target:
             if is_field_missing(it, f):
                 add(it, 'Error', f'required_past_planning:{f}', f'missing `{f}` (required past Planning)')
 
+    # Epic breakdown fields: produced during Analysis, required from Open on
+    # (methodics §3.2, Release Management §5.1)
+    if status and status not in ('Planning', 'Analysis'):
+        for f in rules.get('required_past_analysis', {}).get(t_lower, []):
+            if is_field_missing(it, f):
+                add(it, 'Error', f'required_past_analysis:{f}', f'missing `{f}` (required from Open on)')
+
     for f in rules['recommended_fields'].get(t_lower, []):
         if is_field_missing(it, f):
             add(it, 'Warning', f'recommended:{f}', f'missing recommended field `{f}`')
@@ -211,17 +235,21 @@ for it in target:
             add(it, 'Error', 'empty_epic_no_sub_issues', 'Epic has no sub-issues')
 
     if rules['consistency_rules'].get('version_mismatch'):
-        parent = c.get('parent')
-        if parent:
-            pkey = (parent['repository']['name'], parent['number'])
-            p_item = lookup.get(pkey)
-            if p_item:
-                parent_v = field_value(p_item, 'Version')
-                my_v = field_value(it, 'Version')
-                if parent_v and parent_v != my_v:
-                    add(it, 'Error', 'version_mismatch',
-                        f'Version `{my_v or "(empty)"}` differs from parent [{parent["repository"]["name"]}#{parent["number"]}]({parent["url"]}) Version `{parent_v}`',
-                        fix_data={'parent_version': parent_v, 'my_version': my_v})
+        # the parent's Version wins transitively: compared with the Epic at
+        # any depth (see consistency.version_reference)
+        rkey = version_reference((c['repository']['name'], c['number']),
+                                 parent_of, type_of)
+        p_item = lookup.get(rkey) if rkey else None
+        if p_item:
+            pc = p_item['content']
+            parent_v = field_value(p_item, 'Version')
+            my_v = field_value(it, 'Version')
+            if parent_v and parent_v != my_v:
+                what = ('epic' if rkey != parent_of.get((c['repository']['name'], c['number']))
+                        else 'parent')
+                add(it, 'Error', 'version_mismatch',
+                    f'Version `{my_v or "(empty)"}` differs from {what} [{pc["repository"]["name"]}#{pc["number"]}]({pc["url"]}) Version `{parent_v}`',
+                    fix_data={'parent_version': parent_v, 'my_version': my_v})
 
     if rules['consistency_rules'].get('orphaned_sub_issues'):
         parent = c.get('parent')
@@ -260,31 +288,33 @@ for it in target:
     if rules['consistency_rules'].get('epic_without_qa_sub_issue') and t == 'Epic':
         if c['subIssues']['totalCount'] > 0:
             subs = load_sub_issues(c['repository']['name'], c['number'])
+            # direct sub-issues (REST, also those outside the project) plus
+            # the project's tree at any depth
             has_qa = any(
                 'qa' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
                 for s in subs
-            )
+            ) or tree_has_qa((c['repository']['name'], c['number']),
+                             children_of, labels_of, type_of)
             if not has_qa:
                 add(it, 'Warning', 'epic_without_qa_sub_issue', 'Epic has no sub-issue with `qa` label')
 
     # §7.2 Epic-status consistency (logic mirrored from epic-breakdown/reconcile.py).
     # Child project Status comes from the `lookup` table; open/closed from sub_issues.
-    _epic_status_rules = ('epic_done_with_open_children', 'epic_status_lags_children', 'epic_status_ahead_of_children')
+    _epic_status_rules = ('epic_done_with_open_children', 'epic_status_mismatch')
     if t == 'Epic' and any(rules['consistency_rules'].get(r) for r in _epic_status_rules):
         subs = load_sub_issues(c['repository']['name'], c['number'])
-        open_count = sum(1 for s in subs if (s.get('state') or '').upper() == 'OPEN')
-        child_statuses = []
+        children = []
         for s in subs:
             # REST sub_issues objects carry repository_url (a string), not a nested
             # repository object; derive the repo name from it (defensive fallback).
             ru = s.get('repository_url') or ''
             srepo = ru.rstrip('/').split('/')[-1] if ru else (s.get('repository') or {}).get('name')
             sit = lookup.get((srepo, s.get('number')))
-            if sit:
-                cs = field_value(sit, 'Status')
-                if cs:
-                    child_statuses.append(cs)
-        for level, rule, msg in epic_status_findings(status, child_statuses, open_count):
+            children.append((field_value(sit, 'Status') if sit else None,
+                             s.get('state'), s.get('state_reason')))
+        breakdown_done = not any(is_field_missing(it, f)
+                                 for f in ('complexity', 'estimate', 'start_date', 'end_date'))
+        for level, rule, msg in epic_status_findings(status, children, breakdown_done):
             if rules['consistency_rules'].get(rule):
                 add(it, level, rule, msg)
 

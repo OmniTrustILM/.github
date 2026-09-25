@@ -183,7 +183,7 @@ stateDiagram-v2
 | **Task** (non-code) | Planning → Open → In Progress → Done | No Review/Testing needed |
 | **Task** (code / QA) | Planning → Open → In Progress → Review → Testing → Done | Fuller lifecycle; QA-labeled Tasks follow this path |
 | **Task** (documentation) | Planning → Open → In Progress → Done | No Review/Testing unless docs require PR review |
-| **Epic** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Status is **derived from the children** (full rules: [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md)). **Planning** while the Epic is being written (User Story, Use Cases — §2.6 Phase 1). **Analysis** while breakdown & estimates are in progress (via `/epic-breakdown`; ≥ 1 child in Analysis, none started). **Open** when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2). **In Progress** when the first child starts development. **Review** / **Testing** when *all* children reached that stage or beyond. **Done** when all children complete (children closed as *not planned* / *duplicate* count as complete). All transitions manual (PM / Epic Owner); the release dashboard's Health tab flags Epics whose Status disagrees with the derivation. |
+| **Epic** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Status is **derived from the children** (full rules: [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md)). **Planning** while the Epic is being written (User Story, Use Cases — §2.6 Phase 1). **Analysis** while breakdown & estimates are in progress (via `/epic-breakdown`; ≥ 1 child in Analysis, none started). **Open** when breakdown is complete and all required fields are set (**Complexity, Estimate, Start Date, End Date** — required by §3.2). **In Progress** when the first child starts development. **Review** / **Testing** when *all* children reached that stage or beyond. **Done** when all children have Status **Done** — closing an issue only ends development and hands it to QA (the automation moves it to Testing), so a closed child still ranks by its Status, never below Testing; only children closed as *not planned* / *duplicate* count as complete outright. All transitions manual (PM / Epic Owner); the release dashboard's Health tab flags Epics whose Status disagrees with the derivation. |
 | **Release** | Planning → In Progress → Done | PM sets **Start Date** and **End Date** before moving past Planning (required by §3.2). PM moves to In Progress when development begins. PM moves to Done after QA sign-off (see Section 2.9). All transitions manual. |
 
 **These are conventions, not hard enforcement.** The full pipeline is available for all types. For Tasks specifically: if a PR is linked, automation moves the Task through Review and Testing naturally. If no PR is involved (documentation, configuration via UI), the developer moves it directly to Done after completion.
@@ -777,19 +777,16 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 
 | Rule | Severity | Description |
 |---|---|---|
-| Version mismatch | Error | Sub-issue Version ≠ parent Version |
+| Version mismatch | Error | Sub-issue Version ≠ its Epic's Version, at any depth — the parent's Version wins transitively, so an issue nested under a container issue is compared with the Epic, not with the container (which may itself be off). Epics compare with their Release; an issue with no Epic above it with its immediate parent. Also checked daily by the release dashboard's Health tab. |
 | Orphaned sub-issue | Warning | Parent closed, child still open |
 | Blocked but In Progress | Warning | Issue In Progress with open `blocked-by` issues |
 | Done but Open state | Error | Status=Done but issue not closed (automation failure) |
-| Closed but not Done | Warning | Manually closed without reaching Done (excludes issues closed as "not planned" or "duplicate" — those are legitimate) |
+| Closed but not Done | Warning | Closed as completed with Status below Testing — closing hands the issue to QA and the automation moves it to Testing, so Testing (the QA queue) and Done are the two legitimate statuses of a closed issue (excludes issues closed as "not planned" or "duplicate" — those are legitimate terminal states) |
 | Reopened without reason | Warning | Reopen Reason empty after reopen |
 | Release/Epic by non-org-member | Warning | Created by someone outside OmniTrustILM org |
-| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten |
-| Epic status lags children | Warning | Epic is in Open but at least one child issue has a more advanced status (In Progress, Review, Testing). Epic should be moved to In Progress. |
-| Epic status ahead of children | Warning | Epic is in In Progress but all child issues are still in Open or Planning. Epic may have been moved prematurely. |
+| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten. The `qa`-labelled issue counts at any depth of the Epic's tree (Bugs excluded) — where the QA task sits is not a rule. |
+| Epic status mismatch | Warning | Epic's Status differs from the value derived from its children per [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (see §2.2 Epic row): Done = all children have Status Done (a closed child ranks by its Status, never below Testing — only *not planned* / *duplicate* closes count as complete outright); Testing / Review = all children at that stage or beyond; In Progress = any child started; otherwise Open once the breakdown is complete (Complexity, Estimate, Start/End Date set — §3.2), Analysis while a child is still being scoped, else Planning. Also checked daily by the release dashboard's Health tab. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
-
-> **Note:** the exact Epic-status rules are defined in [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (status derived from the children; see §2.2 Epic row) and are checked daily by the release dashboard's Health tab. The three Epic-status rows above are the triage report's simplified approximation and are pending alignment with §5.1.
 
 ### 7.3 Rule precedence
 
@@ -799,7 +796,7 @@ When multiple rules fire on the same issue, resolve conflicts in this order:
 2. **Legitimate close reasons override "Closed but not Done".** An issue closed as `not planned` or `duplicate` is a valid terminal state — the "Closed but not Done" Warning does NOT fire for these closures.
 3. **"Done but Open state" takes precedence over "Closed but not Done".** If the Status says Done and the issue is still open, that's an automation failure — fix it before evaluating any other close-related rule.
 4. **Status transitions driven by automation always win over human-set status.** If a human sets Status = Done but the PR hasn't merged, the automation will re-enter the correct Status on the next relevant event. Don't manually force Status.
-5. **"Epic Done with open children" takes precedence over "Epic status ahead of children".** If the Epic is Done with open children, the Error is shown and the Warning is suppressed.
+5. **"Epic Done with open children" takes precedence over "Epic status mismatch".** If the Epic is Done with open children, the Error is shown and the mismatch Warning is suppressed.
 
 If two Warnings fire on the same issue, the triage report shows both — no suppression; the operator resolves in any order.
 
