@@ -24,16 +24,16 @@ SEVERITY=$(printf '%s\n' "$ISSUE_BODY" | grep -A2 '### Severity' | tail -1 | xar
 MODULE=$(printf '%s\n' "$ISSUE_BODY" | grep -A2 '### Module' | tail -1 | xargs 2>/dev/null || echo "")
 VERSION=$(printf '%s\n' "$ISSUE_BODY" | grep -A2 '### Version Number' | tail -1 | xargs 2>/dev/null || echo "")
 
-[ "$SEVERITY" = "_No response_" ] && SEVERITY=""
-[ "$MODULE" = "_No response_" ] && MODULE=""
-[ "$VERSION" = "_No response_" ] && VERSION=""
+[[ "$SEVERITY" = "_No response_" ]] && SEVERITY=""
+[[ "$MODULE" = "_No response_" ]] && MODULE=""
+[[ "$VERSION" = "_No response_" ]] && VERSION=""
 
 # Vulnerability defaults.
 # ISSUE_LABELS is comma-joined by the workflow; wrap the haystack and
 # needle in commas to avoid matching labels like "not-a-vulnerability".
 PRIORITY=""
 if printf '%s' ",$ISSUE_LABELS," | grep -q ",vulnerability,"; then
-  if [ -z "$SEVERITY" ]; then
+  if [[ -z "$SEVERITY" ]]; then
     SEVERITY="Critical"
     echo "Vulnerability without Severity — defaulting to Critical"
   fi
@@ -43,7 +43,7 @@ fi
 
 echo "Parsed — Severity: ${SEVERITY:-empty}, Module: ${MODULE:-empty}, Version: ${VERSION:-empty}, Prioritization: ${PRIORITY:-empty}"
 
-if [ -z "$SEVERITY" ] && [ -z "$MODULE" ] && [ -z "$PRIORITY" ] && [ -z "$VERSION" ]; then
+if [[ -z "$SEVERITY" ]] && [[ -z "$MODULE" ]] && [[ -z "$PRIORITY" ]] && [[ -z "$VERSION" ]]; then
   echo "No fields to set, exiting."
   exit 0
 fi
@@ -69,13 +69,13 @@ for i in {1..5}; do
   ITEM_ID=$(printf '%s' "$ITEMS_JSON" | jq -r --arg pid "$PROJECT_ID" \
     '.data.resource.projectItems.nodes[] | select(.project.id == $pid) | .id')
 
-  if [ -n "$ITEM_ID" ] && [ "$ITEM_ID" != "null" ]; then
+  if [[ -n "$ITEM_ID" ]] && [[ "$ITEM_ID" != "null" ]]; then
     break
   fi
-  [ "$i" -lt 5 ] && sleep 2
+  [[ "$i" -lt 5 ]] && sleep 2
 done
 
-if [ -z "$ITEM_ID" ] || [ "$ITEM_ID" = "null" ]; then
+if [[ -z "$ITEM_ID" ]] || [[ "$ITEM_ID" = "null" ]]; then
   echo "::warning::Issue not yet in project after polling, skipping field set."
   exit 0
 fi
@@ -84,7 +84,7 @@ set_field() {
   local field_name=$1
   local value=$2
 
-  if [ -z "$value" ]; then
+  if [[ -z "$value" ]]; then
     return
   fi
 
@@ -109,7 +109,7 @@ set_field() {
   local option_id
   option_id=$(printf '%s' "$field_data" | jq -r --arg name "$value" '.options[] | select(.name == $name) | .id')
 
-  if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
+  if [[ -n "$option_id" ]] && [[ "$option_id" != "null" ]]; then
     gh api graphql -f query='
       mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
         updateProjectV2ItemFieldValue(input: {
