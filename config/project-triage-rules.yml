@@ -35,14 +35,14 @@ special_rules:
   empty_epic_no_sub_issues: true       # Error: Epic with no sub-issues
 
 consistency_rules:
-  version_mismatch: true
+  version_mismatch: true               # Error: Version ≠ the Epic's, at any depth (parent wins transitively)
   orphaned_sub_issues: true
   blocked_but_in_progress: true
   done_but_open_state: true
   closed_but_not_done: true            # Status below Testing on a completed close; Testing = the QA queue. Excludes "not planned"/"duplicate"
   reopened_without_reason: true
   release_epic_by_non_org_member: true
-  epic_without_qa_sub_issue: true      # Warning: Epic has no Task+qa sub-issue
+  epic_without_qa_sub_issue: true      # Warning: no non-Bug qa-labelled issue anywhere in the Epic's tree
   epic_status_mismatch: true           # Warning: Epic Status differs from the children-derived value (RM §5.1)
   epic_done_with_open_children: true   # Error: Epic Status=Done but a child is still open
 

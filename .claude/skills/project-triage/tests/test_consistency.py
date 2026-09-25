@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from consistency import (  # noqa: E402
     epic_status_findings, expected_epic_status,
     closed_but_not_done_finding, within_window,
+    version_reference, tree_has_qa,
 )
 
 _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
@@ -155,6 +156,62 @@ def test_within_window_missing_false():
 def test_within_window_unparseable_false():
     assert within_window("not-a-date", _NOW, 30) is False
 
+
+
+# ---- version_reference: the parent's Version wins transitively ----
+
+REL, EPIC, CONT, LEAF, LOOSE = ("ilm", 1), ("ilm", 2), ("core", 3), ("core", 4), ("core", 5)
+TREE_PARENT = {EPIC: REL, CONT: EPIC, LEAF: CONT, LOOSE: REL}
+TREE_TYPE = {REL: "Release", EPIC: "Epic", CONT: "Feature", LEAF: "Task", LOOSE: "Task"}
+
+
+def test_version_reference_direct_child_uses_epic():
+    assert version_reference(CONT, TREE_PARENT, TREE_TYPE) == EPIC
+
+
+def test_version_reference_sub_issue_skips_container():
+    # compared with the Epic, never with a container that may itself be off
+    assert version_reference(LEAF, TREE_PARENT, TREE_TYPE) == EPIC
+
+
+def test_version_reference_epic_uses_release():
+    assert version_reference(EPIC, TREE_PARENT, TREE_TYPE) == REL
+
+
+def test_version_reference_without_epic_falls_back_to_parent():
+    assert version_reference(LOOSE, TREE_PARENT, TREE_TYPE) == REL
+
+
+def test_version_reference_no_parent():
+    assert version_reference(REL, TREE_PARENT, TREE_TYPE) is None
+
+
+def test_version_reference_cycle_terminates():
+    a, b = ("x", 1), ("x", 2)
+    assert version_reference(a, {a: b, b: a}, {a: "Task", b: "Task"}) == b
+
+
+# ---- tree_has_qa: QA tasks count at any depth ----
+
+def _children(parent_of):
+    out = {}
+    for k, p in parent_of.items():
+        out.setdefault(p, []).append(k)
+    return out
+
+
+def test_tree_has_qa_nested_task():
+    labels = {LEAF: {"qa"}}
+    assert tree_has_qa(EPIC, _children(TREE_PARENT), labels, TREE_TYPE)
+
+
+def test_tree_has_qa_ignores_bugs():
+    types = {**TREE_TYPE, LEAF: "Bug"}
+    assert not tree_has_qa(EPIC, _children(TREE_PARENT), {LEAF: {"qa"}}, types)
+
+
+def test_tree_has_qa_none():
+    assert not tree_has_qa(EPIC, _children(TREE_PARENT), {}, TREE_TYPE)
 
 if __name__ == "__main__":
     import traceback

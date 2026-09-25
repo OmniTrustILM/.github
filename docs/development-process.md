@@ -777,14 +777,14 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 
 | Rule | Severity | Description |
 |---|---|---|
-| Version mismatch | Error | Sub-issue Version ≠ parent Version |
+| Version mismatch | Error | Sub-issue Version ≠ its Epic's Version, at any depth — the parent's Version wins transitively, so an issue nested under a container issue is compared with the Epic, not with the container (which may itself be off). Epics compare with their Release; an issue with no Epic above it with its immediate parent. Also checked daily by the release dashboard's Health tab. |
 | Orphaned sub-issue | Warning | Parent closed, child still open |
 | Blocked but In Progress | Warning | Issue In Progress with open `blocked-by` issues |
 | Done but Open state | Error | Status=Done but issue not closed (automation failure) |
 | Closed but not Done | Warning | Closed as completed with Status below Testing — closing hands the issue to QA and the automation moves it to Testing, so Testing (the QA queue) and Done are the two legitimate statuses of a closed issue (excludes issues closed as "not planned" or "duplicate" — those are legitimate terminal states) |
 | Reopened without reason | Warning | Reopen Reason empty after reopen |
 | Release/Epic by non-org-member | Warning | Created by someone outside OmniTrustILM org |
-| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten |
+| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten. The `qa`-labelled issue counts at any depth of the Epic's tree (Bugs excluded) — where the QA task sits is not a rule. |
 | Epic status mismatch | Warning | Epic's Status differs from the value derived from its children per [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (see §2.2 Epic row): Done = all children have Status Done (a closed child ranks by its Status, never below Testing — only *not planned* / *duplicate* closes count as complete outright); Testing / Review = all children at that stage or beyond; In Progress = any child started; otherwise Open once the breakdown is complete (Complexity, Estimate, Start/End Date set — §3.2), Analysis while a child is still being scoped, else Planning. Also checked daily by the release dashboard's Health tab. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
 

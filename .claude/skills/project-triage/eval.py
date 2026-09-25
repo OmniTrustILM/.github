@@ -23,7 +23,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from consistency import epic_status_findings, closed_but_not_done_finding, within_window  # noqa: E402
+from consistency import (  # noqa: E402
+    epic_status_findings, closed_but_not_done_finding, within_window,
+    version_reference, tree_has_qa,
+)
 
 BASE = Path(os.environ.get('TRIAGE_DIR', '.triage')).resolve()
 NOW = datetime.now(timezone.utc)
@@ -115,6 +118,20 @@ for it in items:
     if not c:
         continue
     lookup[(c['repository']['name'], c['number'])] = it
+
+# the project's issue tree, for the any-depth rules (version_mismatch,
+# epic_without_qa_sub_issue); only items that are in Project #5 are known
+parent_of, children_of, type_of, labels_of = {}, {}, {}, {}
+for key, it in lookup.items():
+    c = it['content']
+    type_of[key] = (c.get('issueType') or {}).get('name')
+    labels_of[key] = {l.get('name', '').lower()
+                      for l in (c.get('labels') or {}).get('nodes') or []}
+    p = c.get('parent')
+    if p:
+        pkey = (p['repository']['name'], p['number'])
+        parent_of[key] = pkey
+        children_of.setdefault(pkey, []).append(key)
 
 
 def load_sub_issues(repo, num):
@@ -218,17 +235,21 @@ for it in target:
             add(it, 'Error', 'empty_epic_no_sub_issues', 'Epic has no sub-issues')
 
     if rules['consistency_rules'].get('version_mismatch'):
-        parent = c.get('parent')
-        if parent:
-            pkey = (parent['repository']['name'], parent['number'])
-            p_item = lookup.get(pkey)
-            if p_item:
-                parent_v = field_value(p_item, 'Version')
-                my_v = field_value(it, 'Version')
-                if parent_v and parent_v != my_v:
-                    add(it, 'Error', 'version_mismatch',
-                        f'Version `{my_v or "(empty)"}` differs from parent [{parent["repository"]["name"]}#{parent["number"]}]({parent["url"]}) Version `{parent_v}`',
-                        fix_data={'parent_version': parent_v, 'my_version': my_v})
+        # the parent's Version wins transitively: compared with the Epic at
+        # any depth (see consistency.version_reference)
+        rkey = version_reference((c['repository']['name'], c['number']),
+                                 parent_of, type_of)
+        p_item = lookup.get(rkey) if rkey else None
+        if p_item:
+            pc = p_item['content']
+            parent_v = field_value(p_item, 'Version')
+            my_v = field_value(it, 'Version')
+            if parent_v and parent_v != my_v:
+                what = ('epic' if rkey != parent_of.get((c['repository']['name'], c['number']))
+                        else 'parent')
+                add(it, 'Error', 'version_mismatch',
+                    f'Version `{my_v or "(empty)"}` differs from {what} [{pc["repository"]["name"]}#{pc["number"]}]({pc["url"]}) Version `{parent_v}`',
+                    fix_data={'parent_version': parent_v, 'my_version': my_v})
 
     if rules['consistency_rules'].get('orphaned_sub_issues'):
         parent = c.get('parent')
@@ -267,10 +288,13 @@ for it in target:
     if rules['consistency_rules'].get('epic_without_qa_sub_issue') and t == 'Epic':
         if c['subIssues']['totalCount'] > 0:
             subs = load_sub_issues(c['repository']['name'], c['number'])
+            # direct sub-issues (REST, also those outside the project) plus
+            # the project's tree at any depth
             has_qa = any(
                 'qa' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
                 for s in subs
-            )
+            ) or tree_has_qa((c['repository']['name'], c['number']),
+                             children_of, labels_of, type_of)
             if not has_qa:
                 add(it, 'Warning', 'epic_without_qa_sub_issue', 'Epic has no sub-issue with `qa` label')
 
