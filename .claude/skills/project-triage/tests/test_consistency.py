@@ -57,6 +57,48 @@ def test_expected_closed_completed_floored_at_testing():
     assert expected_epic_status([kid("In Progress", "CLOSED")], BD) == "Testing"
 
 
+def bug(status, state="OPEN", reason=None):
+    # testing-phase work: a Bug, or a task labelled qa / testing
+    return kid(status, state, reason) + (True,)
+
+
+def test_expected_open_bug_keeps_epic_in_testing():
+    # features developed and reviewed, a bug from testing being fixed:
+    # the epic is in its testing phase, not back in development (ilm#323)
+    assert expected_epic_status(
+        [kid("Testing", "CLOSED"), kid("Testing", "CLOSED"),
+         bug("Done", "CLOSED"), bug("In Progress")], BD) == "Testing"
+
+
+def test_expected_test_task_does_not_hold_review():
+    # a test task still in Planning while every feature is in Review
+    assert expected_epic_status(
+        [kid("Review"), kid("Review"), bug("Planning")], BD) == "Review"
+
+
+def test_expected_phase_work_still_holds_done():
+    assert expected_epic_status(
+        [kid("Done", "CLOSED"), bug("Testing", "CLOSED")], BD) == "Testing"
+
+
+def test_expected_phase_work_still_starts_in_progress():
+    # a bug being fixed while no feature has started counts as started
+    assert expected_epic_status(
+        [kid("Open"), bug("In Progress")], BD) == "In Progress"
+
+
+def test_expected_bug_collector_ranks_bugs_as_its_work():
+    # an epic holding nothing but bugs follows them like any children
+    assert expected_epic_status(
+        [bug("In Progress"), bug("Testing", "CLOSED")], BD) == "In Progress"
+
+
+def test_expected_triples_still_accepted():
+    # callers passing plain triples see the previous behaviour
+    assert expected_epic_status(
+        [kid("Testing", "CLOSED"), kid("In Progress")], BD) == "In Progress"
+
+
 def test_expected_all_testing_or_beyond():
     assert expected_epic_status([kid("Testing"), kid("Done")], BD) == "Testing"
 

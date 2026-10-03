@@ -101,12 +101,15 @@ def _expected_epic_status(children, breakdown_done):
     Release Management §5.1 ladder (most advanced rule wins). Mirrors
     project-triage/consistency.py expected_epic_status (this skill does not
     import triage's code). children = [(project_status, github_state,
-    state_reason), ...]. Closing an issue only hands it to QA (the
-    automation moves it to Testing), so a CLOSED child ranks by its Status
-    field, floored at Testing; only children cancelled as not planned /
-    duplicate (or closed with no project Status) count as Done outright.
-    breakdown_done = Complexity, Estimate, Start/End Date all set on the
-    Epic (§3.2)."""
+    state_reason[, phase_work]), ...]. Closing an issue only hands it to
+    QA (the automation moves it to Testing), so a CLOSED child ranks by
+    its Status field, floored at Testing; only children cancelled as not
+    planned / duplicate (or closed with no project Status) count as Done
+    outright. phase_work marks testing-phase work — a Bug, or a task
+    labelled qa / testing (Jiří 2026-10-03) — which decides In Progress
+    and Done but not Review / Testing; an Epic holding nothing but such
+    work ranks it as its development. breakdown_done = Complexity,
+    Estimate, Start/End Date all set on the Epic (§3.2)."""
     def rank(status, state, reason):
         r = _RANK.get(status)
         if (state or "").upper() != "CLOSED":
@@ -114,14 +117,16 @@ def _expected_epic_status(children, breakdown_done):
         if (reason or "").upper() in ("NOT_PLANNED", "DUPLICATE") or r is None:
             return _RANK["Done"]
         return max(r, _RANK["Testing"])
-    ranked = [r for c in children if (r := rank(*c)) is not None]
+    pairs = [(c, r) for c in children if (r := rank(*c[:3])) is not None]
+    ranked = [r for _, r in pairs]
     if not ranked:
         return None
+    core = [r for c, r in pairs if not (len(c) > 3 and c[3])] or ranked
     if min(ranked) >= _RANK["Done"]:
         return "Done"
-    if min(ranked) >= _RANK["Testing"]:
+    if min(core) >= _RANK["Testing"]:
         return "Testing"
-    if min(ranked) >= _RANK["Review"]:
+    if min(core) >= _RANK["Review"]:
         return "Review"
     if max(ranked) >= _RANK["In Progress"]:
         return "In Progress"
@@ -166,7 +171,9 @@ def diff(epic, rules=None):
     # §7.2 — Epic Status vs. the children-derived value (RM §5.1; logic
     # mirrors project-triage/consistency.py expected_epic_status).
     if status:
-        children = [(s.get("status"), s.get("state"), s.get("state_reason"))
+        children = [(s.get("status"), s.get("state"), s.get("state_reason"),
+                     s.get("issueType") == "Bug"
+                     or bool({"qa", "testing"} & {l.lower() for l in s.get("labels") or []}))
                     for s in subs]
         breakdown_done = all(epic.get(f) not in (None, "")
                              for f in ("complexity", "estimate", "start_date", "end_date"))

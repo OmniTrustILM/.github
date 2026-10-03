@@ -12,9 +12,13 @@ Done = all children have Status Done — closing an issue only ends
 development and hands it to QA (the automation moves it to Testing), so a
 closed child ranks by its Status field, floored at Testing; only children
 cancelled as not planned / duplicate (or closed with no project Status)
-count as Done outright. Testing / Review = all children at that stage or
-beyond; In Progress = any child started; otherwise Open once the breakdown
-is complete (Complexity, Estimate, Start/End Date set on the Epic — §3.2),
+count as Done outright. Testing / Review = all *development* children at
+that stage or beyond — Bugs and qa/testing tasks are testing-phase work
+(bugs come out of testing, test tasks are the testing itself; Jiří
+2026-10-03), so they hold the Epic below Done only, never below Testing;
+an Epic holding nothing but such work ranks it as its development. In
+Progress = any child started; otherwise Open once the breakdown is
+complete (Complexity, Estimate, Start/End Date set on the Epic — §3.2),
 Analysis while a child is still being scoped, else Planning.
 
 §7.3 precedence note: epic_done_with_open_children is an Error and outranks
@@ -63,21 +67,28 @@ def expected_epic_status(children, breakdown_done):
     Release Management §5.1 ladder (most advanced rule wins).
 
     children       — list of (project_status, github_state, state_reason)
-                     triples, one per child, ranked by _child_rank above.
+                     triples, one per child, ranked by _child_rank above;
+                     an optional fourth element marks testing-phase work
+                     (a Bug, or a task labelled qa / testing), which decides
+                     In Progress and Done but not Review / Testing.
     breakdown_done — True when Complexity, Estimate, Start Date and End Date
                      are all set on the Epic (§3.2: the fields the breakdown
                      must produce before the Epic may move to Open).
 
     Returns None when nothing can be derived (no child has a usable state).
     """
-    ranked = [r for c in children if (r := _child_rank(*c)) is not None]
+    pairs = [(c, r) for c in children if (r := _child_rank(*c[:3])) is not None]
+    ranked = [r for _, r in pairs]
     if not ranked:
         return None
+    # the development children decide Review / Testing; a bug collector
+    # (nothing but testing-phase work) ranks that work as its development
+    core = [r for c, r in pairs if not (len(c) > 3 and c[3])] or ranked
     if min(ranked) >= _RANK["Done"]:
         return "Done"
-    if min(ranked) >= _RANK["Testing"]:
+    if min(core) >= _RANK["Testing"]:
         return "Testing"
-    if min(ranked) >= _RANK["Review"]:
+    if min(core) >= _RANK["Review"]:
         return "Review"
     if max(ranked) >= _RANK["In Progress"]:
         return "In Progress"

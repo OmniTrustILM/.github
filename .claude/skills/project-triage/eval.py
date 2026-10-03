@@ -310,8 +310,13 @@ for it in target:
             ru = s.get('repository_url') or ''
             srepo = ru.rstrip('/').split('/')[-1] if ru else (s.get('repository') or {}).get('name')
             sit = lookup.get((srepo, s.get('number')))
+            # testing-phase work (a Bug, or a qa / testing task) decides In
+            # Progress and Done only — see consistency.expected_epic_status
+            slabels = [l.get('name', '').lower() for l in (s.get('labels') or [])]
+            stype = type_of.get((srepo, s.get('number'))) or (s.get('type') or {}).get('name')
+            phase_work = stype == 'Bug' or bool({'qa', 'testing'} & set(slabels))
             children.append((field_value(sit, 'Status') if sit else None,
-                             s.get('state'), s.get('state_reason')))
+                             s.get('state'), s.get('state_reason'), phase_work))
         breakdown_done = not any(is_field_missing(it, f)
                                  for f in ('complexity', 'estimate', 'start_date', 'end_date'))
         for level, rule, msg in epic_status_findings(status, children, breakdown_done):
