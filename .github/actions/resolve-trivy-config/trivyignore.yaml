@@ -1,0 +1,28 @@
+# OmniTrustILM org-wide Trivy exceptions.
+#
+# resolve.sh hands this file to the vulnerability gate of every repo that runs
+# under the org-default policy (allow-trivy-config-override: false). A
+# repo-local .trivyignore stays neutralized there, so an exception is granted
+# here, in one reviewed place, or not at all.
+#
+# Every entry must carry:
+#   id          the advisory ID Trivy reports (CVE-... or GHSA-...)
+#   purls       the affected packages; leave the version off to cover every
+#               version the advisory flags
+#   statement   why the finding is not exploitable in OmniTrustILM, and what
+#               retires the exception
+#   expired_at  yyyy-mm-dd, at most a year out; once it passes, Trivy drops the
+#               entry and the gate fails again in every affected repo
+#
+# resolve.test.sh rejects an entry that misses any of these.
+vulnerabilities:
+  - id: CVE-2026-47884
+    purls:
+      - pkg:maven/org.springframework/spring-webmvc
+    statement: >-
+      XsltView SSRF/RCE. Exploitation needs XsltView, a catch-all /** view
+      mapping and view names taken from user input; OmniTrustILM services are
+      REST-only and render no views. The only open-source fix is Spring
+      Framework 7.0.9 (Spring Boot 4); 6.2.20 is commercial only. Retire with
+      the Spring Boot 4 migration.
+    expired_at: 2026-12-31

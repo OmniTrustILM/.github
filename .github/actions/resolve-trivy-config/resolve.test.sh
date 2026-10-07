@@ -9,6 +9,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 resolve="$script_dir/resolve.sh"
 default_src="$script_dir/trivy.yaml"
+default_ignore_src="$script_dir/trivyignore.yaml"
+default_ignore_src="$script_dir/trivyignore.yaml"
 
 failures=0
 
@@ -25,7 +27,8 @@ assert_eq() {
 
 # ---------------------------------------------------------------------------
 # Case 1: override not allowed -> bundled default copied into the workspace,
-# and a repo-local .trivyignore is neutralized via TRIVY_IGNOREFILE.
+# and a repo-local .trivyignore is swapped for the bundled org exceptions via
+# TRIVY_IGNOREFILE.
 # ---------------------------------------------------------------------------
 work="$(mktemp -d)"
 out="$work/gh_output"
@@ -39,6 +42,7 @@ mkdir -p "$rt"
   INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE=false \
   INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
   DEFAULT_CONFIG_SRC="$default_src" \
+  DEFAULT_IGNORE_SRC="$default_ignore_src" \
   GITHUB_OUTPUT="$out" \
   GITHUB_ENV="$env_out" \
   RUNNER_TEMP="$rt" \
@@ -51,10 +55,10 @@ assert_eq "default: file materialized in workspace" \
   "yes" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 assert_eq "default: content matches bundled policy" \
   "$(cat "$default_src")" "$(cat "$work/.trivy-default.yaml")"
-assert_eq "default: TRIVY_IGNOREFILE pointed at empty ignore file" \
-  "TRIVY_IGNOREFILE=$rt/trivy-empty-ignore" "$(cat "$env_out")"
-assert_eq "default: empty ignore file exists and is empty" \
-  "yes" "$([ -f "$rt/trivy-empty-ignore" ] && [ ! -s "$rt/trivy-empty-ignore" ] && echo yes || echo no)"
+assert_eq "default: TRIVY_IGNOREFILE pointed at the org exceptions copy" \
+  "TRIVY_IGNOREFILE=$rt/trivy-org-ignore.yaml" "$(cat "$env_out")"
+assert_eq "default: org exceptions copy matches bundled file" \
+  "$(cat "$default_ignore_src")" "$(cat "$rt/trivy-org-ignore.yaml")"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
@@ -143,6 +147,7 @@ rc=0
   INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE=false \
   INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
   DEFAULT_CONFIG_SRC="$default_src" \
+  DEFAULT_IGNORE_SRC="$default_ignore_src" \
   GITHUB_OUTPUT="$out" \
   bash "$resolve"
 ) || rc=$?
@@ -151,6 +156,56 @@ assert_eq "symlink guard: no config-file written" "" "$(cat "$out")"
 assert_eq "symlink guard: link left in place, not written through" \
   "yes" "$([ -L "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 rm -rf "$work"
+
+# ---------------------------------------------------------------------------
+# Case 6: override not allowed + bundled org exceptions missing -> fail
+# closed (packaging error), rather than fall back to Trivy's own .trivyignore.
+# ---------------------------------------------------------------------------
+work="$(mktemp -d)"
+out="$work/gh_output"
+env_out="$work/gh_env"
+: > "$out"
+: > "$env_out"
+rc=0
+(
+  cd "$work"
+  INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE=false \
+  INPUT_TRIVY_CONFIG_PATH=config/trivy.yaml \
+  DEFAULT_CONFIG_SRC="$default_src" \
+  DEFAULT_IGNORE_SRC="$work/missing.yaml" \
+  GITHUB_OUTPUT="$out" \
+  GITHUB_ENV="$env_out" \
+  RUNNER_TEMP="$work" \
+  bash "$resolve"
+) || rc=$?
+assert_eq "exceptions missing: exits non-zero" "1" "$rc"
+assert_eq "exceptions missing: no config-file written" "" "$(cat "$out")"
+assert_eq "exceptions missing: TRIVY_IGNOREFILE NOT set" "" "$(cat "$env_out")"
+rm -rf "$work"
+
+# ---------------------------------------------------------------------------
+# Case 7: every bundled org exception carries an id, purls, a statement and an
+# expiry at most a year out. Needs mikefarah yq v4 (installed by action-tests).
+# ---------------------------------------------------------------------------
+if command -v yq >/dev/null 2>&1; then
+  limit="$(date -u -d '+366 days' +%F)"
+  count="$(yq '.vulnerabilities | length' "$default_ignore_src")"
+  for ((i = 0; i < count; i++)); do
+    e=".vulnerabilities[$i]"
+    id="$(yq "$e.id // \"\"" "$default_ignore_src")"
+    label="exception ${id:-#$i}"
+    assert_eq "$label: has an id" "yes" "$([ -n "$id" ] && echo yes || echo no)"
+    assert_eq "$label: names its purls" \
+      "yes" "$([ "$(yq "$e.purls // [] | length" "$default_ignore_src")" -gt 0 ] && echo yes || echo no)"
+    assert_eq "$label: has a statement" \
+      "yes" "$([ -n "$(yq "$e.statement // \"\"" "$default_ignore_src")" ] && echo yes || echo no)"
+    expiry="$(yq "$e.expired_at // \"\"" "$default_ignore_src")"
+    assert_eq "$label: expires (yyyy-mm-dd) at most a year out" \
+      "yes" "$([[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && ! "$expiry" > "$limit" ]] && echo yes || echo no)"
+  done
+else
+  echo "skip - bundled org exceptions lint (yq not installed)"
+fi
 
 echo "----"
 if [ "$failures" -eq 0 ]; then

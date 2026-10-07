@@ -3,7 +3,8 @@ description: >-
   Decide which Trivy config the vulnerability gate should use: the bundled
   OmniTrustILM org-default policy, or (only when explicitly permitted) a
   repo-local override file. Outputs the workspace-relative path to the chosen
-  config so the caller's Trivy step can consume it.
+  config so the caller's Trivy step can consume it. Under the org default it
+  also points Trivy at the bundled org exceptions (trivyignore.yaml).
 
 inputs:
   allow-trivy-config-override:
@@ -35,4 +36,5 @@ runs:
         INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE: ${{ inputs.allow-trivy-config-override }}
         INPUT_TRIVY_CONFIG_PATH: ${{ inputs.trivy-config-path }}
         DEFAULT_CONFIG_SRC: ${{ github.action_path }}/trivy.yaml
+        DEFAULT_IGNORE_SRC: ${{ github.action_path }}/trivyignore.yaml
       run: bash "$GITHUB_ACTION_PATH/resolve.sh"

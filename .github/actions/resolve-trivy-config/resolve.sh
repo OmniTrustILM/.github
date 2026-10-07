@@ -9,12 +9,14 @@
 # Behaviour:
 #   override not allowed (default) -> copy the bundled default into the
 #                                     workspace and use it (org policy enforced),
-#                                     and neutralize any repo-local .trivyignore
+#                                     and swap any repo-local .trivyignore for
+#                                     the bundled org exceptions
 #   override allowed + file present -> use the repo's file (full replacement)
 #   override allowed + file missing -> fail loudly (misconfiguration)
 #
 # Reads: INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE, INPUT_TRIVY_CONFIG_PATH,
-#        DEFAULT_CONFIG_SRC, GITHUB_OUTPUT, GITHUB_ENV, RUNNER_TEMP
+#        DEFAULT_CONFIG_SRC, DEFAULT_IGNORE_SRC, GITHUB_OUTPUT, GITHUB_ENV,
+#        RUNNER_TEMP
 set -euo pipefail
 
 # Any value other than the exact string "true" falls through to the org
@@ -45,15 +47,21 @@ else
     echo "::error::'$default_dest' is a symlink in the checked-out repo; refusing to write the org-default Trivy config through it."
     exit 1
   fi
+  default_ignore_src="${DEFAULT_IGNORE_SRC:?DEFAULT_IGNORE_SRC must point at the bundled org trivyignore.yaml}"
+  if [ ! -f "$default_ignore_src" ]; then
+    echo "::error::Bundled org Trivy exceptions not found at '$default_ignore_src' (action packaging error)."
+    exit 1
+  fi
   cp "$default_src" "$default_dest"
   # Trivy auto-loads a repo-committed .trivyignore from the working directory,
   # which would silently suppress findings under the locked org default. Point
-  # Trivy at an empty ignore file we control (outside the caller checkout) so
-  # the default gate can't be weakened without opting into an override.
-  empty_ignore="${RUNNER_TEMP:-/tmp}/trivy-empty-ignore"
-  : > "$empty_ignore"
-  echo "TRIVY_IGNOREFILE=$empty_ignore" >> "$GITHUB_ENV"
-  echo "Trivy config: using org-default policy (override not enabled); repo-local .trivyignore neutralized."
+  # Trivy at the org's own exceptions instead, copied outside the caller
+  # checkout, so the default gate is only ever relaxed in this repo. The copy
+  # keeps its .yaml extension: Trivy picks the YAML parser by extension.
+  org_ignore="${RUNNER_TEMP:-/tmp}/trivy-org-ignore.yaml"
+  cp "$default_ignore_src" "$org_ignore"
+  echo "TRIVY_IGNOREFILE=$org_ignore" >> "$GITHUB_ENV"
+  echo "Trivy config: using org-default policy and org exceptions (override not enabled); repo-local .trivyignore neutralized."
   resolved="$default_dest"
 fi
 
