@@ -25,4 +25,4 @@ vulnerabilities:
       REST-only and render no views. The only open-source fix is Spring
       Framework 7.0.9 (Spring Boot 4); 6.2.20 is commercial only. Retire with
       the Spring Boot 4 migration.
-    expired_at: 2026-12-31
+    expired_at: 2026-10-31
