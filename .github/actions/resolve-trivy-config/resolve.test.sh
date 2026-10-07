@@ -10,7 +10,6 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 resolve="$script_dir/resolve.sh"
 default_src="$script_dir/trivy.yaml"
 default_ignore_src="$script_dir/trivyignore.yaml"
-default_ignore_src="$script_dir/trivyignore.yaml"
 
 failures=0
 
@@ -23,6 +22,13 @@ assert_eq() {
     echo "FAIL - $desc (expected '$expected', got '$actual')"
     failures=$((failures + 1))
   fi
+}
+
+# valid_expiry <date> <latest>: <date> is a real yyyy-mm-dd day no later than
+# <latest>. Round-tripping through date rejects both a wrong shape and a day
+# that does not exist, which a pattern alone lets through.
+valid_expiry() {
+  [[ "$(date -u -d "$1" +%F 2>/dev/null)" == "$1" && ! "$1" > "$2" ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -184,7 +190,20 @@ assert_eq "exceptions missing: TRIVY_IGNOREFILE NOT set" "" "$(cat "$env_out")"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
-# Case 7: every bundled org exception carries an id, purls, a statement and an
+# Case 7: the expiry check rejects what Trivy cannot parse. An impossible date
+# makes Trivy exit fatally, failing the scan in every repo on the default.
+# ---------------------------------------------------------------------------
+assert_eq "expiry check: rejects an impossible day" \
+  "no" "$(valid_expiry 2026-02-30 2099-12-31 && echo yes || echo no)"
+assert_eq "expiry check: rejects an impossible month" \
+  "no" "$(valid_expiry 2026-13-01 2099-12-31 && echo yes || echo no)"
+assert_eq "expiry check: rejects a date past the limit" \
+  "no" "$(valid_expiry 2027-01-01 2026-12-31 && echo yes || echo no)"
+assert_eq "expiry check: accepts a real date up to the limit" \
+  "yes" "$(valid_expiry 2026-12-31 2026-12-31 && echo yes || echo no)"
+
+# ---------------------------------------------------------------------------
+# Case 8: every bundled org exception carries an id, purls, a statement and an
 # expiry at most a year out. Needs mikefarah yq v4 (installed by action-tests).
 # ---------------------------------------------------------------------------
 if command -v yq >/dev/null 2>&1; then
@@ -201,7 +220,7 @@ if command -v yq >/dev/null 2>&1; then
       "yes" "$([ -n "$(yq "$e.statement // \"\"" "$default_ignore_src")" ] && echo yes || echo no)"
     expiry="$(yq "$e.expired_at // \"\"" "$default_ignore_src")"
     assert_eq "$label: expires (yyyy-mm-dd) at most a year out" \
-      "yes" "$([[ "$expiry" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ && ! "$expiry" > "$limit" ]] && echo yes || echo no)"
+      "yes" "$(valid_expiry "$expiry" "$limit" && echo yes || echo no)"
   done
 else
   echo "skip - bundled org exceptions lint (yq not installed)"
