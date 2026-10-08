@@ -15,7 +15,7 @@ failures=0
 # assert_eq <description> <expected> <actual>
 assert_eq() {
   local desc="$1" expected="$2" actual="$3"
-  if [ "$expected" = "$actual" ]; then
+  if [[ "$expected" = "$actual" ]]; then
     echo "ok - $desc"
   else
     echo "FAIL - $desc (expected '$expected', got '$actual')"
@@ -50,7 +50,7 @@ run_verdict() {
   local report="$work/report.json"
   rm -f "$report"
   : > "$work/summary"
-  if [ -n "$report_json" ]; then
+  if [[ -n "$report_json" ]]; then
     printf '%s' "$report_json" > "$report"
   fi
   rc=0
@@ -137,7 +137,7 @@ assert_lacks "missing mode: no warning annotation" "$log" "::warning"
 # -- Warn mode: any other finding fails; secrets stay unread -----------------
 run_verdict warn "$WITH_SECRET"
 assert_eq "warn: a secret exits 1" "1" "$rc"
-assert_has "warn: error annotation" "$log" \
+assert_has "warn: error annotation" "$errors" \
   "::error title=Vulnerability gate (amd64)::Findings other than vulnerabilities, such as leaked secrets: 1."
 assert_has "warn: summary says other findings fail" "$summary" \
   "Findings other than vulnerabilities fail every build."
@@ -156,14 +156,14 @@ run_verdict warn "$OTHER_KINDS"
 assert_eq "warn: misconfiguration and license exit 1" "1" "$rc"
 assert_has "warn: lists the license" "$summary" '| `CRITICAL` | license | `AGPL-3.0` | `OS Packages` |'
 assert_has "warn: lists the misconfiguration" "$summary" '| `HIGH` | misconfiguration | `DS002` | `Dockerfile` |'
-assert_has "warn: a passed check is not a finding" "$log" \
+assert_has "warn: a passed check is not a finding" "$errors" \
   "Findings other than vulnerabilities, such as leaked secrets: 2."
 assert_lacks "warn: a passed check is not listed" "$summary" "DS001"
 
 # -- An unreadable report fails in both modes --------------------------------
 run_verdict warn ""
 assert_eq "missing report: exits 1" "1" "$rc"
-assert_has "missing report: error annotation" "$log" \
+assert_has "missing report: error annotation" "$errors" \
   "::error title=Vulnerability gate (amd64)::The Trivy report"
 
 run_verdict enforce '[]'
@@ -171,7 +171,7 @@ assert_eq "not an object: exits 1" "1" "$rc"
 
 run_verdict warn "$MALFORMED"
 assert_eq "malformed report: exits 1" "1" "$rc"
-assert_has "malformed report: error annotation" "$log" \
+assert_has "malformed report: error annotation" "$errors" \
   "::error title=Vulnerability gate (amd64)::The Trivy report"
 assert_lacks "malformed report: no report value on stderr" "$errors" "##[error]"
 assert_lacks "malformed report: no report value in the log" "$log" "##[error]"
@@ -197,7 +197,7 @@ assert_has "empty label: plain heading" "$summary" $'### Vulnerability gate\n'
 assert_has "empty label: plain annotation title" "$log" "::warning title=Vulnerability gate::"
 
 echo "----"
-if [ "$failures" -eq 0 ]; then
+if [[ "$failures" -eq 0 ]]; then
   echo "All verdict.sh tests passed."
 else
   echo "$failures test(s) failed."

@@ -15,7 +15,7 @@ failures=0
 # assert_eq <description> <expected> <actual>
 assert_eq() {
   local desc="$1" expected="$2" actual="$3"
-  if [ "$expected" = "$actual" ]; then
+  if [[ "$expected" = "$actual" ]]; then
     echo "ok - $desc"
   else
     echo "FAIL - $desc (expected '$expected', got '$actual')"
@@ -54,13 +54,13 @@ assert_eq "default: exits 0" "0" "$?"
 assert_eq "default: outputs .trivy-default.yaml" \
   ".trivy-default.yaml" "$(output_of "$out" config-file)"
 assert_eq "default: file materialized in workspace" \
-  "yes" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
+  "yes" "$([[ -f "$work/.trivy-default.yaml" ]] && echo yes || echo no)"
 assert_eq "default: content matches bundled policy" \
   "$(cat "$default_src")" "$(cat "$work/.trivy-default.yaml")"
 assert_eq "default: TRIVY_IGNOREFILE pointed at empty ignore file" \
   "TRIVY_IGNOREFILE=$rt/trivy-empty-ignore" "$(cat "$env_out")"
 assert_eq "default: empty ignore file exists and is empty" \
-  "yes" "$([ -f "$rt/trivy-empty-ignore" ] && [ ! -s "$rt/trivy-empty-ignore" ] && echo yes || echo no)"
+  "yes" "$([[ -f "$rt/trivy-empty-ignore" ]] && [[ ! -s "$rt/trivy-empty-ignore" ]] && echo yes || echo no)"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ assert_eq "override present: exits 0" "0" "$?"
 assert_eq "override present: outputs repo path" \
   "config/trivy.yaml" "$(output_of "$out" config-file)"
 assert_eq "override present: bundled default NOT copied" \
-  "no" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
+  "no" "$([[ -f "$work/.trivy-default.yaml" ]] && echo yes || echo no)"
 assert_eq "override present: TRIVY_IGNOREFILE NOT set" "" "$(cat "$env_out")"
 rm -rf "$work"
 
@@ -155,7 +155,7 @@ rc=0
 assert_eq "symlink guard: exits non-zero" "1" "$rc"
 assert_eq "symlink guard: no config-file written" "" "$(cat "$out")"
 assert_eq "symlink guard: link left in place, not written through" \
-  "yes" "$([ -L "$work/.trivy-default.yaml" ] && echo yes || echo no)"
+  "yes" "$([[ -L "$work/.trivy-default.yaml" ]] && echo yes || echo no)"
 rm -rf "$work"
 
 # ---------------------------------------------------------------------------
@@ -173,7 +173,7 @@ gate_mode_for() {
   (
     cd "$work"
     unset GITHUB_REF
-    if [ -n "$ref" ]; then
+    if [[ -n "$ref" ]]; then
       export GITHUB_REF="$ref"
     fi
     DEFAULT_CONFIG_SRC="$default_src" \
@@ -186,15 +186,20 @@ gate_mode_for() {
   rm -rf "$work"
 }
 
-assert_eq "gate mode: release tag enforces" "enforce" "$(gate_mode_for refs/tags/2.20.0)"
-assert_eq "gate mode: pre-release tag enforces" "enforce" "$(gate_mode_for refs/tags/2.20.0-rc.1)"
-assert_eq "gate mode: branch build warns" "warn" "$(gate_mode_for refs/heads/main)"
-assert_eq "gate mode: pull request build warns" "warn" "$(gate_mode_for refs/pull/12/merge)"
-assert_eq "gate mode: missing ref enforces" "enforce" "$(gate_mode_for "")"
-assert_eq "gate mode: unrecognized ref enforces" "enforce" "$(gate_mode_for refs/remotes/origin/main)"
+# <expected mode> <GITHUB_REF>; a line without a ref runs with GITHUB_REF unset.
+while read -r expected ref; do
+  assert_eq "gate mode: '${ref}' gives ${expected}" "$expected" "$(gate_mode_for "$ref")"
+done <<'CASES'
+enforce refs/tags/2.20.0
+enforce refs/tags/2.20.0-rc.1
+warn    refs/heads/main
+warn    refs/pull/12/merge
+enforce
+enforce refs/remotes/origin/main
+CASES
 
 echo "----"
-if [ "$failures" -eq 0 ]; then
+if [[ "$failures" -eq 0 ]]; then
   echo "All resolve.sh tests passed."
 else
   echo "$failures test(s) failed."
