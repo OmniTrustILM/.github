@@ -3,6 +3,8 @@ description: >-
   Report what the vulnerability gate found, in the job summary, and decide
   what it means for the build. In warn mode vulnerabilities only warn and any
   other finding fails; in enforce mode the gate step's own exit code decides.
+  When vulnerabilities only warn and the caller grants checks: write, a check
+  run that needs action also marks the commit.
 
 inputs:
   gate-mode:
@@ -35,4 +37,6 @@ runs:
         INPUT_REPORT_FILE: ${{ inputs.report-file }}
         INPUT_LABEL: ${{ inputs.label }}
         INPUT_GATE_OUTCOME: ${{ inputs.gate-outcome }}
+        INPUT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        GH_TOKEN: ${{ github.token }}
       run: bash "$GITHUB_ACTION_PATH/verdict.sh"

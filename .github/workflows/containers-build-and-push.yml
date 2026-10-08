@@ -11,7 +11,9 @@ name: Publish Harbor image (reusable)
 #                                   build, such as a tag; any other finding fails
 #                                   every build. A branch build that only warns
 #                                   still publishes and signs its tags, such as
-#                                   develop-latest. Each run exports its digest as
+#                                   develop-latest; a caller that grants checks:
+#                                   write also gets a check run that needs action
+#                                   on its commit. Each run exports its digest as
 #                                   a marker file.
 #   3. publish_manifest:            collects all per-arch digests, creates the
 #                                   multiarch manifest under each tag from

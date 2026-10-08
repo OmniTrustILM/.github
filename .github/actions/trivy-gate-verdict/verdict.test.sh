@@ -10,6 +10,20 @@ verdict="$script_dir/verdict.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# Stands in for the GitHub CLI: records its arguments, one per line, and exits
+# with GH_EXIT, so no case ever calls GitHub.
+mkdir -p "$work/bin"
+cat > "$work/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$GH_ARGS_FILE"
+exit "${GH_EXIT:-0}"
+STUB
+chmod +x "$work/bin/gh"
+
+# The checkout the verdict runs in; HEAD_SHA="" makes it fall back to this HEAD.
+git init -q "$work/repo"
+git -C "$work/repo" -c user.name=test -c user.email=test@example.com commit -q --allow-empty -m init
+
 failures=0
 
 # assert_eq <description> <expected> <actual>
@@ -42,24 +56,29 @@ assert_lacks() {
   esac
 }
 
-# run_verdict <mode> <report-json> [label] [gate-outcome] — runs verdict.sh and
-# sets rc, log (its stdout), errors (its stderr) and summary (the job summary it
-# wrote). An empty report-json runs it without a report file; the label defaults
-# to amd64 and the gate step's outcome to success.
+# run_verdict <mode> <report-json> [label] [gate-outcome] — runs verdict.sh in
+# the test checkout and sets rc, log (its stdout), errors (its stderr), summary
+# (the job summary it wrote) and gh_args (what it passed to gh, empty when it
+# did not call it). An empty report-json runs it without a report file; the
+# label defaults to amd64 and the gate step's outcome to success. GH_EXIT and
+# HEAD_SHA, set on the call, change the stub's exit code and the head commit.
 run_verdict() {
   local mode="$1" report_json="$2" label="${3-amd64}" outcome="${4-success}"
   local report="$work/report.json"
-  rm -f "$report"
+  rm -f "$report" "$work/gh-args"
   : > "$work/summary"
   if [[ -n "$report_json" ]]; then
     printf '%s' "$report_json" > "$report"
   fi
   rc=0
-  log="$(INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
-    INPUT_GATE_OUTCOME="$outcome" GITHUB_STEP_SUMMARY="$work/summary" \
-    bash "$verdict" 2> "$work/stderr")" || rc=$?
+  log="$(cd "$work/repo" && PATH="$work/bin:$PATH" GH_ARGS_FILE="$work/gh-args" GH_EXIT="${GH_EXIT:-0}" \
+    INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
+    INPUT_GATE_OUTCOME="$outcome" INPUT_HEAD_SHA="${HEAD_SHA-abc123}" \
+    GITHUB_REPOSITORY=OmniTrustILM/core GITHUB_SERVER_URL=https://github.com GITHUB_RUN_ID=42 \
+    GITHUB_STEP_SUMMARY="$work/summary" bash "$verdict" 2> "$work/stderr")" || rc=$?
   errors="$(cat "$work/stderr")"
   summary="$(cat "$work/summary")"
+  gh_args="$(cat "$work/gh-args" 2> /dev/null || true)"
 }
 
 readonly NO_RESULTS='{"SchemaVersion": 2}'
@@ -205,6 +224,36 @@ assert_eq "lower severities: MEDIUM sorts before an unknown severity" '| `MEDIUM
   "$(printf '%s\n' "$summary" | grep -m1 -oE '^\| `(MEDIUM|UNKNOWN)`')"
 assert_has "lower severities: a missing fixed version stays empty" "$summary" \
   '| `UNKNOWN` | `CVE-2026-0005` | `unrated` | `1.0` |  |'
+
+# -- A build that only warns marks its commit with a check run ---------------
+run_verdict warn "$VULNERABILITIES"
+assert_has "check run: created for the repository" "$gh_args" "repos/OmniTrustILM/core/check-runs"
+assert_has "check run: named after the gate" "$gh_args" "name=Vulnerability gate (amd64)"
+assert_has "check run: on the head commit" "$gh_args" "head_sha=abc123"
+assert_has "check run: needs action" "$gh_args" "conclusion=action_required"
+assert_has "check run: links to the run" "$gh_args" "details_url=https://github.com/OmniTrustILM/core/actions/runs/42"
+assert_has "check run: carries the count" "$gh_args" "output[title]=Vulnerabilities: 2"
+assert_has "check run: the log says so" "$log" "Vulnerability gate (amd64): added a check run that marks the commit."
+
+GH_EXIT=1 run_verdict warn "$VULNERABILITIES"
+assert_eq "no checks permission: still exits 0" "0" "$rc"
+assert_has "no checks permission: the log says so" "$log" "Vulnerability gate (amd64): added no check run"
+assert_lacks "no checks permission: no error annotation" "$errors" "::error"
+
+HEAD_SHA="" run_verdict warn "$VULNERABILITIES"
+assert_has "check run: without a pull request head, the checked-out commit" "$gh_args" \
+  "head_sha=$(git -C "$work/repo" rev-parse HEAD)"
+
+run_verdict warn "$NO_RESULTS"
+assert_eq "check run: none without findings" "" "$gh_args"
+run_verdict warn "$WITH_SECRET"
+assert_eq "check run: none when the build fails anyway" "" "$gh_args"
+run_verdict enforce "$VULNERABILITIES"
+assert_eq "check run: none in enforce mode" "" "$gh_args"
+
+run_verdict warn "$HOSTILE"
+assert_lacks "check run: no report values sent (legacy command)" "$gh_args" "forged"
+assert_lacks "check run: no report values sent (line break)" "$gh_args" "injected"
 
 # -- Label -------------------------------------------------------------------
 run_verdict warn "$VULNERABILITIES" ""

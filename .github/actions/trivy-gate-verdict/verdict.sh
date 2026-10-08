@@ -12,6 +12,11 @@
 # A missing or unreadable report fails in both modes, unless the gate step
 # already failed the build. Any mode other than "warn" enforces.
 #
+# When vulnerabilities only warn, a check run that needs action also marks the
+# commit, so the pull request and the commit list show a yellow triangle without
+# failing anything. That takes checks: write, which a caller grants by choice and
+# a fork never has; without it the warning annotation is the only signal.
+#
 # Report values never reach the log, where the runner reads a legacy
 # "##[command]" anywhere in a line; jq's diagnostics can quote them, so those
 # are discarded too. In the job summary the values are code spans, so they can
@@ -19,11 +24,13 @@
 # never read, because the run pages of public repos are public.
 #
 # Reads: INPUT_GATE_MODE, INPUT_GATE_OUTCOME, INPUT_REPORT_FILE, INPUT_LABEL,
-#        GITHUB_STEP_SUMMARY
+#        INPUT_HEAD_SHA, GITHUB_STEP_SUMMARY, GITHUB_REPOSITORY,
+#        GITHUB_SERVER_URL, GITHUB_RUN_ID, GH_TOKEN
 set -euo pipefail
 
 mode="${INPUT_GATE_MODE:-}"
 gate_outcome="${INPUT_GATE_OUTCOME:-}"
+head_sha="${INPUT_HEAD_SHA:-}"
 report="${INPUT_REPORT_FILE:?INPUT_REPORT_FILE must name the gate report}"
 label="${INPUT_LABEL:-}"
 summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
@@ -107,3 +114,21 @@ if [[ "$others" -gt 0 ]]; then
 fi
 
 echo "::warning title=${title}::Vulnerabilities found by the Trivy policy: ${vulnerabilities}. This build is not a release, so it continues; release builds enforce the policy. Details are in the job summary."
+
+if [[ -z "$head_sha" ]]; then
+  head_sha="$(git rev-parse HEAD 2> /dev/null || true)"
+fi
+if [[ -n "$head_sha" && -n "${GITHUB_REPOSITORY:-}" && -n "${GITHUB_RUN_ID:-}" ]] &&
+  gh api "repos/${GITHUB_REPOSITORY}/check-runs" \
+    -f name="$title" \
+    -f head_sha="$head_sha" \
+    -f status=completed \
+    -f conclusion=action_required \
+    -f details_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+    -f "output[title]=Vulnerabilities: ${vulnerabilities}" \
+    -f "output[summary]=The Trivy policy found ${vulnerabilities} vulnerabilities. This build is not a release, so it continues; release builds enforce the policy. The job summary of the run lists them." \
+    > /dev/null 2>&1; then
+  echo "${title}: added a check run that marks the commit."
+else
+  echo "${title}: added no check run; that needs checks: write, which a fork never has."
+fi

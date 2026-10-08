@@ -4,7 +4,9 @@ name: Test Docker image (reusable)
 # Builds the image locally for each target architecture and scans it with
 # Trivy. Vulnerabilities only warn in a branch or pull request build and fail
 # any other build, such as a tag; any other finding, such as a leaked secret,
-# fails every build. Nothing is pushed.
+# fails every build. A caller that grants checks: write also gets a check run
+# that needs action on a commit whose vulnerabilities only warn. Nothing is
+# pushed.
 #
 # Optional pre-build:
 #   - pre-build: 'maven'  -> runs `mvn clean package` once and shares the JARs
