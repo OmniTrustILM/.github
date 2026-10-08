@@ -2,9 +2,9 @@ name: Test Docker image (reusable)
 
 # Reusable workflow for OmniTrustILM PR test builds.
 # Builds the image locally for each target architecture and scans it with
-# Trivy. Vulnerabilities fail a tag build and only warn in any other build;
-# any other finding, such as a leaked secret, fails every build. Nothing is
-# pushed.
+# Trivy. Vulnerabilities only warn in a branch or pull request build and fail
+# any other build, such as a tag; any other finding, such as a leaked secret,
+# fails every build. Nothing is pushed.
 #
 # Optional pre-build:
 #   - pre-build: 'maven'  -> runs `mvn clean package` once and shares the JARs

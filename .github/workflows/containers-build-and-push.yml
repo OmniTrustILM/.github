@@ -6,10 +6,11 @@ name: Publish Harbor image (reusable)
 #   1. (Optional) build_artifacts:  one-shot Maven build, shared via tar artifact.
 #   2. build:                       per-arch build + push by digest only (no tags),
 #                                   with provenance + SBOM + Trivy scan against the
-#                                   pushed digest. Vulnerabilities fail a tag build
-#                                   and only warn in any other build; any other
-#                                   finding fails every build. Each run exports its
-#                                   digest as a marker file.
+#                                   pushed digest. Vulnerabilities only warn in a
+#                                   branch or pull request build and fail any other
+#                                   build, such as a tag; any other finding fails
+#                                   every build. Each run exports its digest as a
+#                                   marker file.
 #   3. publish_manifest:            collects all per-arch digests, creates the
 #                                   multiarch manifest under each tag from
 #                                   docker/metadata-action, then - when `sign`

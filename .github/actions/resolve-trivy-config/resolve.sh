@@ -14,10 +14,10 @@
 #   override allowed + file present -> use the repo's file (full replacement)
 #   override allowed + file missing -> fail loudly (misconfiguration)
 #
-# It also writes gate-mode: "warn" for branch and pull request builds, which
-# report findings and continue, and "enforce" for any other ref. Only a tag
-# push publishes a release, and a ref this script does not recognize must
-# never soften the gate.
+# It also writes gate-mode: "warn" for branch and pull request builds, where
+# vulnerabilities only warn, and "enforce" for any other ref. Only a tag push
+# publishes a release, and a ref this script does not recognize must never
+# soften the gate.
 #
 # Reads: INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE, INPUT_TRIVY_CONFIG_PATH,
 #        DEFAULT_CONFIG_SRC, GITHUB_REF, GITHUB_OUTPUT, GITHUB_ENV, RUNNER_TEMP

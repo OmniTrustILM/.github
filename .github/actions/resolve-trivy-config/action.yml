@@ -27,9 +27,10 @@ outputs:
     value: ${{ steps.resolve.outputs.config-file }}
   gate-mode:
     description: >-
-      'warn' for branch and pull request builds, which report findings and
-      continue; 'enforce' for tag builds and any other ref, which fail on
-      findings through the policy's exit code.
+      'warn' for branch and pull request builds, where vulnerabilities only
+      warn; 'enforce' for tag builds and any other ref, where findings fail
+      through the policy's exit code. Findings other than vulnerabilities fail
+      in both modes.
     value: ${{ steps.resolve.outputs.gate-mode }}
 
 runs:
