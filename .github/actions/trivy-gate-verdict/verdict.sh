@@ -16,7 +16,8 @@
 # verdict also becomes a check run named after the gate on the scanned commit:
 # success when nothing is found, action_required (a yellow triangle that blocks
 # nothing) when vulnerabilities only warn, failure when findings fail the build.
-# Without the permission the annotations are the only signal.
+# Without the permission the annotations are the only signal; any other API
+# failure adds a warning annotation, and the verdict stays as it was.
 #
 # Report values never reach the log, where the runner reads a legacy
 # "##[command]" anywhere in a line; jq's diagnostics can quote them, so those
@@ -131,18 +132,32 @@ fi
 if [[ -z "$head_sha" ]]; then
   head_sha="$(git rev-parse HEAD 2> /dev/null || true)"
 fi
-if [[ -n "$head_sha" && -n "${GITHUB_REPOSITORY:-}" && -n "${GITHUB_RUN_ID:-}" ]] &&
-  gh api "repos/${GITHUB_REPOSITORY}/check-runs" \
-    -f name="$title" \
-    -f head_sha="$head_sha" \
-    -f status=completed \
-    -f conclusion="$conclusion" \
-    -f details_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-    -f "output[title]=${check_title}" \
-    -f "output[summary]=${check_summary}" \
-    > /dev/null 2>&1; then
+if [[ -z "$head_sha" || -z "${GITHUB_REPOSITORY:-}" || -z "${GITHUB_RUN_ID:-}" ]]; then
+  echo "${title}: added no check run; the commit or the run is unknown."
+  exit "$status"
+fi
+
+# 403 is the expected answer without checks: write, or on a fork. Any other
+# failure is reported by its status only: the API's message is not echoed.
+api_status=0
+api_error="$(gh api "repos/${GITHUB_REPOSITORY}/check-runs" \
+  -f name="$title" \
+  -f head_sha="$head_sha" \
+  -f status=completed \
+  -f conclusion="$conclusion" \
+  -f details_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+  -f "output[title]=${check_title}" \
+  -f "output[summary]=${check_summary}" \
+  2>&1 > /dev/null)" || api_status=$?
+if [[ "$api_status" -eq 0 ]]; then
   echo "${title}: check run on the commit: ${conclusion}."
-else
+elif [[ "$api_error" == *"(HTTP 403)"* ]]; then
   echo "${title}: added no check run; that needs checks: write, which a fork never has."
+else
+  reason="exit ${api_status}"
+  if [[ "$api_error" =~ \(HTTP\ ([0-9]{3})\) ]]; then
+    reason="HTTP ${BASH_REMATCH[1]}"
+  fi
+  echo "::warning title=${title}::The check run could not be published (${reason}); the verdict is unaffected."
 fi
 exit "$status"

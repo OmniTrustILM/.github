@@ -10,12 +10,16 @@ verdict="$script_dir/verdict.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# Stands in for the GitHub CLI: records its arguments, one per line, and exits
-# with GH_EXIT, so no case ever calls GitHub.
+# Stands in for the GitHub CLI: records its arguments, one per line, prints
+# GH_STDERR the way gh reports an API error, and exits with GH_EXIT, so no case
+# ever calls GitHub.
 mkdir -p "$work/bin"
 cat > "$work/bin/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$@" > "$GH_ARGS_FILE"
+if [[ -n "${GH_STDERR:-}" ]]; then
+  printf '%s\n' "$GH_STDERR" >&2
+fi
 exit "${GH_EXIT:-0}"
 STUB
 chmod +x "$work/bin/gh"
@@ -60,8 +64,9 @@ assert_lacks() {
 # the test checkout and sets rc, log (its stdout), errors (its stderr), summary
 # (the job summary it wrote) and gh_args (what it passed to gh, empty when it
 # did not call it). An empty report-json runs it without a report file; the
-# label defaults to amd64 and the gate step's outcome to success. GH_EXIT and
-# HEAD_SHA, set on the call, change the stub's exit code and the head commit.
+# label defaults to amd64 and the gate step's outcome to success. GH_EXIT,
+# GH_STDERR and HEAD_SHA, set on the call, change the stub's exit code, its
+# error message and the head commit.
 run_verdict() {
   local mode="$1" report_json="$2" label="${3-amd64}" outcome="${4-success}"
   local report="$work/report.json"
@@ -71,7 +76,7 @@ run_verdict() {
     printf '%s' "$report_json" > "$report"
   fi
   rc=0
-  log="$(cd "$work/repo" && PATH="$work/bin:$PATH" GH_ARGS_FILE="$work/gh-args" GH_EXIT="${GH_EXIT:-0}" \
+  log="$(cd "$work/repo" && PATH="$work/bin:$PATH" GH_ARGS_FILE="$work/gh-args" GH_EXIT="${GH_EXIT:-0}" GH_STDERR="${GH_STDERR:-}" \
     INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
     INPUT_GATE_OUTCOME="$outcome" INPUT_HEAD_SHA="${HEAD_SHA-abc123}" \
     GITHUB_REPOSITORY=OmniTrustILM/core GITHUB_SERVER_URL=https://github.com GITHUB_RUN_ID=42 \
@@ -235,10 +240,21 @@ assert_has "check run: links to the run" "$gh_args" "details_url=https://github.
 assert_has "check run: carries the count" "$gh_args" "output[title]=Vulnerabilities: 2"
 assert_has "check run: the log says so" "$log" "Vulnerability gate (amd64): check run on the commit: action_required."
 
-GH_EXIT=1 run_verdict warn "$VULNERABILITIES"
+GH_EXIT=1 GH_STDERR="gh: Resource not accessible by integration (HTTP 403)" run_verdict warn "$VULNERABILITIES"
 assert_eq "no checks permission: still exits 0" "0" "$rc"
 assert_has "no checks permission: the log says so" "$log" "Vulnerability gate (amd64): added no check run"
 assert_lacks "no checks permission: no error annotation" "$errors" "::error"
+assert_lacks "no checks permission: no warning about the check run" "$log" "could not be published"
+
+GH_EXIT=1 GH_STDERR="gh: No commit found for SHA: abc123 (HTTP 422)" run_verdict warn "$VULNERABILITIES"
+assert_eq "check run API error: still exits 0" "0" "$rc"
+assert_has "check run API error: a warning names the status" "$log" \
+  "::warning title=Vulnerability gate (amd64)::The check run could not be published (HTTP 422); the verdict is unaffected."
+assert_lacks "check run API error: the API's message is not echoed" "$log" "No commit found"
+
+GH_EXIT=127 run_verdict warn "$VULNERABILITIES"
+assert_has "check run without gh: a warning names the exit code" "$log" \
+  "::warning title=Vulnerability gate (amd64)::The check run could not be published (exit 127); the verdict is unaffected."
 
 run_verdict warn "$VULNERABILITIES" "ilm/core amd64"
 assert_has "check run: named by the label, so each image keeps its own" "$gh_args" "name=Vulnerability gate (ilm/core amd64)"
