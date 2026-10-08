@@ -5,11 +5,12 @@
 # Called by the reusable Docker workflows right after the "Vulnerability gate"
 # step, which writes the findings of the resolved Trivy policy to a JSON
 # report. The findings go to the job summary and their counts to the log, then:
-#   enforce -> exit 0; the gate step's own exit code decides the build
+#   enforce -> exit 0; the gate step's own exit code decides the build, and
+#              when that step failed, one error annotation gives the counts
 #   warn    -> vulnerabilities only: a warning, and the build continues;
 #              any other finding, such as a leaked secret: an error, exit 1
-# A missing or unreadable report fails in both modes. Any mode other than
-# "warn" enforces.
+# A missing or unreadable report fails in both modes, unless the gate step
+# already failed the build. Any mode other than "warn" enforces.
 #
 # Report values never reach the log, where the runner reads a legacy
 # "##[command]" anywhere in a line; jq's diagnostics can quote them, so those
@@ -17,10 +18,12 @@
 # neither break the table nor render as markdown. A secret's Match and Code are
 # never read, because the run pages of public repos are public.
 #
-# Reads: INPUT_GATE_MODE, INPUT_REPORT_FILE, INPUT_LABEL, GITHUB_STEP_SUMMARY
+# Reads: INPUT_GATE_MODE, INPUT_GATE_OUTCOME, INPUT_REPORT_FILE, INPUT_LABEL,
+#        GITHUB_STEP_SUMMARY
 set -euo pipefail
 
 mode="${INPUT_GATE_MODE:-}"
+gate_outcome="${INPUT_GATE_OUTCOME:-}"
 report="${INPUT_REPORT_FILE:?INPUT_REPORT_FILE must name the gate report}"
 label="${INPUT_LABEL:-}"
 summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
@@ -52,6 +55,10 @@ readonly JQ_DEFS='
 if ! jq -e 'type == "object"' "$report" > /dev/null 2>&1 ||
   ! vulnerabilities="$(jq "${JQ_DEFS} vulnerability_rows | length" "$report" 2> /dev/null)" ||
   ! others="$(jq "${JQ_DEFS} other_rows | length" "$report" 2> /dev/null)"; then
+  if [[ "$gate_outcome" = "failure" ]]; then
+    echo "${title}: the gate step failed and left no readable report."
+    exit 0
+  fi
   echo "::error title=${title}::The Trivy report ${report} is missing or unreadable, so the gate cannot tell what the scan found." >&2
   exit 1
 fi
@@ -88,6 +95,9 @@ fi
 echo "${title}: findings listed in the job summary (vulnerabilities: ${vulnerabilities}, other: ${others})."
 
 if [[ "$mode" != "warn" ]]; then
+  if [[ "$gate_outcome" = "failure" ]]; then
+    echo "::error title=${title}::Findings fail this build (vulnerabilities: ${vulnerabilities}, other: ${others}). Details are in the job summary." >&2
+  fi
   exit 0
 fi
 

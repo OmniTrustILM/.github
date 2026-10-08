@@ -11,10 +11,17 @@ inputs:
       other than 'warn' enforces.
     required: true
   report-file:
-    description: Workspace-relative path to the JSON report the gate step wrote.
+    description: Path to the JSON report the gate step wrote.
     required: true
   label:
     description: Short name for the summary heading and annotation titles, such as the architecture.
+    required: false
+    default: ''
+  gate-outcome:
+    description: >-
+      Outcome of the gate step ('success' or 'failure'). After a failed gate
+      step, a missing report adds no second error, and in enforce mode the
+      findings get one error annotation with their counts.
     required: false
     default: ''
 
@@ -27,4 +34,5 @@ runs:
         INPUT_GATE_MODE: ${{ inputs.gate-mode }}
         INPUT_REPORT_FILE: ${{ inputs.report-file }}
         INPUT_LABEL: ${{ inputs.label }}
+        INPUT_GATE_OUTCOME: ${{ inputs.gate-outcome }}
       run: bash "$GITHUB_ACTION_PATH/verdict.sh"

@@ -42,11 +42,12 @@ assert_lacks() {
   esac
 }
 
-# run_verdict <mode> <report-json> [label] — runs verdict.sh and sets rc, log
-# (its stdout), errors (its stderr) and summary (the job summary it wrote). An
-# empty report-json runs it without a report file; the label defaults to amd64.
+# run_verdict <mode> <report-json> [label] [gate-outcome] — runs verdict.sh and
+# sets rc, log (its stdout), errors (its stderr) and summary (the job summary it
+# wrote). An empty report-json runs it without a report file; the label defaults
+# to amd64 and the gate step's outcome to success.
 run_verdict() {
-  local mode="$1" report_json="$2" label="${3-amd64}"
+  local mode="$1" report_json="$2" label="${3-amd64}" outcome="${4-success}"
   local report="$work/report.json"
   rm -f "$report"
   : > "$work/summary"
@@ -55,7 +56,8 @@ run_verdict() {
   fi
   rc=0
   log="$(INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
-    GITHUB_STEP_SUMMARY="$work/summary" bash "$verdict" 2> "$work/stderr")" || rc=$?
+    INPUT_GATE_OUTCOME="$outcome" GITHUB_STEP_SUMMARY="$work/summary" \
+    bash "$verdict" 2> "$work/stderr")" || rc=$?
   errors="$(cat "$work/stderr")"
   summary="$(cat "$work/summary")"
 }
@@ -124,6 +126,12 @@ run_verdict enforce "$VULNERABILITIES"
 assert_eq "enforce: exits 0" "0" "$rc"
 assert_has "enforce: summary says the policy is enforced" "$summary" "This build enforces the Trivy policy."
 assert_lacks "enforce: no warning annotation" "$log" "::warning"
+assert_lacks "enforce, gate passed: no error annotation" "$errors" "::error"
+
+run_verdict enforce "$VULNERABILITIES" amd64 failure
+assert_eq "enforce, gate failed: exits 0, the gate step already failed" "0" "$rc"
+assert_has "enforce, gate failed: one error annotation names the cause" "$errors" \
+  "::error title=Vulnerability gate (amd64)::Findings fail this build (vulnerabilities: 2, other: 0). Details are in the job summary."
 
 run_verdict report "$VULNERABILITIES"
 assert_has "unknown mode: enforces" "$summary" "This build enforces the Trivy policy."
@@ -168,6 +176,13 @@ assert_has "missing report: error annotation" "$errors" \
 
 run_verdict enforce '[]'
 assert_eq "not an object: exits 1" "1" "$rc"
+
+run_verdict warn "" amd64 ""
+assert_eq "missing report, no gate outcome: exits 1" "1" "$rc"
+
+run_verdict enforce "" amd64 failure
+assert_eq "gate failed without a report: exits 0, the gate step already failed" "0" "$rc"
+assert_lacks "gate failed without a report: no second error" "$errors" "::error"
 
 run_verdict warn "$MALFORMED"
 assert_eq "malformed report: exits 1" "1" "$rc"
