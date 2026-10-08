@@ -3,7 +3,8 @@ description: >-
   Decide which Trivy config the vulnerability gate should use: the bundled
   OmniTrustILM org-default policy, or (only when explicitly permitted) a
   repo-local override file. Outputs the workspace-relative path to the chosen
-  config so the caller's Trivy step can consume it.
+  config so the caller's Trivy step can consume it, and the gate mode for the
+  caller's ref.
 
 inputs:
   allow-trivy-config-override:
@@ -24,6 +25,13 @@ outputs:
   config-file:
     description: Workspace-relative path to the resolved Trivy config file.
     value: ${{ steps.resolve.outputs.config-file }}
+  gate-mode:
+    description: >-
+      'warn' for branch and pull request builds, where vulnerabilities only
+      warn; 'enforce' for tag builds and any other ref, where findings fail
+      through the policy's exit code. Findings other than vulnerabilities fail
+      in both modes.
+    value: ${{ steps.resolve.outputs.gate-mode }}
 
 runs:
   using: composite

@@ -1,8 +1,10 @@
 name: Test Docker image (reusable)
 
 # Reusable workflow for OmniTrustILM PR test builds.
-# Builds the image locally for each target architecture, scans it with Trivy,
-# and fails on policy violations. Nothing is pushed.
+# Builds the image locally for each target architecture and scans it with
+# Trivy. Vulnerabilities only warn in a branch or pull request build and fail
+# any other build, such as a tag; any other finding, such as a leaked secret,
+# fails every build. Nothing is pushed.
 #
 # Optional pre-build:
 #   - pre-build: 'maven'  -> runs `mvn clean package` once and shares the JARs
@@ -199,9 +201,34 @@ jobs:
           name: ${{ env.ARTIFACT_PREFIX }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
-      - name: Fail build on vulnerabilities
+      # The verdict must read only what the gate step writes. Clearing the path
+      # also drops a file an earlier write left there through a symlink in the
+      # checkout.
+      - name: Clear the gate report
+        run: rm -f "${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json"
+
+      # warn mode passes exit code 0, so findings do not fail this step and the
+      # verdict below decides; enforce mode leaves it empty, so the policy's own
+      # exit code applies. A scan error fails this step either way. The report
+      # goes outside the checkout, so a file in the caller's repository can never
+      # stand in for this scan's report.
+      - name: Vulnerability gate
+        id: vulnerability-gate
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ inputs.registry }}/${{ inputs.image }}:ci
           trivy-config: ${{ steps.trivy-config.outputs.config-file }}
+          format: json
+          output: ${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json
+          exit-code: ${{ steps.trivy-config.outputs.gate-mode == 'warn' && '0' || '' }}
           skip-setup-trivy: true
+
+      # Runs after a failed gate too, so a blocked build still lists its findings.
+      - name: Vulnerability gate verdict
+        if: ${{ !cancelled() && (steps.vulnerability-gate.outcome == 'success' || steps.vulnerability-gate.outcome == 'failure') }}
+        uses: OmniTrustILM/.github/.github/actions/trivy-gate-verdict@main
+        with:
+          gate-mode: ${{ steps.trivy-config.outputs.gate-mode }}
+          report-file: ${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json
+          label: ${{ matrix.arch }}
+          gate-outcome: ${{ steps.vulnerability-gate.outcome }}
