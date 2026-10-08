@@ -219,7 +219,7 @@ jobs:
           tar -cpf app-data.tar data
 
       - name: Upload artifact (tar)
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.ARTIFACT_PREFIX }}app-data
           path: app-data.tar
@@ -290,7 +290,7 @@ jobs:
           touch "${{ runner.temp }}/digests/${digest#sha256:}"
 
       - name: Upload digest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.ARTIFACT_PREFIX }}digests-${{ matrix.arch }}
           path: ${{ runner.temp }}/digests/*
@@ -320,7 +320,7 @@ jobs:
           exit-code: 0
 
       - name: Upload vulnerability report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ env.ARTIFACT_PREFIX }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
