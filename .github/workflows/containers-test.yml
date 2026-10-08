@@ -183,7 +183,7 @@ jobs:
       # the gate enforces.
       - name: Resolve Trivy config
         id: trivy-config
-        uses: OmniTrustILM/.github/.github/actions/resolve-trivy-config@main
+        uses: OmniTrustILM/.github/.github/actions/resolve-trivy-config@3c1cc96084c72e708748af07d47fec6ac35f960e # main
         with:
           allow-trivy-config-override: ${{ inputs.allow-trivy-config-override }}
           trivy-config-path: ${{ inputs.trivy-config }}
@@ -228,7 +228,7 @@ jobs:
       # Runs after a failed gate too, so a blocked build still lists its findings.
       - name: Vulnerability gate verdict
         if: ${{ !cancelled() && (steps.vulnerability-gate.outcome == 'success' || steps.vulnerability-gate.outcome == 'failure') }}
-        uses: OmniTrustILM/.github/.github/actions/trivy-gate-verdict@main
+        uses: OmniTrustILM/.github/.github/actions/trivy-gate-verdict@3c1cc96084c72e708748af07d47fec6ac35f960e # main
         with:
           gate-mode: ${{ steps.trivy-config.outputs.gate-mode }}
           report-file: ${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json
