@@ -12,6 +12,13 @@
 # A missing or unreadable report fails in both modes, unless the gate step
 # already failed the build. Any mode other than "warn" enforces.
 #
+# With checks: write, which a caller grants by choice and a fork never has, the
+# verdict also becomes a check run named after the gate on the scanned commit:
+# success when nothing is found, action_required (a yellow triangle that blocks
+# nothing) when vulnerabilities only warn, failure when findings fail the build.
+# Without the permission the annotations are the only signal; any other API
+# failure adds a warning annotation, and the verdict stays as it was.
+#
 # Report values never reach the log, where the runner reads a legacy
 # "##[command]" anywhere in a line; jq's diagnostics can quote them, so those
 # are discarded too. In the job summary the values are code spans, so they can
@@ -19,11 +26,13 @@
 # never read, because the run pages of public repos are public.
 #
 # Reads: INPUT_GATE_MODE, INPUT_GATE_OUTCOME, INPUT_REPORT_FILE, INPUT_LABEL,
-#        GITHUB_STEP_SUMMARY
+#        INPUT_HEAD_SHA, GITHUB_STEP_SUMMARY, GITHUB_REPOSITORY,
+#        GITHUB_SERVER_URL, GITHUB_RUN_ID, GH_TOKEN
 set -euo pipefail
 
 mode="${INPUT_GATE_MODE:-}"
 gate_outcome="${INPUT_GATE_OUTCOME:-}"
+head_sha="${INPUT_HEAD_SHA:-}"
 report="${INPUT_REPORT_FILE:?INPUT_REPORT_FILE must name the gate report}"
 label="${INPUT_LABEL:-}"
 summary="${GITHUB_STEP_SUMMARY:-/dev/null}"
@@ -63,47 +72,92 @@ if ! jq -e 'type == "object"' "$report" > /dev/null 2>&1 ||
   exit 1
 fi
 
-if [[ "$vulnerabilities" -eq 0 ]] && [[ "$others" -eq 0 ]]; then
+if [[ "$vulnerabilities" -eq 0 && "$others" -eq 0 ]]; then
   echo "${title}: no findings."
-  exit 0
-fi
-
-{
-  echo "### ${title}"
-  echo
-  if [[ "$mode" = "warn" ]]; then
-    echo "This build is not a release, so vulnerabilities do not fail it. Release builds enforce the Trivy policy."
-    if [[ "$others" -gt 0 ]]; then
-      echo "Findings other than vulnerabilities fail every build."
+  conclusion="success"
+  check_title="No findings"
+  check_summary="The Trivy policy found nothing in this build."
+  status=0
+else
+  {
+    echo "### ${title}"
+    echo
+    if [[ "$mode" = "warn" ]]; then
+      echo "This build is not a release, so vulnerabilities do not fail it. Release builds enforce the Trivy policy."
+      if [[ "$others" -gt 0 ]]; then
+        echo "Findings other than vulnerabilities fail every build."
+      fi
+    else
+      echo "This build enforces the Trivy policy."
     fi
+    if [[ "$vulnerabilities" -gt 0 ]]; then
+      echo
+      echo "| Severity | Vulnerability | Package | Installed | Fixed |"
+      echo "|---|---|---|---|---|"
+      jq -r "${JQ_DEFS} vulnerability_rows | .[]" "$report" 2> /dev/null
+    fi
+    if [[ "$others" -gt 0 ]]; then
+      echo
+      echo "| Severity | Kind | ID | Location |"
+      echo "|---|---|---|---|"
+      jq -r "${JQ_DEFS} other_rows | .[]" "$report" 2> /dev/null
+    fi
+  } >> "$summary"
+  echo "${title}: findings listed in the job summary (vulnerabilities: ${vulnerabilities}, other: ${others})."
+  check_summary="The Trivy policy found ${vulnerabilities} vulnerabilities and ${others} other findings. The job summary of the run lists them."
+  if [[ "$mode" != "warn" ]]; then
+    conclusion="success"
+    check_title="Vulnerabilities: ${vulnerabilities}, other: ${others}"
+    if [[ "$gate_outcome" = "failure" ]]; then
+      echo "::error title=${title}::Findings fail this build (vulnerabilities: ${vulnerabilities}, other: ${others}). Details are in the job summary." >&2
+      conclusion="failure"
+      check_title="Findings fail this build (vulnerabilities: ${vulnerabilities}, other: ${others})"
+    fi
+    status=0
+  elif [[ "$others" -gt 0 ]]; then
+    echo "::error title=${title}::Findings other than vulnerabilities, such as leaked secrets: ${others}. These fail every build, release or not." >&2
+    conclusion="failure"
+    check_title="Findings fail this build (vulnerabilities: ${vulnerabilities}, other: ${others})"
+    status=1
   else
-    echo "This build enforces the Trivy policy."
+    echo "::warning title=${title}::Vulnerabilities found by the Trivy policy: ${vulnerabilities}. This build is not a release, so it continues; release builds enforce the policy. Details are in the job summary."
+    conclusion="action_required"
+    check_title="Vulnerabilities: ${vulnerabilities}"
+    status=0
   fi
-  if [[ "$vulnerabilities" -gt 0 ]]; then
-    echo
-    echo "| Severity | Vulnerability | Package | Installed | Fixed |"
-    echo "|---|---|---|---|---|"
-    jq -r "${JQ_DEFS} vulnerability_rows | .[]" "$report" 2> /dev/null
-  fi
-  if [[ "$others" -gt 0 ]]; then
-    echo
-    echo "| Severity | Kind | ID | Location |"
-    echo "|---|---|---|---|"
-    jq -r "${JQ_DEFS} other_rows | .[]" "$report" 2> /dev/null
-  fi
-} >> "$summary"
-echo "${title}: findings listed in the job summary (vulnerabilities: ${vulnerabilities}, other: ${others})."
-
-if [[ "$mode" != "warn" ]]; then
-  if [[ "$gate_outcome" = "failure" ]]; then
-    echo "::error title=${title}::Findings fail this build (vulnerabilities: ${vulnerabilities}, other: ${others}). Details are in the job summary." >&2
-  fi
-  exit 0
 fi
 
-if [[ "$others" -gt 0 ]]; then
-  echo "::error title=${title}::Findings other than vulnerabilities, such as leaked secrets: ${others}. These fail every build, release or not." >&2
-  exit 1
+# A rescan of the same commit publishes a check run with the same name, which
+# replaces the earlier one, so the commit always shows the latest verdict.
+if [[ -z "$head_sha" ]]; then
+  head_sha="$(git rev-parse HEAD 2> /dev/null || true)"
+fi
+if [[ -z "$head_sha" || -z "${GITHUB_REPOSITORY:-}" || -z "${GITHUB_RUN_ID:-}" ]]; then
+  echo "${title}: added no check run; the commit or the run is unknown."
+  exit "$status"
 fi
 
-echo "::warning title=${title}::Vulnerabilities found by the Trivy policy: ${vulnerabilities}. This build is not a release, so it continues; release builds enforce the policy. Details are in the job summary."
+# 403 is the expected answer without checks: write, or on a fork. Any other
+# failure is reported by its status only: the API's message is not echoed.
+api_status=0
+api_error="$(gh api "repos/${GITHUB_REPOSITORY}/check-runs" \
+  -f name="$title" \
+  -f head_sha="$head_sha" \
+  -f status=completed \
+  -f conclusion="$conclusion" \
+  -f details_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+  -f "output[title]=${check_title}" \
+  -f "output[summary]=${check_summary}" \
+  2>&1 > /dev/null)" || api_status=$?
+if [[ "$api_status" -eq 0 ]]; then
+  echo "${title}: check run on the commit: ${conclusion}."
+elif [[ "$api_error" == *"(HTTP 403)"* ]]; then
+  echo "${title}: added no check run; that needs checks: write, which a fork never has."
+else
+  reason="exit ${api_status}"
+  if [[ "$api_error" =~ \(HTTP\ ([0-9]{3})\) ]]; then
+    reason="HTTP ${BASH_REMATCH[1]}"
+  fi
+  echo "::warning title=${title}::The check run could not be published (${reason}); the verdict is unaffected."
+fi
+exit "$status"

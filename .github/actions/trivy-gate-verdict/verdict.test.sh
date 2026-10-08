@@ -10,6 +10,24 @@ verdict="$script_dir/verdict.sh"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# Stands in for the GitHub CLI: records its arguments, one per line, prints
+# GH_STDERR the way gh reports an API error, and exits with GH_EXIT, so no case
+# ever calls GitHub.
+mkdir -p "$work/bin"
+cat > "$work/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" > "$GH_ARGS_FILE"
+if [[ -n "${GH_STDERR:-}" ]]; then
+  printf '%s\n' "$GH_STDERR" >&2
+fi
+exit "${GH_EXIT:-0}"
+STUB
+chmod +x "$work/bin/gh"
+
+# The checkout the verdict runs in; HEAD_SHA="" makes it fall back to this HEAD.
+git init -q "$work/repo"
+git -C "$work/repo" -c user.name=test -c user.email=test@example.com commit -q --allow-empty -m init
+
 failures=0
 
 # assert_eq <description> <expected> <actual>
@@ -42,24 +60,30 @@ assert_lacks() {
   esac
 }
 
-# run_verdict <mode> <report-json> [label] [gate-outcome] — runs verdict.sh and
-# sets rc, log (its stdout), errors (its stderr) and summary (the job summary it
-# wrote). An empty report-json runs it without a report file; the label defaults
-# to amd64 and the gate step's outcome to success.
+# run_verdict <mode> <report-json> [label] [gate-outcome] — runs verdict.sh in
+# the test checkout and sets rc, log (its stdout), errors (its stderr), summary
+# (the job summary it wrote) and gh_args (what it passed to gh, empty when it
+# did not call it). An empty report-json runs it without a report file; the
+# label defaults to amd64 and the gate step's outcome to success. GH_EXIT,
+# GH_STDERR and HEAD_SHA, set on the call, change the stub's exit code, its
+# error message and the head commit.
 run_verdict() {
   local mode="$1" report_json="$2" label="${3-amd64}" outcome="${4-success}"
   local report="$work/report.json"
-  rm -f "$report"
+  rm -f "$report" "$work/gh-args"
   : > "$work/summary"
   if [[ -n "$report_json" ]]; then
     printf '%s' "$report_json" > "$report"
   fi
   rc=0
-  log="$(INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
-    INPUT_GATE_OUTCOME="$outcome" GITHUB_STEP_SUMMARY="$work/summary" \
-    bash "$verdict" 2> "$work/stderr")" || rc=$?
+  log="$(cd "$work/repo" && PATH="$work/bin:$PATH" GH_ARGS_FILE="$work/gh-args" GH_EXIT="${GH_EXIT:-0}" GH_STDERR="${GH_STDERR:-}" \
+    INPUT_GATE_MODE="$mode" INPUT_REPORT_FILE="$report" INPUT_LABEL="$label" \
+    INPUT_GATE_OUTCOME="$outcome" INPUT_HEAD_SHA="${HEAD_SHA-abc123}" \
+    GITHUB_REPOSITORY=OmniTrustILM/core GITHUB_SERVER_URL=https://github.com GITHUB_RUN_ID=42 \
+    GITHUB_STEP_SUMMARY="$work/summary" bash "$verdict" 2> "$work/stderr")" || rc=$?
   errors="$(cat "$work/stderr")"
   summary="$(cat "$work/summary")"
+  gh_args="$(cat "$work/gh-args" 2> /dev/null || true)"
 }
 
 readonly NO_RESULTS='{"SchemaVersion": 2}'
@@ -97,7 +121,7 @@ readonly LOWER_SEVERITIES='{"SchemaVersion": 2, "Results": [{"Target": "Java", "
 # -- Clean reports pass quietly ---------------------------------------------
 run_verdict warn "$NO_RESULTS"
 assert_eq "no results: exits 0" "0" "$rc"
-assert_eq "no results: says so" "Vulnerability gate (amd64): no findings." "$log"
+assert_has "no results: says so" "$log" "Vulnerability gate (amd64): no findings."
 assert_eq "no results: writes no summary" "" "$summary"
 
 run_verdict enforce "$CLEAN"
@@ -205,6 +229,61 @@ assert_eq "lower severities: MEDIUM sorts before an unknown severity" '| `MEDIUM
   "$(printf '%s\n' "$summary" | grep -m1 -oE '^\| `(MEDIUM|UNKNOWN)`')"
 assert_has "lower severities: a missing fixed version stays empty" "$summary" \
   '| `UNKNOWN` | `CVE-2026-0005` | `unrated` | `1.0` |  |'
+
+# -- The commit gets a check run that mirrors the verdict --------------------
+run_verdict warn "$VULNERABILITIES"
+assert_has "check run: created for the repository" "$gh_args" "repos/OmniTrustILM/core/check-runs"
+assert_has "check run: named after the gate" "$gh_args" "name=Vulnerability gate (amd64)"
+assert_has "check run: on the head commit" "$gh_args" "head_sha=abc123"
+assert_has "check run: needs action" "$gh_args" "conclusion=action_required"
+assert_has "check run: links to the run" "$gh_args" "details_url=https://github.com/OmniTrustILM/core/actions/runs/42"
+assert_has "check run: carries the count" "$gh_args" "output[title]=Vulnerabilities: 2"
+assert_has "check run: the log says so" "$log" "Vulnerability gate (amd64): check run on the commit: action_required."
+
+GH_EXIT=1 GH_STDERR="gh: Resource not accessible by integration (HTTP 403)" run_verdict warn "$VULNERABILITIES"
+assert_eq "no checks permission: still exits 0" "0" "$rc"
+assert_has "no checks permission: the log says so" "$log" "Vulnerability gate (amd64): added no check run"
+assert_lacks "no checks permission: no error annotation" "$errors" "::error"
+assert_lacks "no checks permission: no warning about the check run" "$log" "could not be published"
+
+GH_EXIT=1 GH_STDERR="gh: No commit found for SHA: abc123 (HTTP 422)" run_verdict warn "$VULNERABILITIES"
+assert_eq "check run API error: still exits 0" "0" "$rc"
+assert_has "check run API error: a warning names the status" "$log" \
+  "::warning title=Vulnerability gate (amd64)::The check run could not be published (HTTP 422); the verdict is unaffected."
+assert_lacks "check run API error: the API's message is not echoed" "$log" "No commit found"
+
+GH_EXIT=127 run_verdict warn "$VULNERABILITIES"
+assert_has "check run without gh: a warning names the exit code" "$log" \
+  "::warning title=Vulnerability gate (amd64)::The check run could not be published (exit 127); the verdict is unaffected."
+
+run_verdict warn "$VULNERABILITIES" "ilm/core amd64"
+assert_has "check run: named by the label, so each image keeps its own" "$gh_args" "name=Vulnerability gate (ilm/core amd64)"
+
+HEAD_SHA="" run_verdict warn "$VULNERABILITIES"
+assert_has "check run: without a pull request head, the checked-out commit" "$gh_args" \
+  "head_sha=$(git -C "$work/repo" rev-parse HEAD)"
+
+# A rescan of the same commit replaces the earlier check of the same name.
+run_verdict warn "$NO_RESULTS"
+assert_has "check run: a clean scan succeeds" "$gh_args" "conclusion=success"
+assert_has "check run: a clean scan says so" "$gh_args" "output[title]=No findings"
+assert_has "check run: a clean scan keeps the gate's name" "$gh_args" "name=Vulnerability gate (amd64)"
+
+run_verdict warn "$WITH_SECRET"
+assert_has "check run: a finding that fails the build fails it" "$gh_args" "conclusion=failure"
+
+run_verdict enforce "$VULNERABILITIES" amd64 failure
+assert_has "check run: a failed release gate fails it" "$gh_args" "conclusion=failure"
+
+run_verdict enforce "$VULNERABILITIES"
+assert_has "check run: a release gate that passed succeeds" "$gh_args" "conclusion=success"
+
+run_verdict enforce "" amd64 failure
+assert_eq "check run: none without a report" "" "$gh_args"
+
+run_verdict warn "$HOSTILE"
+assert_lacks "check run: no report values sent (legacy command)" "$gh_args" "forged"
+assert_lacks "check run: no report values sent (line break)" "$gh_args" "injected"
 
 # -- Label -------------------------------------------------------------------
 run_verdict warn "$VULNERABILITIES" ""
