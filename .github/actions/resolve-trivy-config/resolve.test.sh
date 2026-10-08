@@ -23,6 +23,12 @@ assert_eq() {
   fi
 }
 
+# output_of <file> <key> — the value resolve.sh wrote for key to GITHUB_OUTPUT.
+output_of() {
+  local file="$1" key="$2"
+  sed -n "s/^${key}=//p" "$file"
+}
+
 # ---------------------------------------------------------------------------
 # Case 1: override not allowed -> bundled default copied into the workspace,
 # and a repo-local .trivyignore is neutralized via TRIVY_IGNOREFILE.
@@ -46,7 +52,7 @@ mkdir -p "$rt"
 )
 assert_eq "default: exits 0" "0" "$?"
 assert_eq "default: outputs .trivy-default.yaml" \
-  "config-file=.trivy-default.yaml" "$(cat "$out")"
+  ".trivy-default.yaml" "$(output_of "$out" config-file)"
 assert_eq "default: file materialized in workspace" \
   "yes" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 assert_eq "default: content matches bundled policy" \
@@ -82,7 +88,7 @@ echo "severity: [CRITICAL]" > "$work/config/trivy.yaml"
 )
 assert_eq "override present: exits 0" "0" "$?"
 assert_eq "override present: outputs repo path" \
-  "config-file=config/trivy.yaml" "$(cat "$out")"
+  "config/trivy.yaml" "$(output_of "$out" config-file)"
 assert_eq "override present: bundled default NOT copied" \
   "no" "$([ -f "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 assert_eq "override present: TRIVY_IGNOREFILE NOT set" "" "$(cat "$env_out")"
@@ -151,6 +157,41 @@ assert_eq "symlink guard: no config-file written" "" "$(cat "$out")"
 assert_eq "symlink guard: link left in place, not written through" \
   "yes" "$([ -L "$work/.trivy-default.yaml" ] && echo yes || echo no)"
 rm -rf "$work"
+
+# ---------------------------------------------------------------------------
+# Gate mode: only branch and pull request builds warn; a tag, a missing ref
+# and an unrecognized ref enforce.
+# ---------------------------------------------------------------------------
+
+# gate_mode_for <ref> — the gate-mode resolve.sh writes for that GITHUB_REF.
+# An empty ref runs it with GITHUB_REF unset, so the CI runner's own ref never
+# leaks into a case.
+gate_mode_for() {
+  local ref="$1" work
+  work="$(mktemp -d)"
+  mkdir -p "$work/runner_temp"
+  (
+    cd "$work"
+    unset GITHUB_REF
+    if [ -n "$ref" ]; then
+      export GITHUB_REF="$ref"
+    fi
+    DEFAULT_CONFIG_SRC="$default_src" \
+    GITHUB_OUTPUT="$work/gh_output" \
+    GITHUB_ENV="$work/gh_env" \
+    RUNNER_TEMP="$work/runner_temp" \
+    bash "$resolve" > /dev/null
+  )
+  output_of "$work/gh_output" gate-mode
+  rm -rf "$work"
+}
+
+assert_eq "gate mode: release tag enforces" "enforce" "$(gate_mode_for refs/tags/2.20.0)"
+assert_eq "gate mode: pre-release tag enforces" "enforce" "$(gate_mode_for refs/tags/2.20.0-rc.1)"
+assert_eq "gate mode: branch build warns" "warn" "$(gate_mode_for refs/heads/main)"
+assert_eq "gate mode: pull request build warns" "warn" "$(gate_mode_for refs/pull/12/merge)"
+assert_eq "gate mode: missing ref enforces" "enforce" "$(gate_mode_for "")"
+assert_eq "gate mode: unrecognized ref enforces" "enforce" "$(gate_mode_for refs/remotes/origin/main)"
 
 echo "----"
 if [ "$failures" -eq 0 ]; then

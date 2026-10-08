@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Resolve which Trivy config the vulnerability gate should use.
+# Resolve which Trivy config the vulnerability gate should use, and whether a
+# finding fails the build.
 #
 # Called by the reusable Docker workflows (containers-test.yml,
-# containers-build-and-push.yml) just before the "Fail build on
-# vulnerabilities" step. Decides between the bundled org-default policy and a
-# repo-local override, and writes the chosen path to GITHUB_OUTPUT.
+# containers-build-and-push.yml) just before the "Vulnerability gate" step.
+# Decides between the bundled org-default policy and a repo-local override,
+# and writes the chosen path to GITHUB_OUTPUT.
 #
 # Behaviour:
 #   override not allowed (default) -> copy the bundled default into the
@@ -13,8 +14,13 @@
 #   override allowed + file present -> use the repo's file (full replacement)
 #   override allowed + file missing -> fail loudly (misconfiguration)
 #
+# It also writes gate-mode: "warn" for branch and pull request builds, which
+# report findings and continue, and "enforce" for any other ref. Only a tag
+# push publishes a release, and a ref this script does not recognize must
+# never soften the gate.
+#
 # Reads: INPUT_ALLOW_TRIVY_CONFIG_OVERRIDE, INPUT_TRIVY_CONFIG_PATH,
-#        DEFAULT_CONFIG_SRC, GITHUB_OUTPUT, GITHUB_ENV, RUNNER_TEMP
+#        DEFAULT_CONFIG_SRC, GITHUB_REF, GITHUB_OUTPUT, GITHUB_ENV, RUNNER_TEMP
 set -euo pipefail
 
 # Any value other than the exact string "true" falls through to the org
@@ -66,3 +72,10 @@ if [ ! -s "$resolved" ]; then
 fi
 
 echo "config-file=${resolved}" >> "$GITHUB_OUTPUT"
+
+case "${GITHUB_REF:-}" in
+  refs/heads/* | refs/pull/*) gate_mode="warn" ;;
+  *) gate_mode="enforce" ;;
+esac
+echo "Vulnerability gate: ${gate_mode} for ref '${GITHUB_REF:-}'."
+echo "gate-mode=${gate_mode}" >> "$GITHUB_OUTPUT"

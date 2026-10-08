@@ -1,0 +1,30 @@
+name: Trivy gate verdict
+description: >-
+  Report what the vulnerability gate found, in the job summary, and decide
+  what it means for the build. In warn mode vulnerabilities only warn and any
+  other finding fails; in enforce mode the gate step's own exit code decides.
+
+inputs:
+  gate-mode:
+    description: >-
+      'warn' or 'enforce', from the resolve-trivy-config action. Any value
+      other than 'warn' enforces.
+    required: true
+  report-file:
+    description: Workspace-relative path to the JSON report the gate step wrote.
+    required: true
+  label:
+    description: Short name for the summary heading and annotation titles, such as the architecture.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Report the gate's findings
+      shell: bash
+      env:
+        INPUT_GATE_MODE: ${{ inputs.gate-mode }}
+        INPUT_REPORT_FILE: ${{ inputs.report-file }}
+        INPUT_LABEL: ${{ inputs.label }}
+      run: bash "$GITHUB_ACTION_PATH/verdict.sh"

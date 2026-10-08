@@ -6,8 +6,10 @@ name: Publish Harbor image (reusable)
 #   1. (Optional) build_artifacts:  one-shot Maven build, shared via tar artifact.
 #   2. build:                       per-arch build + push by digest only (no tags),
 #                                   with provenance + SBOM + Trivy scan against the
-#                                   pushed digest. Each run exports its digest as
-#                                   a marker file.
+#                                   pushed digest. Vulnerabilities fail a tag build
+#                                   and only warn in any other build; any other
+#                                   finding fails every build. Each run exports its
+#                                   digest as a marker file.
 #   3. publish_manifest:            collects all per-arch digests, creates the
 #                                   multiarch manifest under each tag from
 #                                   docker/metadata-action, then - when `sign`
@@ -317,7 +319,11 @@ jobs:
           name: ${{ env.ARTIFACT_PREFIX }}trivy-report-${{ matrix.arch }}
           path: trivy-report-${{ matrix.arch }}.json
 
-      - name: Fail build on vulnerabilities
+      # warn mode passes exit code 0, so findings do not fail this step and the
+      # verdict below decides; enforce mode leaves it empty, so the policy's own
+      # exit code applies. A scan error fails this step either way.
+      - name: Vulnerability gate
+        id: vulnerability-gate
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_IMAGE_SRC: remote
@@ -325,7 +331,19 @@ jobs:
         with:
           image-ref: ${{ inputs.registry }}/${{ inputs.image }}@${{ steps.build.outputs.digest }}
           trivy-config: ${{ steps.trivy-config.outputs.config-file }}
+          format: json
+          output: trivy-gate-${{ matrix.arch }}.json
+          exit-code: ${{ steps.trivy-config.outputs.gate-mode == 'warn' && '0' || '' }}
           skip-setup-trivy: true
+
+      # Runs after a failed gate too, so a blocked build still lists its findings.
+      - name: Vulnerability gate verdict
+        if: ${{ !cancelled() && (steps.vulnerability-gate.outcome == 'success' || steps.vulnerability-gate.outcome == 'failure') }}
+        uses: OmniTrustILM/.github/.github/actions/trivy-gate-verdict@main
+        with:
+          gate-mode: ${{ steps.trivy-config.outputs.gate-mode }}
+          report-file: trivy-gate-${{ matrix.arch }}.json
+          label: ${{ matrix.arch }}
 
   publish_manifest:
     name: Publish multiarch manifest
