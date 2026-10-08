@@ -12,9 +12,10 @@ name: Publish Harbor image (reusable)
 #                                   every build. A branch build that only warns
 #                                   still publishes and signs its tags, such as
 #                                   develop-latest; a caller that grants checks:
-#                                   write also gets a check run that needs action
-#                                   on its commit. Each run exports its digest as
-#                                   a marker file.
+#                                   write also gets the verdict as a check run on
+#                                   the commit, needing action when vulnerabilities
+#                                   only warn. Each run exports its digest as a
+#                                   marker file.
 #   3. publish_manifest:            collects all per-arch digests, creates the
 #                                   multiarch manifest under each tag from
 #                                   docker/metadata-action, then - when `sign`
@@ -356,8 +357,11 @@ jobs:
         with:
           gate-mode: ${{ steps.trivy-config.outputs.gate-mode }}
           report-file: ${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json
-          label: ${{ matrix.arch }}
+          label: ${{ inputs.image }} ${{ matrix.arch }}
           gate-outcome: ${{ steps.vulnerability-gate.outcome }}
+          # A pull request's head only when that is what was scanned; with a ref
+          # override the verdict uses the checked-out commit.
+          head-sha: ${{ inputs.ref == '' && github.event.pull_request.head.sha || '' }}
 
   publish_manifest:
     name: Publish multiarch manifest

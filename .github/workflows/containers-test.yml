@@ -4,9 +4,9 @@ name: Test Docker image (reusable)
 # Builds the image locally for each target architecture and scans it with
 # Trivy. Vulnerabilities only warn in a branch or pull request build and fail
 # any other build, such as a tag; any other finding, such as a leaked secret,
-# fails every build. A caller that grants checks: write also gets a check run
-# that needs action on a commit whose vulnerabilities only warn. Nothing is
-# pushed.
+# fails every build. A caller that grants checks: write also gets the verdict
+# as a check run on the scanned commit, needing action when vulnerabilities only
+# warn. Nothing is pushed.
 #
 # Optional pre-build:
 #   - pre-build: 'maven'  -> runs `mvn clean package` once and shares the JARs
@@ -232,5 +232,8 @@ jobs:
         with:
           gate-mode: ${{ steps.trivy-config.outputs.gate-mode }}
           report-file: ${{ runner.temp }}/trivy-gate-${{ matrix.arch }}.json
-          label: ${{ matrix.arch }}
+          label: ${{ inputs.image }} ${{ matrix.arch }}
           gate-outcome: ${{ steps.vulnerability-gate.outcome }}
+          # A pull request's head only when that is what was scanned; with a ref
+          # override the verdict uses the checked-out commit.
+          head-sha: ${{ inputs.ref == '' && github.event.pull_request.head.sha || '' }}

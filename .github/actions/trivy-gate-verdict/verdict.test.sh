@@ -116,7 +116,7 @@ readonly LOWER_SEVERITIES='{"SchemaVersion": 2, "Results": [{"Target": "Java", "
 # -- Clean reports pass quietly ---------------------------------------------
 run_verdict warn "$NO_RESULTS"
 assert_eq "no results: exits 0" "0" "$rc"
-assert_eq "no results: says so" "Vulnerability gate (amd64): no findings." "$log"
+assert_has "no results: says so" "$log" "Vulnerability gate (amd64): no findings."
 assert_eq "no results: writes no summary" "" "$summary"
 
 run_verdict enforce "$CLEAN"
@@ -225,7 +225,7 @@ assert_eq "lower severities: MEDIUM sorts before an unknown severity" '| `MEDIUM
 assert_has "lower severities: a missing fixed version stays empty" "$summary" \
   '| `UNKNOWN` | `CVE-2026-0005` | `unrated` | `1.0` |  |'
 
-# -- A build that only warns marks its commit with a check run ---------------
+# -- The commit gets a check run that mirrors the verdict --------------------
 run_verdict warn "$VULNERABILITIES"
 assert_has "check run: created for the repository" "$gh_args" "repos/OmniTrustILM/core/check-runs"
 assert_has "check run: named after the gate" "$gh_args" "name=Vulnerability gate (amd64)"
@@ -233,23 +233,37 @@ assert_has "check run: on the head commit" "$gh_args" "head_sha=abc123"
 assert_has "check run: needs action" "$gh_args" "conclusion=action_required"
 assert_has "check run: links to the run" "$gh_args" "details_url=https://github.com/OmniTrustILM/core/actions/runs/42"
 assert_has "check run: carries the count" "$gh_args" "output[title]=Vulnerabilities: 2"
-assert_has "check run: the log says so" "$log" "Vulnerability gate (amd64): added a check run that marks the commit."
+assert_has "check run: the log says so" "$log" "Vulnerability gate (amd64): check run on the commit: action_required."
 
 GH_EXIT=1 run_verdict warn "$VULNERABILITIES"
 assert_eq "no checks permission: still exits 0" "0" "$rc"
 assert_has "no checks permission: the log says so" "$log" "Vulnerability gate (amd64): added no check run"
 assert_lacks "no checks permission: no error annotation" "$errors" "::error"
 
+run_verdict warn "$VULNERABILITIES" "ilm/core amd64"
+assert_has "check run: named by the label, so each image keeps its own" "$gh_args" "name=Vulnerability gate (ilm/core amd64)"
+
 HEAD_SHA="" run_verdict warn "$VULNERABILITIES"
 assert_has "check run: without a pull request head, the checked-out commit" "$gh_args" \
   "head_sha=$(git -C "$work/repo" rev-parse HEAD)"
 
+# A rescan of the same commit replaces the earlier check of the same name.
 run_verdict warn "$NO_RESULTS"
-assert_eq "check run: none without findings" "" "$gh_args"
+assert_has "check run: a clean scan succeeds" "$gh_args" "conclusion=success"
+assert_has "check run: a clean scan says so" "$gh_args" "output[title]=No findings"
+assert_has "check run: a clean scan keeps the gate's name" "$gh_args" "name=Vulnerability gate (amd64)"
+
 run_verdict warn "$WITH_SECRET"
-assert_eq "check run: none when the build fails anyway" "" "$gh_args"
+assert_has "check run: a finding that fails the build fails it" "$gh_args" "conclusion=failure"
+
+run_verdict enforce "$VULNERABILITIES" amd64 failure
+assert_has "check run: a failed release gate fails it" "$gh_args" "conclusion=failure"
+
 run_verdict enforce "$VULNERABILITIES"
-assert_eq "check run: none in enforce mode" "" "$gh_args"
+assert_has "check run: a release gate that passed succeeds" "$gh_args" "conclusion=success"
+
+run_verdict enforce "" amd64 failure
+assert_eq "check run: none without a report" "" "$gh_args"
 
 run_verdict warn "$HOSTILE"
 assert_lacks "check run: no report values sent (legacy command)" "$gh_args" "forged"

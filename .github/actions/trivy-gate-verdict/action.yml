@@ -3,8 +3,8 @@ description: >-
   Report what the vulnerability gate found, in the job summary, and decide
   what it means for the build. In warn mode vulnerabilities only warn and any
   other finding fails; in enforce mode the gate step's own exit code decides.
-  When vulnerabilities only warn and the caller grants checks: write, a check
-  run that needs action also marks the commit.
+  When the caller grants checks: write, the verdict also becomes a check run
+  on the scanned commit; it needs action when vulnerabilities only warn.
 
 inputs:
   gate-mode:
@@ -16,7 +16,16 @@ inputs:
     description: Path to the JSON report the gate step wrote.
     required: true
   label:
-    description: Short name for the summary heading and annotation titles, such as the architecture.
+    description: >-
+      Names the summary heading, the annotation titles and the check run, such
+      as the image and architecture; the check run of each label is replaced
+      on a rescan, so every image scanned on a commit needs its own.
+    required: false
+    default: ''
+  head-sha:
+    description: >-
+      Commit the check run goes on. Empty (the default) means the checked-out
+      commit; the workflows pass a pull request's head when they scan it.
     required: false
     default: ''
   gate-outcome:
@@ -37,6 +46,6 @@ runs:
         INPUT_REPORT_FILE: ${{ inputs.report-file }}
         INPUT_LABEL: ${{ inputs.label }}
         INPUT_GATE_OUTCOME: ${{ inputs.gate-outcome }}
-        INPUT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        INPUT_HEAD_SHA: ${{ inputs.head-sha }}
         GH_TOKEN: ${{ github.token }}
       run: bash "$GITHUB_ACTION_PATH/verdict.sh"
