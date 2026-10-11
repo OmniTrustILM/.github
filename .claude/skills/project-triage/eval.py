@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from consistency import (  # noqa: E402
     epic_status_findings, closed_but_not_done_finding, within_window,
-    version_reference, tree_has_qa,
+    version_reference, tree_has_qa, is_analysis_task,
 )
 
 BASE = Path(os.environ.get('TRIAGE_DIR', '.triage')).resolve()
@@ -310,13 +310,16 @@ for it in target:
             ru = s.get('repository_url') or ''
             srepo = ru.rstrip('/').split('/')[-1] if ru else (s.get('repository') or {}).get('name')
             sit = lookup.get((srepo, s.get('number')))
-            # testing-phase work (a Bug, or a qa / testing task) decides In
-            # Progress and Done only — see consistency.expected_epic_status
+            # testing-phase work (a Bug, or a qa / testing task) decides Done
+            # only, the analysis task Done and Analysis only — see
+            # consistency.expected_epic_status
             slabels = [l.get('name', '').lower() for l in (s.get('labels') or [])]
             stype = type_of.get((srepo, s.get('number'))) or (s.get('type') or {}).get('name')
+            stitle = s.get('title') or (sit['content'].get('title') if sit else None)
             phase_work = stype == 'Bug' or bool({'qa', 'testing'} & set(slabels))
             children.append((field_value(sit, 'Status') if sit else None,
-                             s.get('state'), s.get('state_reason'), phase_work))
+                             s.get('state'), s.get('state_reason'), phase_work,
+                             is_analysis_task(stype, stitle)))
         breakdown_done = not any(is_field_missing(it, f)
                                  for f in ('complexity', 'estimate', 'start_date', 'end_date'))
         for level, rule, msg in epic_status_findings(status, children, breakdown_done):

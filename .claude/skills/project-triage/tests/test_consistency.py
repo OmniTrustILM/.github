@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from consistency import (  # noqa: E402
     epic_status_findings, expected_epic_status,
     closed_but_not_done_finding, within_window,
-    version_reference, tree_has_qa,
+    version_reference, tree_has_qa, is_analysis_task,
 )
 
 _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
@@ -81,10 +81,20 @@ def test_expected_phase_work_still_holds_done():
         [kid("Done", "CLOSED"), bug("Testing", "CLOSED")], BD) == "Testing"
 
 
-def test_expected_phase_work_still_starts_in_progress():
-    # a bug being fixed while no feature has started counts as started
+def test_expected_phase_work_does_not_start_in_progress():
+    # In Progress = the development started; a bug being fixed while no
+    # feature has started leaves the Epic below it (Jiří 2026-10-11)
     assert expected_epic_status(
-        [kid("Open"), bug("In Progress")], BD) == "In Progress"
+        [kid("Open"), bug("In Progress")], BD) == "Open"
+    assert expected_epic_status(
+        [kid("Planning"), bug("In Progress")], NBD) == "Planning"
+
+
+def test_expected_only_phase_work_in_flight_is_testing():
+    # development done, only a bug and a test task being worked on
+    assert expected_epic_status(
+        [kid("Done", "CLOSED"), kid("Testing", "CLOSED"),
+         bug("In Progress"), bug("Open")], BD) == "Testing"
 
 
 def test_expected_bug_collector_ranks_bugs_as_its_work():
@@ -93,8 +103,55 @@ def test_expected_bug_collector_ranks_bugs_as_its_work():
         [bug("In Progress"), bug("Testing", "CLOSED")], BD) == "In Progress"
 
 
+def analysis(status, state="OPEN", reason=None):
+    # the Epic's "Analysis, breakdown, estimations" task
+    return kid(status, state, reason) + (False, True)
+
+
+def test_is_analysis_task_by_title():
+    assert is_analysis_task("Task", "Analysis, breakdown, estimations")
+    assert is_analysis_task("Task", "Epic breakdown")
+    assert is_analysis_task("Task", "ESTIMATIONS for the Epic")
+    assert not is_analysis_task("Feature", "Analysis of the key store")
+    assert not is_analysis_task("Task", "Implement the key store")
+    assert not is_analysis_task("Task", None)
+
+
+def test_expected_analysis_task_under_way_is_analysis():
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("Planning")], NBD) == "Analysis"
+
+
+def test_expected_analysis_task_not_started_is_planning():
+    assert expected_epic_status(
+        [analysis("Planning"), kid("Planning")], NBD) == "Planning"
+
+
+def test_expected_closed_analysis_task_never_lifts_past_analysis():
+    # the analysis task is preparation: closed, it still is not development
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Open")], NBD) == "Analysis"
+    # closed, awaiting QA, and nothing else scoped yet
+    assert expected_epic_status([analysis("Testing", "CLOSED")], NBD) == "Analysis"
+
+
+def test_expected_breakdown_done_is_open_until_development_starts():
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Planning"), bug("In Progress")], BD) == "Open"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("In Progress")], BD) == "In Progress"
+
+
+def test_expected_analysis_task_holds_done():
+    # Done needs every child Done, the analysis task included
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("Done", "CLOSED")], BD) == "Testing"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Done", "CLOSED")], BD) == "Done"
+
+
 def test_expected_triples_still_accepted():
-    # callers passing plain triples see the previous behaviour
+    # plain triples are development children
     assert expected_epic_status(
         [kid("Testing", "CLOSED"), kid("In Progress")], BD) == "In Progress"
 

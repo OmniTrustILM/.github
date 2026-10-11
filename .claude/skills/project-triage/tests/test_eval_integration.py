@@ -115,6 +115,50 @@ def _run_tree_eval():
     return _eval_dir(d)
 
 
+def _run_ladder_eval():
+    """Epic 400 (In Progress, breakdown fields set) → its analysis task 401
+    (closed, Done), Feature 402 (Open) and Bug 403 (In Progress). Neither
+    the analysis task nor the bug is development, so the children imply
+    Open; the task is recognised by the title the sub-issue list carries."""
+    import yaml
+    d = tempfile.mkdtemp(prefix="triage-ladder-")
+    epic_body = "## User Story\nAs a user...\n## Use Cases\nUC1\n## Acceptance Criteria\n- [ ] done\n"
+    epic = _item(400, "core", "Epic", "In Progress", subcount=3, version="2.20.0", body=epic_body)
+    epic["fieldValues"]["nodes"] += [
+        {"__typename": "ProjectV2ItemFieldSingleSelectValue", "name": "Medium",
+         "field": {"name": "Complexity"}},
+        {"__typename": "ProjectV2ItemFieldNumberValue", "number": 8, "field": {"name": "Estimate"}},
+        {"__typename": "ProjectV2ItemFieldDateValue", "date": "2026-10-01",
+         "field": {"name": "Start Date"}},
+        {"__typename": "ProjectV2ItemFieldDateValue", "date": "2026-11-01",
+         "field": {"name": "End Date"}}]
+    kids = [_item(401, "core", "Task", "Done", state="CLOSED", state_reason="COMPLETED",
+                  version="2.20.0", parent=_parent(400), closed_at=RECENT),
+            _item(402, "core", "Feature", "Open", version="2.20.0", parent=_parent(400)),
+            _item(403, "core", "Bug", "In Progress", version="2.20.0", parent=_parent(400))]
+    subs = [{"number": n, "title": t, "state": st, "state_reason": sr,
+             "repository_url": "https://api.github.com/repos/OmniTrustILM/core", "labels": []}
+            for n, t, st, sr in ((401, "Analysis, breakdown, estimations", "closed", "completed"),
+                                 (402, "Key store", "open", None),
+                                 (403, "Key store crash", "open", None))]
+    for name, obj in (("items-flat.json", [epic, *kids]),
+                      ("filtered.json", [epic, *kids[1:]]),
+                      ("filtered-closed.json", []),
+                      ("rules.json", yaml.safe_load(open(CONFIG, encoding="utf-8"))),
+                      ("subs-core-400.json", subs)):
+        with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
+            json.dump(obj, fh)
+    with open(os.path.join(d, "members.txt"), "w", encoding="utf-8") as fh:
+        fh.write("alice\n")
+    return _eval_dir(d)
+
+
+def test_eval_epic_ladder_skips_analysis_task_and_bugs():
+    findings = _run_ladder_eval()
+    mm = [f for f in findings if f["rule"] == "epic_status_mismatch" and f["number"] == 400]
+    assert len(mm) == 1 and "imply `Open`" in mm[0]["msg"], findings
+
+
 def test_eval_version_mismatch_compares_sub_issue_with_epic():
     findings = _run_tree_eval()
     vm = {f["number"]: f for f in findings if f["rule"] == "version_mismatch"}

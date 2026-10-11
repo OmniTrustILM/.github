@@ -13,13 +13,17 @@ development and hands it to QA (the automation moves it to Testing), so a
 closed child ranks by its Status field, floored at Testing; only children
 cancelled as not planned / duplicate (or closed with no project Status)
 count as Done outright. Testing / Review = all *development* children at
-that stage or beyond — Bugs and qa/testing tasks are testing-phase work
-(bugs come out of testing, test tasks are the testing itself; Jiří
-2026-10-03), so they hold the Epic below Done only, never below Testing;
-an Epic holding nothing but such work ranks it as its development. In
-Progress = any child started; otherwise Open once the breakdown is
-complete (Complexity, Estimate, Start/End Date set on the Epic — §3.2),
-Analysis while a child is still being scoped, else Planning.
+that stage or beyond, In Progress = a development child started — Bugs
+and qa/testing tasks are testing-phase work (bugs come out of testing,
+test tasks are the testing itself; Jiří 2026-10-03, In Progress since
+2026-10-11), so they hold the Epic below Done only, never below Testing;
+an Epic holding nothing but such work ranks it as its development. The
+Epic's analysis task ("Analysis, breakdown, estimations") is preparation
+(Jiří 2026-10-11): it never lifts the Epic past Analysis, not even once
+closed. Below In Progress: Open once the breakdown is complete
+(Complexity, Estimate, Start/End Date set on the Epic — §3.2), else
+Analysis while the analysis task is under way or a child is still being
+scoped, else Open when a child is Open, else Planning.
 
 §7.3 precedence note: epic_done_with_open_children is an Error and outranks
 the epic_status_mismatch Warning — when it fires, the mismatch is not
@@ -31,6 +35,7 @@ from datetime import datetime
 
 STATUS_ORDER = ("Planning", "Analysis", "Open", "In Progress", "Review", "Testing", "Done")
 _RANK = {s: i for i, s in enumerate(STATUS_ORDER)}
+ANALYSIS_TITLE_WORDS = ("analys", "breakdown", "estimat")
 
 
 def within_window(closed_at_iso, now, days):
@@ -62,6 +67,49 @@ def _child_rank(status, state, state_reason):
     return max(rank, _RANK["Testing"])
 
 
+def is_analysis_task(issue_type, title):
+    """The Epic's breakdown task ("Analysis, breakdown, estimations" and the
+    like), created together with the Epic: preparation, not the Epic's
+    delivery. No label marks it, so the title decides (the same test as
+    PM_reporting's work_units.is_analysis_task)."""
+    t = (title or "").lower()
+    return issue_type == "Task" and any(w in t for w in ANALYSIS_TITLE_WORDS)
+
+
+def _flag(child, i):
+    return len(child) > i and bool(child[i])
+
+
+def _ladder(children):
+    """(all ranks, development ranks, delivery ranks, analysis ranks) of the
+    rankable children. All ranks decide Done; the development ranks decide
+    In Progress / Review / Testing; the delivery ranks (everything but the
+    analysis task) decide Analysis / Open below them. A bug collector
+    (nothing but testing-phase work) ranks that work as its development."""
+    pairs = [(c, r) for c in children if (r := _child_rank(*c[:3])) is not None]
+    delivery = [(c, r) for c, r in pairs if not _flag(c, 4)]
+    core = ([r for c, r in delivery if not _flag(c, 3)]
+            or [r for _, r in delivery])
+    return ([r for _, r in pairs], core, [r for _, r in delivery],
+            [r for c, r in pairs if _flag(c, 4)])
+
+
+def _upper_rung(ranked, core):
+    """Done / Testing / Review / In Progress; None while the development
+    has not started."""
+    if min(ranked) >= _RANK["Done"]:
+        return "Done"
+    if not core:
+        return None
+    if min(core) >= _RANK["Testing"]:
+        return "Testing"
+    if min(core) >= _RANK["Review"]:
+        return "Review"
+    if max(core) >= _RANK["In Progress"]:
+        return "In Progress"
+    return None
+
+
 def expected_epic_status(children, breakdown_done):
     """The Status an Epic should have, derived from its children — the
     Release Management §5.1 ladder (most advanced rule wins).
@@ -70,34 +118,29 @@ def expected_epic_status(children, breakdown_done):
                      triples, one per child, ranked by _child_rank above;
                      an optional fourth element marks testing-phase work
                      (a Bug, or a task labelled qa / testing), which decides
-                     In Progress and Done but not Review / Testing.
+                     Done only unless the Epic holds nothing else, and an
+                     optional fifth marks the analysis
+                     task (is_analysis_task), which decides Done and
+                     Analysis only.
     breakdown_done — True when Complexity, Estimate, Start Date and End Date
                      are all set on the Epic (§3.2: the fields the breakdown
                      must produce before the Epic may move to Open).
 
     Returns None when nothing can be derived (no child has a usable state).
     """
-    pairs = [(c, r) for c in children if (r := _child_rank(*c[:3])) is not None]
-    ranked = [r for _, r in pairs]
+    ranked, core, delivery, analysis = _ladder(children)
     if not ranked:
         return None
-    # the development children decide Review / Testing; a bug collector
-    # (nothing but testing-phase work) ranks that work as its development
-    core = [r for c, r in pairs if not (len(c) > 3 and c[3])] or ranked
-    if min(ranked) >= _RANK["Done"]:
-        return "Done"
-    if min(core) >= _RANK["Testing"]:
-        return "Testing"
-    if min(core) >= _RANK["Review"]:
-        return "Review"
-    if max(ranked) >= _RANK["In Progress"]:
-        return "In Progress"
-    # nothing started yet: breakdown completion decides Analysis vs. Open
+    upper = _upper_rung(ranked, core)
+    if upper:
+        return upper
+    # development not started: Open = the analysis is done, the breakdown
+    # fields are its proof; a started analysis task means Analysis
     if breakdown_done:
         return "Open"
-    if _RANK["Analysis"] in ranked:
+    if any(r >= _RANK["In Progress"] for r in analysis) or _RANK["Analysis"] in delivery:
         return "Analysis"
-    if _RANK["Open"] in ranked:
+    if _RANK["Open"] in delivery:
         return "Open"
     return "Planning"
 
@@ -106,8 +149,7 @@ def epic_status_findings(status, children, breakdown_done):
     """Return a list of (level, rule, msg) for the §7.2 Epic-status rules.
 
     status         — the Epic's project Status field value.
-    children       — list of (project_status, github_state, state_reason)
-                     triples per child.
+    children       — per-child tuples, see expected_epic_status().
     breakdown_done — see expected_epic_status().
     """
     open_count = sum(1 for c in children if (c[1] or "").upper() == "OPEN")
