@@ -18,9 +18,9 @@ You've opened this doc. Jump to the section for your role:
 2. Move to **In Progress**, commit, open a PR that references the issue (e.g., `Closes #123`).
 3. PR linked → Status moves to **Review** automatically. Address review feedback in the same PR. A task with no PR (configuration, docs) you **close yourself** when finished — closing moves it to **Testing**.
 4. The reviewer approves, **merges the PR and closes the issue** → Status moves to **Testing** automatically. Closing ends development, not the lifecycle — *closed ≠ done*. Pick up the next issue.
-5. Testing happens per **Epic**, on its testing task (label `testing`) — by default you test it yourself: move it to **In Progress**, test, close it. A defect in your issue → **reopen** it (Status → In Progress), fix in a new PR, cycle repeats.
-6. Once the Epic is tested, move your development issues (and the `testing` task) from **Testing** to **Done**. Only Done ends the cycle.
-7. Epics handed over to QA get `qa` on their testing task — QA tests and moves that task to Done; QA findings become new Bugs under the Epic.
+5. Testing happens per **Epic**, on its testing tasks (§1 Epic anatomy). A **developer testing task** (label `testing`, assigned to you) you test yourself: move it to **In Progress**, test, close it. A defect in your issue → **reopen** it (Status → In Progress), fix in a new PR, cycle repeats.
+6. Once the Epic is tested, move your development issues (and your `testing` tasks) from **Testing** to **Done**. Only Done ends the cycle.
+7. A **QA testing task** (`testing` + `qa`, assigned to a QA member) — instead of yours or alongside it — is tested by QA, who moves it to Done; QA findings become new Bugs under the Epic.
 
 ### PM / Tech Lead
 1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Priority/Version/Module/Sprint during planning.
@@ -28,7 +28,7 @@ You've opened this doc. Jump to the section for your role:
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
 ### QA
-1. Epics are handed over to you with a demo (Release Management §6); their testing task gets the labels `testing` + `qa` and you as Assignee. Watch the **QA Board** — testing tasks with `qa` are yours.
+1. An Epic's **QA testing task** carries the labels `testing` + `qa` and a QA member as Assignee — it is planned in the breakdown, on its own or alongside a developer testing task. You start on it once the Epic is handed over with a demo (Release Management §6). Watch the **QA Board** — testing tasks with `qa` are yours.
 2. Test the Epic end-to-end on the integrated main branch: move the task to **In Progress**, test, close it (→ Testing). Defects → file **new Bugs under the Epic**; fixing them is part of the Epic's testing phase (the Epic stays in Testing).
 3. Epic verified → move the `testing` + `qa` task to **Done**. Post-release regression → reopen the original issue and set **Reopen Reason** to Regression.
 
@@ -48,6 +48,7 @@ You've opened this doc. Jump to the section for your role:
 | How are Bug, Vulnerability, QA work, Documentation distinguished? | §1 |
 | What does closing an issue mean? | §2.4, §6 |
 | Can I create a Feature inside a Feature? | §1 (no — split the Epic) |
+| Which issues belong under an Epic, and who tests it? | §1 Epic anatomy |
 | How is Module picked for a new issue? | §3.1 Module row |
 
 ---
@@ -101,6 +102,7 @@ Release 2.18.0
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
 │   ├── Task+documentation [documentation]: Revocation user guide
+│   ├── Task+testing [ilm]: Test revocation end to end
 │   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
@@ -117,13 +119,36 @@ Release 2.18.0
   the cycle are its sub-issues. It is an ordinary Epic in an ordinary place in the hierarchy — no separate rules apply to
   it. Bugs found during the cycle go here rather than directly under the Release, which keeps the Release's own children
   down to Epics. The `/create-issue` skill links a new bug under the active cycle automatically (§2.5).
-- Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks)
+- Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks) — the kinds and what each is for are in **Epic anatomy** below
 - Features can contain Tasks and Bugs as implementation details (small sub-work discovered during development). **A Feature must NOT contain sub-Features** — this signals the Epic is too large and should be split.
 - Sub-issues receive Version and Module from parent at creation time (automation copies if child's fields are empty; does not update if parent changes later — see Section 6, Rule #2)
 - An issue can have only one parent
 - **Breakdown guideline:** If a Feature under an Epic needs its own sub-issues, this is a signal that the Epic may be too large. Consider breaking it into separate Epics, each with a focused scope. A well-sized Epic has Features/Tasks that are directly implementable without further decomposition.
 - **Cross-repo work:** Changes that touch 2+ repositories should be structured as an Epic for proper dependency tracking via sub-issues and blocked-by relationships. **Exception:** Trivial cross-repo changes (config updates, version bumps, dependency alignment) can use linked standalone issues without an Epic — use `blocked-by` links between them for ordering.
 - **Dependencies:** Use GitHub's native issue dependency feature (`blocked-by` / `blocks`) to express ordering between issues. The `/epic-breakdown` skill sets these automatically when creating sub-issues. The consistency rule "Blocked but In Progress" (§7.2) flags issues being worked on while their blockers are still open.
+
+### Epic Anatomy
+
+The kinds of issues under an Epic. The kind follows from the issue type and its labels; it decides who typically owns the issue, which release capacity it draws on (release planning — the dashboard's Health → Release Scope, PM_reporting `docs/release-delivery.md`) and how it feeds the derived Epic status (§2.2).
+
+| Kind | Type and labels | Typically assigned to | Capacity in release planning | For the Epic status | How many |
+|---|---|---|---|---|---|
+| **Epic** | Epic | Epic Owner | none itself — its Estimate (overall delivery estimate) stands in while there is no breakdown | derived from the children | 1 |
+| **Development issue** | Feature / Task without `testing`, `qa` | developer | Development | development work | 1 or more |
+| **Documentation** | Task + `documentation` | developer | Development | development work | as needed |
+| **Analysis task** | Task "Analysis, breakdown, estimations" | Epic Owner | Development | preparation — never lifts the Epic past Analysis; must be Done for the Epic to be Done | usually 1, at the start |
+| **Developer testing task** | Task + `testing` | developer | Testing after freeze | testing phase | at least one testing task per Epic — a developer one, a QA one, or both side by side; a complex Epic may have more |
+| **QA testing task** | Task + `testing` + `qa` (manual or automated, e.g. ATF regression suites) | QA member | QA | testing phase | ↑ |
+| **QA work** | Task + `qa` (automation, framework, QA infrastructure) | QA member | QA | testing phase | as needed |
+| **Bug** | Bug, filed under the Epic from testing | developer (the fix) | not planned — it takes from the time the window after the freeze leaves for bugs | testing phase | arises from testing |
+| **Sub-epic** | Feature / Task with sub-issues | — | none itself — its leaves carry the work at any depth; `testing`, `qa` and `documentation` are inherited by the whole subtree | by its leaves | in a large Epic |
+
+The three capacities: **Development** = the team's developers from the release Start Date to the Feature freeze (primary — the release is filled by it); **Testing after freeze** = the same developers from the freeze to the End Date (developer testing tasks and bug fixes); **QA** = the QA members over the whole release.
+
+- **A standard Epic** has at least one development issue and **at least one testing task**: a developer testing task, a QA testing task, or both side by side; a complex Epic may have more. The consistency rule "Epic without testing task" (§7.2) flags an Epic with none.
+- **Whose work it is:** the **Developer** field (the permanent record of who built the issue), else the issue's Assignee, else the Epic Owner. The `qa` label, or an assignment to a QA member, puts the work on the QA capacity. The Assignee stays the developer through the lifecycle; the tester of a testing task is its Assignee.
+- **Planning gaps:** a leaf without an Estimate counts as 1 MD; an Epic without a developer testing task gets 1 MD of testing, and an Epic without any QA work 1 MD of QA, per started 10 MD of its development — always on top of the development estimate. An Epic without a breakdown weighs its own Estimate, else the average Epic of the previous release.
+- The **`Bugs x.y.z`** cycle Epic holds only bugs, has no testing task and stays out of release planning.
 
 ---
 
@@ -173,7 +198,7 @@ stateDiagram-v2
 
 > **Analysis is not exclusively PM work.** For Bugs, QA may triage and move to Open. For technically complex issues, the Tech Lead or assigned developer may perform the analysis (root cause identification, correct repo, impact assessment). The PM retains authority over business prioritization (Priority, Version, Sprint) regardless of who performs the technical analysis. For simple items (obvious fix, trivial scope), the person triaging may move from Analysis to Open immediately — Analysis is a triage inbox, not a mandatory waiting period.
 
-> **Testing model:** code is merged after code review; the reviewer closes the issue on merge and automation moves it to **Testing**. Testing is done per **Epic** on its testing task (label `testing` — by the developer; `testing` + `qa` — by QA once the Epic is handed over, Release Management §6), not per PR. Defects reopen the affected issue or become new Bugs under the Epic; Done is set manually once the Epic is tested.
+> **Testing model:** code is merged after code review; the reviewer closes the issue on merge and automation moves it to **Testing**. Testing is done per **Epic** on its testing tasks (a developer testing task `testing` — by the developer; a QA testing task `testing` + `qa` — by QA once the Epic is handed over, Release Management §6; one or both), not per PR. Defects reopen the affected issue or become new Bugs under the Epic; Done is set manually once the Epic is tested.
 
 ### 2.2 Convention by Issue Type
 
@@ -249,14 +274,14 @@ When a PR is submitted by an external contributor without a linked issue:
 
 #### Testing (per Epic, after merge)
 
-Testing is not done per PR. Every Epic has one or more **testing tasks** (label `testing`; sub-issues of the Epic, or of one of its Features/Tasks) that cover the Epic end-to-end:
+Testing is not done per PR. Every Epic has **at least one testing task** (label `testing`; sub-issues of the Epic, or of one of its Features/Tasks) that covers the Epic end-to-end: a **developer testing task** (`testing`, assigned to a developer), a **QA testing task** (`testing` + `qa`, assigned to a QA member), or both side by side; a complex Epic may have more (§1 Epic anatomy).
 
-1. By default the **developer** tests: moves the testing task to **In Progress**, tests, **closes** it → automation moves it to **Testing**
-2. An Epic **handed over to QA** (demo, Release Management §6): the testing task additionally gets the `qa` label and a QA member as Assignee; **QA** tests it the same way
+1. The **developer** tests a developer testing task: moves it to **In Progress**, tests, **closes** it → automation moves it to **Testing**
+2. **QA** tests a QA testing task the same way, once the Epic is handed over with a demo (Release Management §6)
 3. **Defect in an existing issue:** the tester **reopens** that issue → automation moves it to **In Progress**; the developer fixes it in a new PR and the cycle repeats from step 2 of Development. QA findings are filed as **new Bugs under the Epic** instead
-4. **Epic verified:** the developer moves the development issues and the `testing` task from **Testing** to **Done**; QA moves a `testing` + `qa` task to Done. Only now the cycle ends — *closed ≠ done*
+4. **Epic verified:** the developer moves the development issues and the developer testing tasks from **Testing** to **Done**; QA moves the QA testing tasks to Done. Only now the cycle ends — *closed ≠ done*
 
-> **Bugs and testing tasks are the Epic's testing phase.** An open Bug or testing task keeps the Epic in Testing; it never pulls it back to In Progress (Epic ladder, §2.2). The Epic is Done when every child — development issues, testing tasks and Bugs — is Done.
+> **Bugs and testing tasks are the Epic's testing phase.** They never make the Epic In Progress: once its development is done, an open Bug or testing task keeps it in Testing (Epic ladder, §2.2). The Epic is Done when every child — development issues, testing tasks and Bugs — is Done.
 
 > **Automated tests** (smoke in CI on every PR, daily regression on main) complement, not replace, the Epic-level testing (§2.8).
 
@@ -329,8 +354,8 @@ This section provides a brief overview; the Epic handover to QA is described in 
 - Results are reviewed by the QA team; regressions found trigger new Bug issues following the standard lifecycle
 
 **Epic-level testing (the manual testing of record):**
-- Every Epic has one or more **testing tasks** labelled `testing` (sub-issues of the Epic, or of its Features/Tasks); testing runs after merge, on the integrated main branch
-- By default the **developer** tests (`testing`); once the Epic is handed over to QA with a demo, the task gets `testing` + `qa` and a QA Assignee and **QA** tests
+- Every Epic has **at least one testing task** labelled `testing` (sub-issues of the Epic, or of its Features/Tasks); testing runs after merge, on the integrated main branch
+- A **developer testing task** (`testing`) is tested by its developer; a **QA testing task** (`testing` + `qa`, QA Assignee) by **QA** once the Epic is handed over with a demo. An Epic may carry either or both
 - Defects reopen the affected issue or become new Bugs under the Epic (§2.7); the Epic stays in Testing until all of them are Done
 
 **Testing Scope:** every Epic includes a Testing Scope section (filled by PM and enriched by `/epic-breakdown` skill) that the testing tasks cover:
@@ -375,7 +400,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | Field | Type | Description |
 |---|---|---|
 | **Title** | Text | Issue title — see naming conventions in Section 10 |
-| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: delivery owner (Epic Owner). For testing tasks: the tester — the developer, or a QA member once `qa` is added. |
+| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: delivery owner (Epic Owner). For testing tasks: the tester — a developer on a `testing` task, a QA member on a `testing` + `qa` task. The Assignee does not rotate through the lifecycle. |
 | **Status** | Single-select | Workflow stage: Planning, Analysis, Open, In Progress, Review, Testing, Done |
 | **Labels** | Labels | Cross-cutting concerns and release notes categorization (see Section 4) |
 | **Linked PRs** | Pull requests | PRs linked to the issue — triggers status automation |
@@ -868,13 +893,13 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Reviews Epic breakdowns for technical accuracy (correct repos, complexity, dependencies)
 - Addresses code review feedback
 - Closes **no-PR tasks** when finished (→ Testing by automation); PR-linked issues are closed by the reviewer on merge
-- Tests the Epic's testing task (`testing`) by default; reopens an issue when a defect is found in it
-- Moves own development issues and `testing` tasks from Testing to **Done** once the Epic is tested
+- Tests the Epic's developer testing tasks (`testing`); reopens an issue when a defect is found in it
+- Moves own development issues and developer testing tasks from Testing to **Done** once the Epic is tested
 
 ### QA Team
 
-- **Testing:** Tests Epics handed over with a demo (Release Management §6) on their testing task (`testing` + `qa`, QA member as Assignee), after merge on the integrated main branch.
-- **Status control:** moves the `testing` + `qa` task to **Done** when the Epic is verified. Defects → new Bugs under the Epic, or a reopen of the affected issue with Reopen Reason set.
+- **Testing:** Tests the Epic's QA testing tasks (`testing` + `qa`, QA member as Assignee) once the Epic is handed over with a demo (Release Management §6), after merge on the integrated main branch.
+- **Status control:** moves the QA testing tasks to **Done** when the Epic is verified. Defects → new Bugs under the Epic, or a reopen of the affected issue with Reopen Reason set.
 - **Bug triage:** Can move Bugs from Analysis → Open after verifying reproduction and assessing impact. Can close Bugs as "not planned" (not reproducible, expected behavior). Can set Priority for Bugs.
 - **Epic review:** Reviews the testing tasks (`testing`, `qa` where QA-owned) proposed by `/epic-breakdown` for testing coverage adequacy.
 - **Release sign-off:** Lead QA confirms smoke + regression tests pass and no open Blockers before release.
