@@ -174,10 +174,12 @@ while IFS= read -r item; do
     fi
   fi
 
-  if [ "$ISSUE_TYPE" = "Epic" ] && [ "$STATUS" != "Planning" ]; then
+  # Breakdown fields are produced during Analysis and required from Open on
+  # (methodics §3.2, Release Management §5.1).
+  if [ "$ISSUE_TYPE" = "Epic" ] && [ "$STATUS" != "Planning" ] && [ "$STATUS" != "Analysis" ]; then
     COMPLEXITY=$(get_field "$item" "Complexity")
     if [ -z "$COMPLEXITY" ]; then
-      echo "- **$REPO#$NUM** — Epic past Planning missing Complexity — $TITLE" >> "$REPORT"
+      echo "- **$REPO#$NUM** — Epic past Analysis missing Complexity — $TITLE" >> "$REPORT"
       ERRORS=$((ERRORS + 1))
     fi
   fi
