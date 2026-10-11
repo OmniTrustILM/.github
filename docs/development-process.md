@@ -27,6 +27,11 @@ You've opened this doc. Jump to the section for your role:
 2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date during breakdown (Analysis) — required before the Epic moves to Open.
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
+### Epic Owner
+1. **P1 Planning:** the RM puts the Epic into a release (Version) and appoints you as Epic Owner (the Epic's Assignee). Take it over: Epic Status → **Analysis**.
+2. **P2 Breakdown:** switch the Epic's task "Analysis, breakdown, estimations" to **In Progress** (create it if it is missing), break the Epic down per §1 Epic anatomy — development issues, documentation, **at least one testing task** (`/epic-breakdown` helps) — and fill in Complexity, Estimate, Start Date, End Date.
+3. Move the ready sub-issues to **Open**, close the analysis task (→ Testing) and move the Epic to **Open**. Carry the Epic through development, the demo and handover to QA (Release Management §6), and move the analysis task to **Done** with the rest once the Epic is tested.
+
 ### QA
 1. An Epic's **QA testing task** carries the labels `testing` + `qa` and a QA member as Assignee — it is planned in the breakdown, on its own or alongside a developer testing task. You start on it once the Epic is handed over with a demo (Release Management §6). Watch the **QA Board** — testing tasks with `qa` are yours.
 2. Test the Epic end-to-end on the integrated main branch: move the task to **In Progress**, test, close it (→ Testing). Defects → file **new Bugs under the Epic**; fixing them is part of the Epic's testing phase (the Epic stays in Testing).
@@ -49,6 +54,7 @@ You've opened this doc. Jump to the section for your role:
 | What does closing an issue mean? | §2.4, §6 |
 | Can I create a Feature inside a Feature? | §1 (no — split the Epic) |
 | Which issues belong under an Epic, and who tests it? | §1 Epic anatomy |
+| How is an Epic prepared before development? | §2.5 Epic preparation |
 | How is Module picked for a new issue? | §3.1 Module row |
 
 ---
@@ -224,6 +230,7 @@ This table shows **status transitions only**. For full role responsibilities (fi
 | Actor | Transitions |
 |---|---|
 | **PM / Tech Lead** | Planning → Analysis → Open (all types); also Open → Planning when deferring (see §2.5 Triage step 2) |
+| **Epic Owner** | Epic: Planning → Analysis (takes the Epic over), Analysis → Open (breakdown complete); the analysis task "Analysis, breakdown, estimations": Open → In Progress, closes it (→ Testing by automation), Testing → Done once the Epic is tested; moves the sub-issues ready for development to Open (§2.5 Epic preparation) |
 | **Developer** | Open → In Progress (self-assign); Analysis → Open (after technical analysis); Review → In Progress (linked PR is a draft / needs major rework); closes no-PR tasks (→ Testing by automation); reopens own issues on defects found in testing (→ In Progress by automation); Testing → Done on development issues and `testing` tasks once the Epic is tested |
 | **QA** | Testing → Done on `testing` + `qa` tasks (Epic verified); files Bugs under the Epic for defects; Analysis → Open (for Bugs, after reproduction check) |
 | **Automation** | Added-to-project → Planning (default) or Analysis (Bugs); In Progress → Review (PR linked); **issue closed → Testing** (whatever the Status); Reopened → In Progress (built-in project workflow) |
@@ -255,6 +262,24 @@ Both paths: issue auto-added to Project #5, status set to Planning (or Analysis 
 3. During Analysis: define acceptance criteria, write user stories (Epics), assess impact (Bugs), create sub-issues
 4. Set Priority, Module, Version, Sprint
 5. Move to Open when fully scoped
+
+#### Epic Preparation (P1 Planning, P2 Breakdown)
+
+Before development, an Epic goes through two preparation steps. Development (§2.5 Development) starts once the Epic is **Open**.
+
+**P1 — Planning** (Epic: Planning → Analysis)
+
+1. A new Epic is added to Project #5 with Status **Planning** (automation). The task **"Analysis, breakdown, estimations"** is created together with the Epic as its sub-issue.
+2. The **RM** puts the Epic into a release — fills in **Version** — and appoints the **Epic Owner** (the Epic's Assignee). The RM checks that the Epic has its **User story**, **Use cases** and **Acceptance criteria** (required fields of the Epic template).
+3. The **Epic Owner** takes the Epic over and starts the analysis: Epic Status → **Analysis**.
+
+**P2 — Breakdown, analysis, estimates** (Epic: Analysis → Open)
+
+1. The **Epic Owner** switches the analysis task to **In Progress**; if the Epic has none, they create it first.
+2. They break the Epic down into sub-issues per §1 Epic anatomy: development issues, documentation and **at least one testing task** (developer, QA or both). The `/epic-breakdown` skill can propose the breakdown (§2.6). New sub-issues are added to Project #5 with Status Planning and inherit the empty Version and Module from the Epic (automation).
+3. The **developers** estimate the issues they will work on — **Estimate** in quarter days (§3.5); the Estimate is the baseline the measured development interval is compared with.
+4. The Epic Owner fills in the Epic's **Complexity**, **Estimate**, **Start Date** and **End Date** (§3.2), moves the sub-issues ready for development to **Open**, **closes** the analysis task (→ Testing by automation) and moves the Epic to **Open**.
+5. The analysis task is preparation, not development: it keeps the Epic in Analysis while it runs and never lifts it past Analysis, not even once closed (Epic row, §2.2). Its work is evidenced like any no-PR task (In Progress → close) and credited to the Epic Owner. The Epic Owner moves it from Testing to **Done** together with the rest of the Epic once the Epic is tested — the Epic is Done only when the analysis task is Done too.
 
 #### External / Community Contributions
 
@@ -883,6 +908,13 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Defines acceptance criteria
 - Approves Epic breakdowns (business scope)
 - Validates that delivered features match requirements
+
+### Epic Owner
+
+- Appointed by the RM when the Epic is put into a release; the Epic's Assignee and delivery owner (Release Management §5)
+- Takes the Epic over (Planning → Analysis) and runs the preparation (§2.5 Epic preparation): works the analysis task "Analysis, breakdown, estimations", breaks the Epic down per §1 Epic anatomy (including at least one testing task), fills in Complexity, Estimate, Start Date and End Date, and moves the Epic to Open
+- Carries the Epic through development to the demo and handover to QA (Release Management §6)
+- Moves the analysis task to **Done** once the Epic is tested
 
 ### Developer (Assignee)
 
