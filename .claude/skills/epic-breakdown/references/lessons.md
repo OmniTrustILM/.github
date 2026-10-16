@@ -52,3 +52,10 @@ concrete signal (a Module, a repo, an existing issue, a decision rule).
   `enrich-epic.sh` exporting `PYTHONIOENCODING=utf-8`, any other tool piping a
   body through a cp1252 stdio on Windows silently writes `U+FFFD`, and a body
   already corrupted that way has to be rewritten by hand.
+
+## Language convention
+
+- ILM issues and Epics are written in **English**, even when the request comes
+  in Czech ("podle zvyklostí" = follow the English convention). Confirmed by the
+  user on ilm#363. Translate a Czech title/body to English; offer Czech only if
+  asked.
