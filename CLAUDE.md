@@ -84,6 +84,8 @@ Reusable workflows (called by other org repos' caller workflows):
 
   Both workflows also accept `artifact-namespace`. Artifact names are scoped to the caller's *run*, not to the call, so a caller that invokes either workflow more than once in a single run — a matrix over `uses:`, one row per image variant — must pass a distinct namespace per call; without it the second call publishes a wrong image under a correct-looking tag. The namespace is joined to the artifact name by a reserved `~` it may not itself contain. The default is empty, which keeps the historical unprefixed names for every single-call caller. Note that a matrix over `containers-test.yml` also renames its job contexts (`test / Build amd64` becomes `test (<row>) / Build amd64`), which breaks any ruleset pinning them.
 
+  Both workflows also accept `read-token-repositories`, for a build that reads private repositories such as a private Go module. Each build job then mints a read-only GitHub App token for those repositories from `READ_TOKEN_APP_ID` and `READ_TOKEN_APP_PRIVATE_KEY`, and the build gets it as the BuildKit secret `read-token-secret-id` names. The workflow mints it because a job that calls a reusable workflow holds that call alone.
+
 ### Composite actions (consumed by caller workflows in target repos)
 
 Each action lives under `.github/actions/<name>/` (directory containing `action.yml` + its shell script). Target repos invoke them via caller workflows deployed by Repo Template Sync. Pinned to moving tags `issue-automation-v1` and `release-automation-v1`.

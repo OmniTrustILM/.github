@@ -152,6 +152,21 @@ on:
         required: false
         type: boolean
         default: true
+      read-token-repositories:
+        description: "Comma-separated repositories the build reads with a GitHub App token, such as a private Go module"
+        required: false
+        type: string
+        default: ''
+      read-token-owner:
+        description: "Owner of read-token-repositories. Empty (the default) is the caller's owner."
+        required: false
+        type: string
+        default: ''
+      read-token-secret-id:
+        description: "BuildKit secret id the build reads the token from"
+        required: false
+        type: string
+        default: github_token
     secrets:
       CONTAINER_REGISTRY_USERNAME:
         required: true
@@ -162,6 +177,11 @@ on:
       COSIGN_PRIVATE_KEY:
         required: false
       COSIGN_PASSWORD:
+        required: false
+      # Needed only with read-token-repositories.
+      READ_TOKEN_APP_ID:
+        required: false
+      READ_TOKEN_APP_PRIVATE_KEY:
         required: false
 
 jobs:
@@ -269,6 +289,17 @@ jobs:
           username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
+      - name: Mint the read token
+        id: read-token
+        if: ${{ inputs.read-token-repositories != '' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.READ_TOKEN_APP_ID }}
+          private-key: ${{ secrets.READ_TOKEN_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.read-token-owner }}
+          repositories: ${{ inputs.read-token-repositories }}
+          permission-contents: read
+
       - name: Build + push (${{ matrix.arch }}) by digest only (no tags)
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -282,6 +313,7 @@ jobs:
           cache-from: type=gha,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           build-args: ${{ inputs.build-args }}
+          secrets: ${{ steps.read-token.outputs.token != '' && format('{0}={1}', inputs.read-token-secret-id, steps.read-token.outputs.token) || '' }}
 
       - name: Export digest as marker file
         run: |
