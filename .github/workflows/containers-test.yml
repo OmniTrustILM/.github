@@ -81,6 +81,27 @@ on:
         required: false
         type: string
         default: ''
+      read-token-repositories:
+        description: "Comma-separated repositories the build reads with a GitHub App token, such as a private Go module"
+        required: false
+        type: string
+        default: ''
+      read-token-owner:
+        description: "Owner of read-token-repositories. Empty (the default) is the caller's owner."
+        required: false
+        type: string
+        default: ''
+      read-token-secret-id:
+        description: "BuildKit secret id the build reads the token from"
+        required: false
+        type: string
+        default: github_token
+    secrets:
+      # Needed only with read-token-repositories.
+      READ_TOKEN_APP_ID:
+        required: false
+      READ_TOKEN_APP_PRIVATE_KEY:
+        required: false
 
 jobs:
   build_artifacts:
@@ -164,6 +185,17 @@ jobs:
         if: ${{ inputs.pre-build == 'maven' }}
         run: tar -xpf app-data.tar
 
+      - name: Mint the read token
+        id: read-token
+        if: ${{ inputs.read-token-repositories != '' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.READ_TOKEN_APP_ID }}
+          private-key: ${{ secrets.READ_TOKEN_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.read-token-owner }}
+          repositories: ${{ inputs.read-token-repositories }}
+          permission-contents: read
+
       - name: Build (${{ matrix.arch }}) - local only (no push)
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -177,6 +209,7 @@ jobs:
           cache-from: type=gha,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           build-args: ${{ inputs.build-args }}
+          secrets: ${{ steps.read-token.outputs.token != '' && format('{0}={1}', inputs.read-token-secret-id, steps.read-token.outputs.token) || '' }}
 
       # Resolve first so TRIVY_IGNOREFILE (set for the org-default gate) also
       # governs the informational report below — the report must reflect what
