@@ -1,3 +1,6 @@
+- name: breaking-change
+  color: "b91c1c"
+  description: "Breaks an existing contract or behaviour (for release notes categorization)"
 - name: bug
   color: "ef4444"
   description: "Bug fix"
@@ -40,6 +43,9 @@
 - name: testing
   color: "eab308"
   description: "Testing-related work (manual or automated), by anyone; QA-owned tasks also get qa"
+- name: upgrade-action
+  color: "d97706"
+  description: "Requires an operator action after upgrading (for release notes categorization)"
 - name: vulnerability
   color: "e11d48"
   description: "Security vulnerability or concern"

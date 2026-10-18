@@ -581,6 +581,8 @@ Standardized across all repos via `labels.yml` and label-sync automation.
 | `documentation` | Documentation work | Documentation template, manual |
 | `tech-epic` | Technical epic — used to mark Epics that group internal technical work (infra, refactors, tooling) rather than customer-facing features | Manual, on Epic issues |
 | `ignore-for-release` | Exclude from release notes | Manual |
+| `breaking-change` | Breaks an existing contract or behaviour | Manual |
+| `upgrade-action` | Requires an operator action after upgrading | Manual |
 | `new-feature` | Wholly new functionality (manually applied to distinguish from enhancements in release notes) | Manual |
 | `enhancement` | Improvement to existing functionality (auto-applied by Feature template; replace with `new-feature` if the Feature is wholly new) | Feature template |
 | `bug` | Bug fix | Bug template |
@@ -593,10 +595,12 @@ Standardized across all repos via `labels.yml` and label-sync automation.
 
 Labels are for cross-cutting concerns and release notes, not issue type classification.
 
-**Release notes mapping** (`templates/release.yml`): on each GitHub Release, merged-PR titles are auto-grouped into the following categories by the labels on the issues they closed.
+**Release notes mapping** (`templates/release.yml`): on each GitHub Release, merged-PR titles are auto-grouped into the following categories by the labels **on the pull request itself**. Labels on the closed issue have no effect.
 
 | Category | Trigger labels |
 |---|---|
+| ⚠️ Breaking Changes | `breaking-change` |
+| 🧰 Upgrade Actions | `upgrade-action` |
 | ✨ New Features | `new-feature` |
 | 🔧 Enhancements | `enhancement` |
 | 🐛 Bug Fixes | `bug` |
@@ -606,6 +610,12 @@ Labels are for cross-cutting concerns and release notes, not issue type classifi
 | 📖 Documentation | `documentation` |
 | 📦 Dependencies | `dependencies` |
 | 📋 Other | (everything else) |
+
+**Order matters.** A PR lands in the first category it matches. The two new categories sit at the top, so a bug fix that also needs an operator action is not buried in Bug Fixes.
+
+Use `upgrade-action` when the change ships correctly but leaves work to do: repairing old data, re-configuring after a changed default.
+
+Notes emit one PR title per line. The title carries the message. Detail goes in the release summary.
 
 Excluded entirely: PRs labeled `ignore-for-release` (chore, internal cleanup, doc-only fixes that should not appear in user-facing release notes). PMs and reviewers should not strip a label like `vulnerability` thinking it's only for project tracking — it is also what routes the entry into the Security section of release notes.
 
