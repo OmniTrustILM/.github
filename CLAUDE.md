@@ -25,7 +25,7 @@ This is the **OmniTrustILM `.github` repository** — the organization-wide defa
 - `templates/` — files synced OUT to every org repo
   - `templates/labels.yml`, `templates/release.yml` — propagated via sync workflows
   - `templates/caller-workflows/` — caller workflow files that land in each repo's `.github/workflows/` to invoke the composite actions below
-- `config/` — files consumed HERE or by external automation (triage rules; and `repo-domains.yml`, consumed by the repo-template-sync workflow to render per-repo CODEOWNERS)
+- `config/` — files consumed HERE or by external automation (triage rules; `repo-domains.yml`, consumed by the repo-template-sync workflow to render per-repo CODEOWNERS; and `copilot-repos.yml`, the allowlist deciding which repos that workflow syncs Copilot review instructions to)
 - `.github/workflows/` — GitHub Actions workflows that run in THIS repo (required path)
 - `.github/actions/` — composite actions consumed by caller workflows in other org repos (and by this repo's own reusable container workflows); each action is a directory with `action.yml` + its shell script
 - `.github/scripts/` — bash scripts called by workflows in this repo (label-sync, project-health-report, release-yml-sync, repo-template-sync)
@@ -68,7 +68,7 @@ Sync / template distribution:
 
 - **Label Sync** (`.github/workflows/label-sync.yml`) — push to `main` on `templates/labels.yml` changes, or manual. Syncs labels to all non-archived org repos.
 - **Release.yml Sync** (`.github/workflows/release-yml-sync.yml`) — manual dispatch. Opens PRs in target repos to adopt `templates/release.yml`. Useful for release.yml-only hotfixes.
-- **Repo Template Sync** (`.github/workflows/repo-template-sync.yml`) — manual dispatch. Orchestrator that aligns each target repo with `templates/release.yml`, `templates/caller-workflows/*.yml`, and a per-repo `.github/CODEOWNERS` rendered from `config/repo-domains.yml`, opening a single PR per repo with up to three commits (skipping tasks with no drift).
+- **Repo Template Sync** (`.github/workflows/repo-template-sync.yml`) — manual dispatch. Orchestrator that aligns each target repo with `templates/release.yml`, `templates/caller-workflows/*.yml`, a per-repo `.github/CODEOWNERS` rendered from `config/repo-domains.yml`, and - for repos listed in `config/copilot-repos.yml` - `templates/copilot-instructions.md`, opening a single PR per repo with up to four commits (skipping tasks with no drift).
 
 Reporting and CI:
 
