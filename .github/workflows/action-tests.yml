@@ -38,6 +38,21 @@ jobs:
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
+      - name: Install bats
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq bats
+
+      # Discovered by glob so later slices' suites are picked up without
+      # touching this workflow.
+      - name: Run bats suites
+        run: |
+          shopt -s globstar nullglob
+          suites=(.github/actions/**/tests/*.bats .github/scripts/**/tests/*.bats)
+          if [ "${#suites[@]}" -eq 0 ]; then
+            echo "No *.bats suites found"
+          else
+            bats "${suites[@]}"
+          fi
+
       - name: Run shell test suites
         run: |
           shopt -s globstar nullglob
