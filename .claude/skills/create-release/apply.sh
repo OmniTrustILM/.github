@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # Execute the confirmed release plan from cache/plan.json:
 #   1. create the Release issue in OmniTrustILM/ilm (type Release),
-#   2. create the "Bugs <version>" tech-epic (type Epic) as its sub-issue,
-#   3. add both to Project #5 and set Status / Start Date / End Date
-#      (+ Prioritization on the epic; Version only if the option exists).
+#   2. create the standard tech-epics "Bugs <version>" and
+#      "Documentation <version>" (type Epic, label tech-epic) as its
+#      sub-issues,
+#   3. add all three to Project #5 and set Status / Start Date / End Date
+#      (+ Prioritization on the epics; Version only if the option exists).
 #
 # Sprint iterations and the Version option are NOT touched here — see
 # SKILL.md: rewriting those field configurations via the API orphans every
 # existing assignment. verify.sh finishes the job after the manual UI step.
 #
 # Writes cache/state.json with created issue/item ids for verify.sh.
-# Output: key=value lines (release_url, release_number, epic_url, epic_number).
+# Output: key=value lines (release_url, release_number, epic_url, epic_number,
+# docs_epic_url, docs_epic_number).
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -42,7 +45,7 @@ if [ -n "$SCOPES_LINE" ] && ! printf '%s' "$SCOPES_LINE" | grep -qE "'project'";
 fi
 
 # --- Idempotence guard: refuse to duplicate existing issues ---
-for title in "$VERSION" "Bugs $VERSION"; do
+for title in "$VERSION" "Bugs $VERSION" "Documentation $VERSION"; do
   HIT=$(gh issue list -R "$REPO" --state all --search "in:title \"$title\"" \
         --json number,title \
         | jq -r --arg t "$title" '[.[] | select(.title == $t)] | first | .number // empty')
@@ -141,23 +144,49 @@ E_NODE=$(sed -n 3p <<<"$E_OUT"); E_ITEM=$(sed -n 4p <<<"$E_OUT")
 
 set_option "$E_ITEM" "Prioritization" "Medium" "$(option_id Prioritization Medium)"
 
-# --- 3. Link the epic under the release ---
-gh api graphql -f query='mutation($p: ID!, $c: ID!) {
-    addSubIssue(input: {issueId: $p, subIssueId: $c}) { issue { id } }
-  }' -f p="$R_NODE" -f c="$E_NODE" >/dev/null \
-  && log "linked Bugs $VERSION as sub-issue of $VERSION" \
-  || log "warn: failed to link sub-issue — link #$E_NUMBER under #$R_NUMBER manually"
+# --- 2b. Documentation tech-epic (standard part of every release since
+# 2.21.0): one direct "Doc: <epic title>" child per product epic is added
+# when product epics join the release, not here. ---
+DOCS_BODY="### User Story
+
+As release manager, I want all documentation work of release $VERSION collected in one place, so that documentation is planned, tracked and delivered for every product epic of the release.
+
+### Use Cases
+
+- Every product epic of the release has exactly one direct child here, named \"Doc: <epic title>\".
+- When an epic needs several documentation tasks, they are nested under its \"Doc:\" task."
+
+D_OUT=$(create_issue "Documentation $VERSION" "$DOCS_BODY" "Epic" --label tech-epic)
+D_URL=$(sed -n 1p <<<"$D_OUT"); D_NUMBER=$(sed -n 2p <<<"$D_OUT")
+D_NODE=$(sed -n 3p <<<"$D_OUT"); D_ITEM=$(sed -n 4p <<<"$D_OUT")
+
+set_option "$D_ITEM" "Prioritization" "Medium" "$(option_id Prioritization Medium)"
+
+# --- 3. Link both tech-epics under the release ---
+link_under_release() {  # $1=node $2=number $3=title
+  gh api graphql -f query='mutation($p: ID!, $c: ID!) {
+      addSubIssue(input: {issueId: $p, subIssueId: $c}) { issue { id } }
+    }' -f p="$R_NODE" -f c="$1" >/dev/null \
+    && log "linked $3 as sub-issue of $VERSION" \
+    || log "warn: failed to link sub-issue — link #$2 under #$R_NUMBER manually"
+}
+link_under_release "$E_NODE" "$E_NUMBER" "Bugs $VERSION"
+link_under_release "$D_NODE" "$D_NUMBER" "Documentation $VERSION"
 
 # --- 4. Persist state for verify.sh ---
 jq -n --arg v "$VERSION" \
       --arg rurl "$R_URL" --arg rnum "$R_NUMBER" --arg ritem "$R_ITEM" \
       --arg eurl "$E_URL" --arg enum "$E_NUMBER" --arg eitem "$E_ITEM" \
+      --arg durl "$D_URL" --arg dnum "$D_NUMBER" --arg ditem "$D_ITEM" \
       '{version: $v,
-        release: {url: $rurl, number: ($rnum | tonumber), item_id: $ritem},
-        epic:    {url: $eurl, number: ($enum | tonumber), item_id: $eitem}}' \
+        release:   {url: $rurl, number: ($rnum | tonumber), item_id: $ritem},
+        epic:      {url: $eurl, number: ($enum | tonumber), item_id: $eitem},
+        docs_epic: {url: $durl, number: ($dnum | tonumber), item_id: $ditem}}' \
   > "$CACHE_DIR/state.json"
 
 echo "release_url=$R_URL"
 echo "release_number=$R_NUMBER"
 echo "epic_url=$E_URL"
 echo "epic_number=$E_NUMBER"
+echo "docs_epic_url=$D_URL"
+echo "docs_epic_number=$D_NUMBER"

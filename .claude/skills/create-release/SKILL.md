@@ -3,7 +3,8 @@ name: create-release
 version: 1.0.0
 description: >
   Use when starting the next OmniTrustILM quarterly release: creates the
-  Release issue and its "Bugs <version>" tech-epic in ilm, sets their
+  Release issue and its standard "Bugs <version>" and "Documentation
+  <version>" tech-epics in ilm, sets their
   Project #5 fields, computes the full sprint schedule (incl. boundary-sprint
   trims), and verifies the manual Sprint/Version UI steps. Also plans sprints
   for an existing release via --sprints-only.
@@ -39,7 +40,8 @@ updated_at: 2026-09-08
 
 Start the next quarterly release cycle: compute the version, the release
 window, and the sprint schedule from the PM conventions baked into `plan.py`;
-create the Release issue and its `Bugs <version>` tech-epic; set their
+create the Release issue and its standard `Bugs <version>` and
+`Documentation <version>` tech-epics; set their
 Project #5 fields; and walk the user through the two steps that must stay
 manual (adding the Version option and the Sprint iterations in the UI),
 verifying them afterwards.
@@ -72,6 +74,14 @@ the IDs.
   an existing iteration overhanging the start gets a trim proposal.
 - The `Bugs <version>` epic (label `tech-epic`, Prioritization Medium) is a
   sub-issue of the Release issue and shares its window.
+- The `Documentation <version>` epic (RM rule 2026-10-20: a standard,
+  mandatory part of every release; label `tech-epic`, Prioritization
+  Medium, same window) is a sub-issue of the Release issue too. It holds
+  exactly one direct child per product epic of the release — a Task
+  titled `Doc: <epic title>` (repo `documentation`, label
+  `documentation`); several doc tasks of one epic nest under its `Doc:`
+  task. This skill creates the empty epic; the `Doc:` tasks are added
+  whenever a product epic joins the release (the epic-moving skills do it).
 
 If PM conventions change, update `docs/development-process.md` first, then
 `plan.py` and its tests.
@@ -132,6 +142,9 @@ Issues to create in OmniTrustILM/ilm (on confirm):
                              Start Date, End Date, Version (after UI step)
   2. Epic "Bugs 2.22.0"    — type Epic, label tech-epic, sub-issue of the
                              release, Prioritization=Medium, same window
+  3. Epic "Documentation 2.22.0"
+                           — type Epic, label tech-epic, sub-issue of the
+                             release, Prioritization=Medium, same window
 
 Sprint plan (manual UI step, verified afterwards):
   Sprint 1 (27/Q1)   2027-01-01  3d  (ends 2027-01-03)
@@ -167,9 +180,10 @@ In `--sprints-only` mode, omit the issues section.
 bash $SKILL_DIR/apply.sh
 ```
 
-Creates both issues, sets types and project fields, links the sub-issue, and
-writes `cache/state.json`. Output is `key=value` lines (`release_url`,
-`release_number`, `epic_url`, `epic_number`) — capture them. `apply.sh`
+Creates the three issues, sets types and project fields, links both
+tech-epics under the release, and writes `cache/state.json`. Output is
+`key=value` lines (`release_url`, `release_number`, `epic_url`,
+`epic_number`, `docs_epic_url`, `docs_epic_number`) — capture them. `apply.sh`
 refuses to run twice for the same version (title guard) and aborts before
 creating anything if the token lacks the `project` scope.
 
@@ -239,8 +253,9 @@ Finish with a summary: issue URLs, window, sprint count, and Version status.
 ## Notes
 
 - `plan.sh` is read-only and safe to re-run any time; `verify.sh` mutates
-  only the Version value on the two issues recorded in `cache/state.json`.
-- This skill is the sanctioned writer of the Release/Bugs-epic Version,
+  only the Version value on the three issues recorded in `cache/state.json`.
+- This skill is the sanctioned writer of the Release / Bugs-epic /
+  Documentation-epic Version,
   Start Date and End Date values (methodics §10) — the same carve-out
   `epic-breakdown` has for Complexity/Estimate. It still never touches
   Sprint assignments on issues, and never rewrites field configurations.

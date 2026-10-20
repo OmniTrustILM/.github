@@ -50,7 +50,9 @@ if [ -n "$VERSION_OPT" ]; then
   echo "OK       Version option '$VERSION' exists"
   if [ -f "$CACHE_DIR/state.json" ] \
      && [ "$(jq -r '.version' "$CACHE_DIR/state.json")" = "$VERSION" ]; then
-    for role in release epic; do
+    for role in release epic docs_epic; do
+      # older state files predate the Documentation epic
+      jq -e --arg r "$role" 'has($r)' "$CACHE_DIR/state.json" >/dev/null || continue
       ITEM=$(jq -r --arg r "$role" '.[$r].item_id' "$CACHE_DIR/state.json")
       NUM=$(jq -r --arg r "$role" '.[$r].number' "$CACHE_DIR/state.json")
       if gh api graphql -f query='mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) {
