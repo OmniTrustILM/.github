@@ -100,7 +100,6 @@ Release 2.18.0
 │   │   └── Bug: Fix serialization edge case
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
-│   ├── Task+documentation [documentation]: Revocation user guide
 │   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
@@ -108,6 +107,11 @@ Release 2.18.0
 ├── Epic [ilm]: Bugs 2.18.0
 │   ├── Bug [core]: Revocation reason not persisted
 │   └── Bug [fe-administrator]: Filter resets when paging
+├── Epic [ilm]: Documentation 2.18.0
+│   ├── Task+documentation [documentation]: Doc: Certificate Revocation Redesign
+│   │   ├── Task+documentation [documentation]: Revocation user guide
+│   │   └── Task+documentation [interface-documentation]: Revocation API reference
+│   └── Task+documentation [documentation]: Doc: CBOM Enhancements
 ├── Bug [fe-administrator]: Standalone bug
 └── Task [helm-charts]: Standalone task
 ```
@@ -117,7 +121,16 @@ Release 2.18.0
   the cycle are its sub-issues. It is an ordinary Epic in an ordinary place in the hierarchy — no separate rules apply to
   it. Bugs found during the cycle go here rather than directly under the Release, which keeps the Release's own children
   down to Epics. The `/create-issue` skill links a new bug under the active cycle automatically (§2.5).
-- Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks)
+- **Documentation cycles.** Each release also carries a `Documentation x.y.z` Epic in `ilm` (label `tech-epic`),
+  parented under that Release. Every product Epic of the release — any Epic other than the release's tech Epics and bug
+  collectors — owns exactly one direct sub-issue of it: a Task in `documentation` with the `documentation` label, titled
+  `Doc: <Epic title>`, with the same Version and Module as the Epic. Its assignee is the Epic's owner (the Epic's
+  assignee). When the Epic needs several documentation tasks, they are nested under its `Doc:` task rather than placed
+  under the Epic; until the scope is known, the `Doc:` task is a placeholder. The `Doc:` task follows its Epic: it moves
+  to the target release's `Documentation x.y.z` Epic when the Epic moves to another release, it is renamed when the
+  Epic is renamed, and a continuation Epic gets its own `Doc:` task while the source Epic keeps its own.
+- Epics contain Features, Bugs, Tasks (including QA-labeled Tasks); an Epic's documentation work lives under its `Doc:`
+  task in the release's `Documentation x.y.z` Epic (see above), not under the Epic itself
 - Features can contain Tasks and Bugs as implementation details (small sub-work discovered during development). **A Feature must NOT contain sub-Features** — this signals the Epic is too large and should be split.
 - Sub-issues receive Version and Module from parent at creation time (automation copies if child's fields are empty; does not update if parent changes later — see Section 6, Rule #2)
 - An issue can have only one parent
@@ -264,7 +277,7 @@ Three-phase process with PM and QA review:
 
 **Phase 1 — Human writes the Epic:** PM, Tech Lead, or Product Owner creates Epic via template. Fills in User Story, Use Cases, Constraints, Out of Scope, Testing Scope.
 
-**Phase 2 — AI skill proposes breakdown:** `/epic-breakdown` reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, an Estimate the skill writes as a seed the Developer owns (with review buffer), blocked-by relationships, suggested assignee.
+**Phase 2 — AI skill proposes breakdown:** `/epic-breakdown` reads the Epic, explores repos, generates Acceptance Criteria + Technical Analysis + Impact Assessment + Testing Scope, proposes sub-issues by work stream (API, Backend, Frontend, Access Control, Testing, Documentation, Deployment). Each sub-issue includes type, target repo, description, acceptance criteria, Module, Complexity, an Estimate the skill writes as a seed the Developer owns (with review buffer), blocked-by relationships, suggested assignee. Documentation sub-issues are not linked under the Epic: they go under the Epic's `Doc: <Epic title>` task in the release's `Documentation x.y.z` Epic (§1, Issue Hierarchy).
 
 **Phase 3 — Review and approval (collaborative):**
 1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
@@ -345,7 +358,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
 
 **Release flow:**
 
-1. PM creates Release issue in Planning, assigns Epics, sets Version
+1. PM creates Release issue in Planning together with its `Bugs x.y.z` and `Documentation x.y.z` Epics, assigns Epics, sets Version, and makes sure every product Epic has its `Doc: <Epic title>` task in the `Documentation x.y.z` Epic (§1, Issue Hierarchy)
 2. Development progresses, tracked via Release Planning and Roadmap views
 3. All child issues reach Done (code merged, individually QA-tested)
 4. PM verifies all child issues are Done (via Release Planning view / Sub-issues progress)
@@ -829,7 +842,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Feature: action ("Add bulk revocation")
 - Epic: deliverable name ("Certificate Revocation Redesign")
 - Task: action ("Update deployment guide")
-- Documentation (Task+label): doc subject ("Document revocation API endpoints")
+- Documentation (Task+label): doc subject ("Document revocation API endpoints"); an Epic's documentation task in the release's `Documentation x.y.z` Epic is titled `Doc: <Epic title>` ("Doc: Certificate Revocation Redesign")
 - Release: version ("Release 2.18.0")
 - QA (Task+label): test scope ("E2E tests for revocation")
 
