@@ -40,7 +40,8 @@ name: Publish Harbor image (reusable)
 # `ref` builds something other than the caller's own ref. A PR preview passes the
 # PR head SHA, which resolves even for a fork: fork objects live in the base
 # repository's network. Such a build is not a release, so it also passes
-# `sign: false` and `push-readme: false`.
+# `sign: false` and `push-readme: false`. The head may be a fork's code, so
+# `validate_inputs` refuses `ref` together with `read-token-repositories`.
 
 on:
   workflow_call:
@@ -185,8 +186,8 @@ on:
         required: false
 
 jobs:
-  # Runs before anything writes an artifact, so a bad namespace fails here with a
-  # readable message rather than inside actions/upload-artifact.
+  # Runs before anything writes an artifact or mints a token, so a bad input fails
+  # here with a readable message rather than inside actions/upload-artifact.
   validate_inputs:
     name: Validate inputs
     runs-on: ubuntu-latest
@@ -200,6 +201,12 @@ jobs:
             echo "::error::artifact-namespace must match ^[A-Za-z0-9][A-Za-z0-9._-]*\$ (got '$NS')"
             exit 1
           fi
+
+      - name: Validate read-token-repositories
+        if: ${{ inputs.read-token-repositories != '' && inputs.ref != '' }}
+        run: |
+          echo "::error::read-token-repositories cannot be combined with ref, because a ref build may run a fork's code"
+          exit 1
 
   build_artifacts:
     name: Build app artifacts (once)
@@ -311,7 +318,7 @@ jobs:
           sbom: true
           outputs: type=image,name=${{ inputs.registry }}/${{ inputs.image }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=${{ inputs.read-token-repositories != '' && 'min' || 'max' }},scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           build-args: ${{ inputs.build-args }}
           secrets: ${{ steps.read-token.outputs.token != '' && format('{0}={1}', inputs.read-token-secret-id, steps.read-token.outputs.token) || '' }}
 
