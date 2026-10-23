@@ -30,7 +30,7 @@ You've opened this doc. Jump to the section for your role:
 ### Epic Owner
 1. **P1 Planning:** the RM puts the Epic into a release (Version) and appoints you as Epic Owner (the Epic's Assignee). Take it over: Epic Status → **Analysis**.
 2. **P2 Breakdown:** switch the Epic's task "Analysis, breakdown, estimations" to **In Progress** (create it if it is missing), break the Epic down per §1 Epic anatomy — development issues, documentation, **at least one testing task** (`/epic-breakdown` helps) — and fill in Complexity, Estimate, Start Date, End Date.
-3. Move the ready sub-issues to **Open**, close the analysis task (→ Testing) and move the Epic to **Open**. Carry the Epic through development, the demo and handover to QA (Release Management §6), and move the analysis task to **Done** with the rest once the Epic is tested.
+3. Move the ready sub-issues to **Open**, move the analysis task to **Done** (it is the gate: the Epic can be Open only once the task is Done — closing alone leaves it in Testing and the Epic in Analysis) and move the Epic to **Open**. Carry the Epic through development, the demo and handover to QA (Release Management §6).
 
 ### QA
 1. An Epic's **QA testing task** carries the labels `testing` + `qa` and a QA member as Assignee — it is planned in the breakdown, on its own or alongside a developer testing task. You start on it once the Epic is handed over with a demo (Release Management §6). Watch the **QA Board** — testing tasks with `qa` are yours.
@@ -142,7 +142,7 @@ The kinds of issues under an Epic. The kind follows from the issue type and its 
 | **Epic** | Epic | Epic Owner | none itself — its Estimate (overall delivery estimate) stands in while there is no breakdown | derived from the children | 1 |
 | **Development issue** | Feature / Task without `testing`, `qa` | developer | Development | development work | 1 or more |
 | **Documentation** | Task + `documentation` | developer | Development | development work | as needed |
-| **Analysis task** | Task "Analysis, breakdown, estimations" | Epic Owner | Development | preparation — never lifts the Epic past Analysis; must be Done for the Epic to be Done | usually 1, at the start |
+| **Analysis task** | Task "Analysis, breakdown, estimations" | Epic Owner | Development | the gate — until it is Done the Epic is Planning or Analysis; Done lets the Epic be Open and move on | usually 1, at the start |
 | **Developer testing task** | Task + `testing` | developer | Testing after freeze | testing phase | at least one testing task per Epic — a developer one, a QA one, or both side by side; a complex Epic may have more |
 | **QA testing task** | Task + `testing` + `qa` (manual or automated, e.g. ATF regression suites) | QA member | QA | testing phase | ↑ |
 | **QA work** | Task + `qa` (automation, framework, QA infrastructure) | QA member | QA | testing phase | as needed |
@@ -230,7 +230,7 @@ This table shows **status transitions only**. For full role responsibilities (fi
 | Actor | Transitions |
 |---|---|
 | **PM / Tech Lead** | Planning → Analysis → Open (all types); also Open → Planning when deferring (see §2.5 Triage step 2) |
-| **Epic Owner** | Epic: Planning → Analysis (takes the Epic over), Analysis → Open (breakdown complete); the analysis task "Analysis, breakdown, estimations": Open → In Progress, closes it (→ Testing by automation), Testing → Done once the Epic is tested; moves the sub-issues ready for development to Open (§2.5 Epic preparation) |
+| **Epic Owner** | Epic: Planning → Analysis (takes the Epic over), Analysis → Open (analysis task Done, breakdown complete); the analysis task "Analysis, breakdown, estimations": Open → In Progress, (Review for the Tech Lead's feedback,) → Done when the analysis is complete — the gate of the Epic's Status (§2.2); moves the sub-issues ready for development to Open (§2.5 Epic preparation) |
 | **Developer** | Open → In Progress (self-assign); Analysis → Open (after technical analysis); Review → In Progress (linked PR is a draft / needs major rework); closes no-PR tasks (→ Testing by automation); reopens own issues on defects found in testing (→ In Progress by automation); Testing → Done on development issues and `testing` tasks once the Epic is tested |
 | **QA** | Testing → Done on `testing` + `qa` tasks (Epic verified); files Bugs under the Epic for defects; Analysis → Open (for Bugs, after reproduction check) |
 | **Automation** | Added-to-project → Planning (default) or Analysis (Bugs); In Progress → Review (PR linked); **issue closed → Testing** (whatever the Status); Reopened → In Progress (built-in project workflow) |
@@ -278,8 +278,8 @@ Before development, an Epic goes through two preparation steps. Development (§2
 1. The **Epic Owner** switches the analysis task to **In Progress**; if the Epic has none, they create it first.
 2. They break the Epic down into sub-issues per §1 Epic anatomy: development issues, documentation and **at least one testing task** (developer, QA or both). The `/epic-breakdown` skill can propose the breakdown (§2.6). New sub-issues are added to Project #5 with Status Planning and inherit the empty Version and Module from the Epic (automation).
 3. The **developers** estimate the issues they will work on — **Estimate** in quarter days (§3.5); the Estimate is the baseline the measured development interval is compared with.
-4. The Epic Owner fills in the Epic's **Complexity**, **Estimate**, **Start Date** and **End Date** (§3.2), moves the sub-issues ready for development to **Open**, **closes** the analysis task (→ Testing by automation) and moves the Epic to **Open**.
-5. The analysis task is preparation, not development: it keeps the Epic in Analysis while it runs and never lifts it past Analysis, not even once closed (Epic row, §2.2). Its work is evidenced like any no-PR task (In Progress → close) and credited to the Epic Owner. The Epic Owner moves it from Testing to **Done** together with the rest of the Epic once the Epic is tested — the Epic is Done only when the analysis task is Done too.
+4. The Epic Owner fills in the Epic's **Complexity**, **Estimate**, **Start Date** and **End Date** (§3.2), moves the sub-issues ready for development to **Open**, moves the analysis task to **Done** and moves the Epic to **Open**. Unsure of the result, the Epic Owner first switches the analysis task to **Review** (without a PR) and asks the Tech Lead for feedback.
+5. The analysis task is the **gate of the Epic's Status** (§2.2, Release Management §5.1): until it is Done the Epic is Planning (task not started) or Analysis (task In Progress, Review or Testing), whatever its other children do; only a Done analysis task lets the Epic be Open and move on. Closing the task alone is not enough — the automation moves a closed issue to Testing, which keeps the Epic in Analysis until the task is moved to Done. Its work is evidenced like any no-PR task (In Progress → close) and credited to the Epic Owner.
 
 #### External / Community Contributions
 
@@ -912,9 +912,9 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 ### Epic Owner
 
 - Appointed by the RM when the Epic is put into a release; the Epic's Assignee and delivery owner (Release Management §5)
-- Takes the Epic over (Planning → Analysis) and runs the preparation (§2.5 Epic preparation): works the analysis task "Analysis, breakdown, estimations", breaks the Epic down per §1 Epic anatomy (including at least one testing task), fills in Complexity, Estimate, Start Date and End Date, and moves the Epic to Open
+- Takes the Epic over (Planning → Analysis) and runs the preparation (§2.5 Epic preparation): works the analysis task "Analysis, breakdown, estimations", breaks the Epic down per §1 Epic anatomy (including at least one testing task), fills in Complexity, Estimate, Start Date and End Date, moves the analysis task to **Done** and the Epic to Open
 - Carries the Epic through development to the demo and handover to QA (Release Management §6)
-- Moves the analysis task to **Done** once the Epic is tested
+- Keeps the analysis task Done once the analysis is complete — it is the gate of the Epic's Status (§2.2)
 
 ### Developer (Assignee)
 
