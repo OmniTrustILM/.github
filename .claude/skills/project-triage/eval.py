@@ -91,7 +91,8 @@ BODY_SECTIONS = {
 
 PROJECT_FIELDS = {
     'severity': 'Severity', 'module': 'Module', 'version': 'Version',
-    'priority': 'Priority', 'complexity': 'Complexity',
+    # rule key stays `priority`; the Project #5 field was renamed
+    'priority': 'Prioritization', 'complexity': 'Complexity',
     'estimate': 'Estimate', 'start_date': 'Start Date', 'end_date': 'End Date',
     'reopen_reason': 'Reopen Reason',
 }

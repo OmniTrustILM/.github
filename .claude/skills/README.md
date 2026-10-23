@@ -34,7 +34,7 @@ before any write — holds for all of them:
   (`(suggested)`/`(paraphrased)`/`(extracted)`).
 - **Permission split (methodics §10):** the skills propose freely but require
   explicit human approval before creating issues or mutating fields, and never
-  set Version / Sprint / Priority autonomously.
+  set Version / Sprint / Prioritization autonomously.
 - **Scopes:** the skills need a `gh` token with `repo`, `read:org`, and — for
   reading/writing Project #5 — `read:project` (reads) or `project` (writes). If a
   step reports a missing scope, run the exact `gh auth refresh -s <scope>` it prints.
