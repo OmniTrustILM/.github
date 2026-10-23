@@ -167,11 +167,21 @@ jobs:
     env:
       ARTIFACT_PREFIX: ${{ inputs.artifact-namespace != '' && format('{0}~', inputs.artifact-namespace) || '' }}
     steps:
-      - name: Validate read-token-repositories
+      - name: Validate read-token-repositories with ref
         if: ${{ inputs.read-token-repositories != '' && inputs.ref != '' }}
         run: |
           echo "::error::read-token-repositories cannot be combined with ref, because a ref build may run a fork's code"
           exit 1
+
+      - name: Validate read-token-repositories entries
+        if: ${{ inputs.read-token-repositories != '' }}
+        env:
+          REPOSITORIES: ${{ inputs.read-token-repositories }}
+        run: |
+          if [ -z "$(printf '%s' "$REPOSITORIES" | tr -d ',[:space:]')" ]; then
+            echo "::error::read-token-repositories lists no repository"
+            exit 1
+          fi
 
       - name: Check out the repo
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

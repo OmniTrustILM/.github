@@ -202,11 +202,21 @@ jobs:
             exit 1
           fi
 
-      - name: Validate read-token-repositories
+      - name: Validate read-token-repositories with ref
         if: ${{ inputs.read-token-repositories != '' && inputs.ref != '' }}
         run: |
           echo "::error::read-token-repositories cannot be combined with ref, because a ref build may run a fork's code"
           exit 1
+
+      - name: Validate read-token-repositories entries
+        if: ${{ inputs.read-token-repositories != '' }}
+        env:
+          REPOSITORIES: ${{ inputs.read-token-repositories }}
+        run: |
+          if [ -z "$(printf '%s' "$REPOSITORIES" | tr -d ',[:space:]')" ]; then
+            echo "::error::read-token-repositories lists no repository"
+            exit 1
+          fi
 
   build_artifacts:
     name: Build app artifacts (once)
