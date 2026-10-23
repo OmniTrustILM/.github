@@ -40,7 +40,8 @@ name: Publish Harbor image (reusable)
 # `ref` builds something other than the caller's own ref. A PR preview passes the
 # PR head SHA, which resolves even for a fork: fork objects live in the base
 # repository's network. Such a build is not a release, so it also passes
-# `sign: false` and `push-readme: false`.
+# `sign: false` and `push-readme: false`. The head may be a fork's code, so
+# `validate_inputs` refuses `ref` together with `read-token-repositories`.
 
 on:
   workflow_call:
@@ -152,6 +153,21 @@ on:
         required: false
         type: boolean
         default: true
+      read-token-repositories:
+        description: "Comma-separated repositories the build reads with a GitHub App token, such as a private Go module"
+        required: false
+        type: string
+        default: ''
+      read-token-owner:
+        description: "Owner of read-token-repositories. Empty (the default) is the caller's owner."
+        required: false
+        type: string
+        default: ''
+      read-token-secret-id:
+        description: "BuildKit secret id the build reads the token from"
+        required: false
+        type: string
+        default: github_token
     secrets:
       CONTAINER_REGISTRY_USERNAME:
         required: true
@@ -163,10 +179,15 @@ on:
         required: false
       COSIGN_PASSWORD:
         required: false
+      # Needed only with read-token-repositories.
+      READ_TOKEN_APP_ID:
+        required: false
+      READ_TOKEN_APP_PRIVATE_KEY:
+        required: false
 
 jobs:
-  # Runs before anything writes an artifact, so a bad namespace fails here with a
-  # readable message rather than inside actions/upload-artifact.
+  # Runs before anything writes an artifact or mints a token, so a bad input fails
+  # here with a readable message rather than inside actions/upload-artifact.
   validate_inputs:
     name: Validate inputs
     runs-on: ubuntu-latest
@@ -178,6 +199,22 @@ jobs:
         run: |
           if [[ ! "$NS" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
             echo "::error::artifact-namespace must match ^[A-Za-z0-9][A-Za-z0-9._-]*\$ (got '$NS')"
+            exit 1
+          fi
+
+      - name: Validate read-token-repositories with ref
+        if: ${{ inputs.read-token-repositories != '' && inputs.ref != '' }}
+        run: |
+          echo "::error::read-token-repositories cannot be combined with ref, because a ref build may run a fork's code"
+          exit 1
+
+      - name: Validate read-token-repositories entries
+        if: ${{ inputs.read-token-repositories != '' }}
+        env:
+          REPOSITORIES: ${{ inputs.read-token-repositories }}
+        run: |
+          if [[ "$REPOSITORIES" =~ [^A-Za-z0-9._/,[:space:]-] || ! "$REPOSITORIES" =~ [A-Za-z0-9._/-] ]]; then
+            echo "::error::read-token-repositories must list repository names, separated by commas or newlines"
             exit 1
           fi
 
@@ -269,6 +306,17 @@ jobs:
           username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
           password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
+      - name: Mint the read token
+        id: read-token
+        if: ${{ inputs.read-token-repositories != '' }}
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.READ_TOKEN_APP_ID }}
+          private-key: ${{ secrets.READ_TOKEN_APP_PRIVATE_KEY }}
+          owner: ${{ inputs.read-token-owner }}
+          repositories: ${{ inputs.read-token-repositories }}
+          permission-contents: read
+
       - name: Build + push (${{ matrix.arch }}) by digest only (no tags)
         id: build
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -280,8 +328,9 @@ jobs:
           sbom: true
           outputs: type=image,name=${{ inputs.registry }}/${{ inputs.image }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
-          cache-to: type=gha,mode=max,scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=${{ inputs.read-token-repositories != '' && 'min' || 'max' }},scope=${{ inputs.cache-scope }}-${{ matrix.arch }}
           build-args: ${{ inputs.build-args }}
+          secrets: ${{ steps.read-token.outputs.token != '' && format('{0}={1}', inputs.read-token-secret-id, steps.read-token.outputs.token) || '' }}
 
       - name: Export digest as marker file
         run: |
