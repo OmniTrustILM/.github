@@ -145,16 +145,17 @@ E_NODE=$(sed -n 3p <<<"$E_OUT"); E_ITEM=$(sed -n 4p <<<"$E_OUT")
 set_option "$E_ITEM" "Prioritization" "Medium" "$(option_id Prioritization Medium)"
 
 # --- 2b. Documentation tech-epic (standard part of every release since
-# 2.21.0): one direct "Doc: <epic title>" child per product epic is added
-# when product epics join the release, not here. ---
+# 2.21.0): the home of documentation work tied to no particular epic. An
+# epic's own "Doc: <epic title>" task sits under the epic itself (RM
+# 2026-10-23, created by the epic-scaffold automation), never here. ---
 DOCS_BODY="### User Story
 
-As release manager, I want all documentation work of release $VERSION collected in one place, so that documentation is planned, tracked and delivered for every product epic of the release.
+As release manager, I want the documentation work of release $VERSION that belongs to no particular epic collected in one place, so that release notes, cross-cutting guides and documentation housekeeping are planned, tracked and delivered with the release.
 
 ### Use Cases
 
-- Every product epic of the release has exactly one direct child here, named \"Doc: <epic title>\".
-- When an epic needs several documentation tasks, they are nested under its \"Doc:\" task."
+- Documentation tasks of the release that are not tied to a product epic are sub-issues of this epic.
+- An epic's own documentation (its \"Doc: <epic title>\" task) stays under the epic and is never moved here."
 
 D_OUT=$(create_issue "Documentation $VERSION" "$DOCS_BODY" "Epic" --label tech-epic)
 D_URL=$(sed -n 1p <<<"$D_OUT"); D_NUMBER=$(sed -n 2p <<<"$D_OUT")

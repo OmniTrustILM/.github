@@ -74,14 +74,15 @@ the IDs.
   an existing iteration overhanging the start gets a trim proposal.
 - The `Bugs <version>` epic (label `tech-epic`, Prioritization Medium) is a
   sub-issue of the Release issue and shares its window.
-- The `Documentation <version>` epic (RM rule 2026-10-20: a standard,
-  mandatory part of every release; label `tech-epic`, Prioritization
-  Medium, same window) is a sub-issue of the Release issue too. It holds
-  exactly one direct child per product epic of the release — a Task
-  titled `Doc: <epic title>` (repo `documentation`, label
-  `documentation`); several doc tasks of one epic nest under its `Doc:`
-  task. This skill creates the empty epic; the `Doc:` tasks are added
-  whenever a product epic joins the release (the epic-moving skills do it).
+- The `Documentation <version>` epic (a standard, mandatory part of every
+  release since 2.21.0; label `tech-epic`, Prioritization Medium, same
+  window) is a sub-issue of the Release issue too. It is the home of the
+  release's documentation work that belongs to no particular epic —
+  release notes, cross-cutting guides, housekeeping. An epic's own
+  documentation task (`Doc: <epic title>`, repo `documentation`, label
+  `documentation`) sits **under the epic itself** (RM 2026-10-23; the
+  `epic-scaffold` automation creates it when the epic is opened) and is
+  never collected here. This skill creates the empty epic.
 
 If PM conventions change, update `docs/development-process.md` first, then
 `plan.py` and its tests.
