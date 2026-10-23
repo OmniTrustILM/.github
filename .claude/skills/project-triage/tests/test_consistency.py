@@ -9,47 +9,229 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from consistency import epic_status_findings, closed_but_not_done_finding, within_window  # noqa: E402
+from consistency import (  # noqa: E402
+    epic_status_findings, expected_epic_status,
+    closed_but_not_done_finding, within_window,
+    version_reference, tree_has_qa, is_analysis_task,
+)
 
 _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
+BD, NBD = True, False  # breakdown done / not done
+
+
+def kid(status, state="OPEN", reason=None):
+    return (status, state, reason or ("COMPLETED" if state == "CLOSED" else None))
 
 
 def rules_of(findings):
     return {r for _, r, _ in findings}
 
 
+# ---- expected_epic_status: the RM §5.1 ladder ----
+
+def test_expected_all_done_children():
+    # a closed child with no project Status cannot hold the Epic either
+    assert expected_epic_status([kid("Done"), kid(None, "CLOSED")], BD) == "Done"
+
+
+def test_expected_closed_not_planned_counts_as_done():
+    assert expected_epic_status(
+        [kid("Done"), kid("Open", "CLOSED", "NOT_PLANNED")], BD) == "Done"
+
+
+def test_expected_closed_duplicate_counts_as_done():
+    assert expected_epic_status(
+        [kid("Done"), kid("In Progress", "CLOSED", "DUPLICATE")], BD) == "Done"
+
+
+def test_expected_closed_completed_ranks_by_status():
+    # closing hands the issue to QA: Status Testing on a closed child keeps
+    # the Epic in Testing — Done comes only from QA setting Status Done
+    assert expected_epic_status([kid("Testing", "CLOSED")], BD) == "Testing"
+    assert expected_epic_status(
+        [kid("Done"), kid("Testing", "CLOSED")], BD) == "Testing"
+
+
+def test_expected_closed_completed_floored_at_testing():
+    # a closed child whose Status lags behind still counts as at least Testing
+    assert expected_epic_status([kid("In Progress", "CLOSED")], BD) == "Testing"
+
+
+def bug(status, state="OPEN", reason=None):
+    # testing-phase work: a Bug, or a task labelled qa / testing
+    return kid(status, state, reason) + (True,)
+
+
+def test_expected_open_bug_keeps_epic_in_testing():
+    # features developed and reviewed, a bug from testing being fixed:
+    # the epic is in its testing phase, not back in development (ilm#323)
+    assert expected_epic_status(
+        [kid("Testing", "CLOSED"), kid("Testing", "CLOSED"),
+         bug("Done", "CLOSED"), bug("In Progress")], BD) == "Testing"
+
+
+def test_expected_test_task_does_not_hold_review():
+    # a test task still in Planning while every feature is in Review
+    assert expected_epic_status(
+        [kid("Review"), kid("Review"), bug("Planning")], BD) == "Review"
+
+
+def test_expected_phase_work_still_holds_done():
+    assert expected_epic_status(
+        [kid("Done", "CLOSED"), bug("Testing", "CLOSED")], BD) == "Testing"
+
+
+def test_expected_phase_work_does_not_start_in_progress():
+    # In Progress = the development started; a bug being fixed while no
+    # feature has started leaves the Epic below it (Jiří 2026-10-11)
+    assert expected_epic_status(
+        [kid("Open"), bug("In Progress")], BD) == "Open"
+    assert expected_epic_status(
+        [kid("Planning"), bug("In Progress")], NBD) == "Planning"
+
+
+def test_expected_only_phase_work_in_flight_is_testing():
+    # development done, only a bug and a test task being worked on
+    assert expected_epic_status(
+        [kid("Done", "CLOSED"), kid("Testing", "CLOSED"),
+         bug("In Progress"), bug("Open")], BD) == "Testing"
+
+
+def test_expected_bug_collector_ranks_bugs_as_its_work():
+    # an epic holding nothing but bugs follows them like any children
+    assert expected_epic_status(
+        [bug("In Progress"), bug("Testing", "CLOSED")], BD) == "In Progress"
+
+
+def analysis(status, state="OPEN", reason=None):
+    # the Epic's "Analysis, breakdown, estimations" task
+    return kid(status, state, reason) + (False, True)
+
+
+def test_is_analysis_task_by_title():
+    assert is_analysis_task("Task", "Analysis, breakdown, estimations")
+    assert is_analysis_task("Task", "Epic breakdown")
+    assert is_analysis_task("Task", "ESTIMATIONS for the Epic")
+    assert not is_analysis_task("Feature", "Analysis of the key store")
+    assert not is_analysis_task("Task", "Implement the key store")
+    assert not is_analysis_task("Task", None)
+
+
+def test_expected_analysis_task_under_way_is_analysis():
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("Planning")], NBD) == "Analysis"
+
+
+def test_expected_analysis_task_not_started_is_planning():
+    assert expected_epic_status(
+        [analysis("Planning"), kid("Planning")], NBD) == "Planning"
+
+
+def test_expected_analysis_task_done_opens_the_epic():
+    # the gate is open: a Done analysis task + children at most Open = Open,
+    # whatever the breakdown fields say
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Open")], NBD) == "Open"
+    assert expected_epic_status([analysis("Done", "CLOSED")], NBD) == "Open"
+
+
+def test_expected_analysis_task_gates_the_epic():
+    # closed but left in Testing (the automation's move) — still Analysis
+    assert expected_epic_status([analysis("Testing", "CLOSED")], NBD) == "Analysis"
+    # in Review without a PR: the Tech Lead's feedback — still Analysis
+    assert expected_epic_status([analysis("Review"), kid("Open")], BD) == "Analysis"
+    # development already running does not lift the gate
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("In Progress")], BD) == "Analysis"
+    assert expected_epic_status(
+        [analysis("Planning"), kid("In Progress")], BD) == "Planning"
+
+
+def test_expected_breakdown_done_is_open_until_development_starts():
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Planning"), bug("In Progress")], BD) == "Open"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("In Progress")], BD) == "In Progress"
+
+
+def test_expected_analysis_task_holds_done():
+    # Done needs every child Done, the analysis task included; before that
+    # the gate holds the Epic in Analysis even with development finished
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("Done", "CLOSED")], BD) == "Analysis"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Done", "CLOSED")], BD) == "Done"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Testing", "CLOSED")], BD) == "Testing"
+
+
+def test_expected_triples_still_accepted():
+    # plain triples are development children
+    assert expected_epic_status(
+        [kid("Testing", "CLOSED"), kid("In Progress")], BD) == "In Progress"
+
+
+def test_expected_all_testing_or_beyond():
+    assert expected_epic_status([kid("Testing"), kid("Done")], BD) == "Testing"
+
+
+def test_expected_all_review_or_beyond():
+    assert expected_epic_status([kid("Review"), kid("Testing")], BD) == "Review"
+
+
+def test_expected_any_started_wins():
+    assert expected_epic_status([kid("In Progress"), kid("Planning")], BD) == "In Progress"
+
+
+def test_expected_open_when_breakdown_done():
+    assert expected_epic_status([kid("Planning")], BD) == "Open"
+
+
+def test_expected_analysis_while_breakdown_running():
+    assert expected_epic_status([kid("Analysis"), kid("Open")], NBD) == "Analysis"
+
+
+def test_expected_open_child_without_breakdown():
+    assert expected_epic_status([kid("Open"), kid("Planning")], NBD) == "Open"
+
+
+def test_expected_planning_default():
+    assert expected_epic_status([kid("Planning"), kid("Planning")], NBD) == "Planning"
+
+
+def test_expected_none_without_usable_children():
+    assert expected_epic_status([kid(None)], BD) is None
+    assert expected_epic_status([], BD) is None
+
+
+# ---- epic_status_findings: findings + §7.3 precedence ----
+
 def test_done_with_open_children_is_error():
-    f = epic_status_findings("Done", ["Planning"], 2)
+    f = epic_status_findings("Done", [kid("Planning"), kid("Planning")], BD)
     assert [(lvl, r) for lvl, r, _ in f] == [("Error", "epic_done_with_open_children")]
 
 
-def test_done_with_no_open_children_no_finding():
-    assert epic_status_findings("Done", [], 0) == []
+def test_done_with_all_children_closed_no_finding():
+    assert epic_status_findings("Done", [kid("Done", "CLOSED")], BD) == []
 
 
-def test_lags_children_warns():
-    assert "epic_status_lags_children" in rules_of(epic_status_findings("Open", ["In Progress"], 1))
+def test_matching_status_no_finding():
+    assert epic_status_findings("In Progress", [kid("In Progress"), kid("Open")], BD) == []
 
 
-def test_open_no_advanced_child_no_finding():
-    assert epic_status_findings("Open", ["Open", "Planning"], 1) == []
+def test_mismatch_warns():
+    f = epic_status_findings("Open", [kid("In Progress")], BD)
+    assert rules_of(f) == {"epic_status_mismatch"}
+    assert f[0][0] == "Warning" and "In Progress" in f[0][2]
 
 
-def test_ahead_of_children_warns():
-    assert "epic_status_ahead_of_children" in rules_of(epic_status_findings("In Progress", ["Open", "Planning"], 2))
+def test_no_children_no_finding():
+    assert epic_status_findings("In Progress", [], BD) == []
 
 
-def test_in_progress_with_advanced_child_no_ahead():
-    assert epic_status_findings("In Progress", ["Review"], 1) == []
-
-
-def test_in_progress_no_children_no_finding():
-    assert epic_status_findings("In Progress", [], 0) == []
-
-
-def test_status_rules_mutually_exclusive():
-    # A Done Epic with an In Progress child yields only the Done error.
-    assert rules_of(epic_status_findings("Done", ["In Progress"], 1)) == {"epic_done_with_open_children"}
+def test_done_error_outranks_mismatch():
+    # A Done Epic with an In Progress child yields only the Done error (§7.3 rule 5).
+    assert rules_of(epic_status_findings("Done", [kid("In Progress")], BD)) == {"epic_done_with_open_children"}
 
 
 def test_closed_but_not_done_fires():
@@ -59,6 +241,10 @@ def test_closed_but_not_done_fires():
 
 def test_closed_and_done_no_finding():
     assert closed_but_not_done_finding("CLOSED", "COMPLETED", "Done") is None
+
+
+def test_closed_in_testing_is_the_normal_qa_queue():
+    assert closed_but_not_done_finding("CLOSED", "COMPLETED", "Testing") is None
 
 
 def test_closed_not_planned_excluded():
@@ -84,6 +270,62 @@ def test_within_window_missing_false():
 def test_within_window_unparseable_false():
     assert within_window("not-a-date", _NOW, 30) is False
 
+
+
+# ---- version_reference: the parent's Version wins transitively ----
+
+REL, EPIC, CONT, LEAF, LOOSE = ("ilm", 1), ("ilm", 2), ("core", 3), ("core", 4), ("core", 5)
+TREE_PARENT = {EPIC: REL, CONT: EPIC, LEAF: CONT, LOOSE: REL}
+TREE_TYPE = {REL: "Release", EPIC: "Epic", CONT: "Feature", LEAF: "Task", LOOSE: "Task"}
+
+
+def test_version_reference_direct_child_uses_epic():
+    assert version_reference(CONT, TREE_PARENT, TREE_TYPE) == EPIC
+
+
+def test_version_reference_sub_issue_skips_container():
+    # compared with the Epic, never with a container that may itself be off
+    assert version_reference(LEAF, TREE_PARENT, TREE_TYPE) == EPIC
+
+
+def test_version_reference_epic_uses_release():
+    assert version_reference(EPIC, TREE_PARENT, TREE_TYPE) == REL
+
+
+def test_version_reference_without_epic_falls_back_to_parent():
+    assert version_reference(LOOSE, TREE_PARENT, TREE_TYPE) == REL
+
+
+def test_version_reference_no_parent():
+    assert version_reference(REL, TREE_PARENT, TREE_TYPE) is None
+
+
+def test_version_reference_cycle_terminates():
+    a, b = ("x", 1), ("x", 2)
+    assert version_reference(a, {a: b, b: a}, {a: "Task", b: "Task"}) == b
+
+
+# ---- tree_has_qa: QA tasks count at any depth ----
+
+def _children(parent_of):
+    out = {}
+    for k, p in parent_of.items():
+        out.setdefault(p, []).append(k)
+    return out
+
+
+def test_tree_has_qa_nested_task():
+    labels = {LEAF: {"qa"}}
+    assert tree_has_qa(EPIC, _children(TREE_PARENT), labels, TREE_TYPE)
+
+
+def test_tree_has_qa_ignores_bugs():
+    types = {**TREE_TYPE, LEAF: "Bug"}
+    assert not tree_has_qa(EPIC, _children(TREE_PARENT), {LEAF: {"qa"}}, types)
+
+
+def test_tree_has_qa_none():
+    assert not tree_has_qa(EPIC, _children(TREE_PARENT), {}, TREE_TYPE)
 
 if __name__ == "__main__":
     import traceback

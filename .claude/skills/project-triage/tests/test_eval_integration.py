@@ -44,6 +44,11 @@ def _item(number, repo, itype, status, *, state="OPEN", state_reason=None, versi
     return {"id": f"PVTI_{number}", "content": content, "fieldValues": {"nodes": fvs}}
 
 
+def _parent(number, repo="core"):
+    return {"number": number, "url": f"https://github.com/OmniTrustILM/{repo}/issues/{number}",
+            "repository": {"name": repo}}
+
+
 def _run_eval():
     import yaml
     d = tempfile.mkdtemp(prefix="triage-it-")
@@ -71,12 +76,101 @@ def _run_eval():
     with open(os.path.join(d, "members.txt"), "w", encoding="utf-8") as fh:
         fh.write("alice\n")
 
+    return _eval_dir(d)
+
+
+def _eval_dir(d):
     env = {**os.environ, "TRIAGE_DIR": d}
     r = subprocess.run([sys.executable, os.path.join(SKILL_DIR, "eval.py")],
                        env=env, capture_output=True, text=True)
     assert r.returncode == 0, f"eval.py failed: {r.stderr}"
     findings = json.load(open(os.path.join(d, "findings.json"), encoding="utf-8"))
     return findings
+
+
+def _run_tree_eval():
+    """Epic 300 (2.20.0) → container Feature 301 (2.21.0, off) → Task 302
+    (2.21.0, labelled qa). The sub-issue must be checked against the Epic,
+    and its qa label must satisfy the Epic's QA rule from depth 2."""
+    import yaml
+    d = tempfile.mkdtemp(prefix="triage-tree-")
+    epic_body = "## User Story\nAs a user...\n## Use Cases\nUC1\n## Acceptance Criteria\n- [ ] done\n"
+    epic = _item(300, "core", "Epic", "In Progress", subcount=1, version="2.20.0", body=epic_body)
+    cont = _item(301, "core", "Feature", "In Progress", subcount=1, version="2.21.0",
+                 parent=_parent(300))
+    leaf = _item(302, "core", "Task", "In Progress", version="2.21.0", labels=["qa"],
+                 parent=_parent(301))
+    for name, obj in (("items-flat.json", [epic, cont, leaf]),
+                      ("filtered.json", [epic, cont, leaf]),
+                      ("filtered-closed.json", []),
+                      ("rules.json", yaml.safe_load(open(CONFIG, encoding="utf-8"))),
+                      ("subs-core-300.json", [{
+                          "number": 301, "state": "open",
+                          "repository_url": "https://api.github.com/repos/OmniTrustILM/core",
+                          "labels": []}])):
+        with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
+            json.dump(obj, fh)
+    with open(os.path.join(d, "members.txt"), "w", encoding="utf-8") as fh:
+        fh.write("alice\n")
+    return _eval_dir(d)
+
+
+def _run_ladder_eval():
+    """Epic 400 (In Progress, breakdown fields set) → its analysis task 401
+    (closed, Done), Feature 402 (Open) and Bug 403 (In Progress). Neither
+    the analysis task nor the bug is development, so the children imply
+    Open; the task is recognised by the title the sub-issue list carries."""
+    import yaml
+    d = tempfile.mkdtemp(prefix="triage-ladder-")
+    epic_body = "## User Story\nAs a user...\n## Use Cases\nUC1\n## Acceptance Criteria\n- [ ] done\n"
+    epic = _item(400, "core", "Epic", "In Progress", subcount=3, version="2.20.0", body=epic_body)
+    epic["fieldValues"]["nodes"] += [
+        {"__typename": "ProjectV2ItemFieldSingleSelectValue", "name": "Medium",
+         "field": {"name": "Complexity"}},
+        {"__typename": "ProjectV2ItemFieldNumberValue", "number": 8, "field": {"name": "Estimate"}},
+        {"__typename": "ProjectV2ItemFieldDateValue", "date": "2026-10-01",
+         "field": {"name": "Start Date"}},
+        {"__typename": "ProjectV2ItemFieldDateValue", "date": "2026-11-01",
+         "field": {"name": "End Date"}}]
+    kids = [_item(401, "core", "Task", "Done", state="CLOSED", state_reason="COMPLETED",
+                  version="2.20.0", parent=_parent(400), closed_at=RECENT),
+            _item(402, "core", "Feature", "Open", version="2.20.0", parent=_parent(400)),
+            _item(403, "core", "Bug", "In Progress", version="2.20.0", parent=_parent(400))]
+    subs = [{"number": n, "title": t, "state": st, "state_reason": sr,
+             "repository_url": "https://api.github.com/repos/OmniTrustILM/core", "labels": []}
+            for n, t, st, sr in ((401, "Analysis, breakdown, estimations", "closed", "completed"),
+                                 (402, "Key store", "open", None),
+                                 (403, "Key store crash", "open", None))]
+    for name, obj in (("items-flat.json", [epic, *kids]),
+                      ("filtered.json", [epic, *kids[1:]]),
+                      ("filtered-closed.json", []),
+                      ("rules.json", yaml.safe_load(open(CONFIG, encoding="utf-8"))),
+                      ("subs-core-400.json", subs)):
+        with open(os.path.join(d, name), "w", encoding="utf-8") as fh:
+            json.dump(obj, fh)
+    with open(os.path.join(d, "members.txt"), "w", encoding="utf-8") as fh:
+        fh.write("alice\n")
+    return _eval_dir(d)
+
+
+def test_eval_epic_ladder_skips_analysis_task_and_bugs():
+    findings = _run_ladder_eval()
+    mm = [f for f in findings if f["rule"] == "epic_status_mismatch" and f["number"] == 400]
+    assert len(mm) == 1 and "imply `Open`" in mm[0]["msg"], findings
+
+
+def test_eval_version_mismatch_compares_sub_issue_with_epic():
+    findings = _run_tree_eval()
+    vm = {f["number"]: f for f in findings if f["rule"] == "version_mismatch"}
+    assert 301 in vm and "core#300" in vm[301]["msg"]
+    # the sub-issue agrees with its (wrong) container but not with the Epic
+    assert 302 in vm and "epic" in vm[302]["msg"] and "core#300" in vm[302]["msg"]
+    assert vm[302]["fix_data"]["parent_version"] == "2.20.0"
+
+
+def test_eval_qa_task_counts_at_any_depth():
+    findings = _run_tree_eval()
+    assert not any(f["rule"] == "epic_without_qa_sub_issue" for f in findings)
 
 
 def test_eval_emits_epic_done_with_open_children():
