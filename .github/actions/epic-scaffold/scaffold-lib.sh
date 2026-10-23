@@ -57,7 +57,7 @@ analysis_body() {
   cat <<'EOF'
 ### Description
 
-Analysis, breakdown and estimates of the Epic (Methodics §2.5 Epic preparation): the Epic Owner works this task while the Epic is in **Analysis** — acceptance criteria, technical analysis, the breakdown into sub-issues (`/epic-breakdown` helps) and the estimates — and closes it when the Epic moves to **Open**.
+Analysis, breakdown and estimates of the Epic (Methodics §2.5 Epic preparation): the Epic Owner works this task while the Epic is in **Analysis** — acceptance criteria, technical analysis, the breakdown into sub-issues (`/epic-breakdown` helps) and the estimates — and moves it to **Done** when the analysis is complete. This task is the gate of the Epic's Status: the Epic stays in Planning / Analysis until it is Done (closing alone moves it only to Testing) and can be Open only afterwards.
 
 ### Definition of Done
 
