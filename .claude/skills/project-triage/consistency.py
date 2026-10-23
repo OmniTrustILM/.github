@@ -18,12 +18,17 @@ and qa/testing tasks are testing-phase work (bugs come out of testing,
 test tasks are the testing itself; Jiří 2026-10-03, In Progress since
 2026-10-11), so they hold the Epic below Done only, never below Testing;
 an Epic holding nothing but such work ranks it as its development. The
-Epic's analysis task ("Analysis, breakdown, estimations") is preparation
-(Jiří 2026-10-11): it never lifts the Epic past Analysis, not even once
-closed. Below In Progress: Open once the breakdown is complete
-(Complexity, Estimate, Start/End Date set on the Epic — §3.2), else
-Analysis while the analysis task is under way or a child is still being
-scoped, else Open when a child is Open, else Planning.
+Epic's analysis task ("Analysis, breakdown, estimations") is the gate
+(Jiří 2026-10-23): until it is Done it alone decides — Planning while it
+is Planning / Analysis / Open, Analysis while it is In Progress, Review
+(the Tech Lead's feedback, without a PR) or Testing (closed but not yet
+moved to Done) — whatever the other children do; once it is Done the
+other children decide: Open while they are at most Open, else the rungs
+above. An Epic without an analysis task derives from its children alone:
+below In Progress it is Open once the breakdown is complete (Complexity,
+Estimate, Start/End Date set on the Epic — §3.2), else Analysis while a
+child is still being scoped, else Open when a child is Open, else
+Planning.
 
 §7.3 precedence note: epic_done_with_open_children is an Error and outranks
 the epic_status_mismatch Warning — when it fires, the mismatch is not
@@ -120,25 +125,35 @@ def expected_epic_status(children, breakdown_done):
                      (a Bug, or a task labelled qa / testing), which decides
                      Done only unless the Epic holds nothing else, and an
                      optional fifth marks the analysis
-                     task (is_analysis_task), which decides Done and
-                     Analysis only.
+                     task (is_analysis_task), the gate: until it is Done
+                     it alone decides Planning / Analysis.
     breakdown_done — True when Complexity, Estimate, Start Date and End Date
-                     are all set on the Epic (§3.2: the fields the breakdown
-                     must produce before the Epic may move to Open).
+                     are all set on the Epic (§3.2); decides Open only for
+                     an Epic without an analysis task.
 
     Returns None when nothing can be derived (no child has a usable state).
     """
     ranked, core, delivery, analysis = _ladder(children)
     if not ranked:
         return None
+    if analysis:
+        # the analysis task gates the epic (Jiří 2026-10-23): until it is
+        # Done it alone decides — a closed one left in Testing still means
+        # Analysis; once Done the other children decide Open and above
+        if min(analysis) < _RANK["Done"]:
+            if max(analysis) >= _RANK["In Progress"]:
+                return "Analysis"
+            return "Planning"
+        if not delivery:
+            return "Open"
+        return _upper_rung(ranked, core) or "Open"
+    # no analysis task (bug collectors, tech epics): the children alone
     upper = _upper_rung(ranked, core)
     if upper:
         return upper
-    # development not started: Open = the analysis is done, the breakdown
-    # fields are its proof; a started analysis task means Analysis
     if breakdown_done:
         return "Open"
-    if any(r >= _RANK["In Progress"] for r in analysis) or _RANK["Analysis"] in delivery:
+    if _RANK["Analysis"] in delivery:
         return "Analysis"
     if _RANK["Open"] in delivery:
         return "Open"

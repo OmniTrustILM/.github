@@ -120,10 +120,12 @@ def _expected_epic_status(children, breakdown_done):
     Bug, or a task labelled qa / testing (Jiří 2026-10-03, In Progress
     since 2026-10-11) — which decides Done only; an Epic holding nothing
     but such work ranks it as its development. analysis_task marks the
-    Epic's analysis task, which is preparation (Jiří 2026-10-11): it decides
-    Done and, once In Progress or beyond, Analysis — never more.
-    breakdown_done = Complexity, Estimate, Start/End Date all set on the
-    Epic (§3.2)."""
+    Epic's analysis task, the gate (Jiří 2026-10-23): until it is Done it
+    alone decides — Planning (not started), Analysis (In Progress, Review or
+    Testing) — whatever the other children; once Done the other children
+    decide Open and above. breakdown_done = Complexity, Estimate, Start/End
+    Date all set on the Epic (§3.2) — decides Open only for an Epic without
+    an analysis task."""
     def rank(status, state, reason):
         r = _RANK.get(status)
         if (state or "").upper() != "CLOSED":
@@ -142,17 +144,28 @@ def _expected_epic_status(children, breakdown_done):
     core = [r for c, r in delivery if not flag(c, 3)] or [r for _, r in delivery]
     analysis = [r for c, r in pairs if flag(c, 4)]
     delivery = [r for _, r in delivery]
-    if min(ranked) >= _RANK["Done"]:
-        return "Done"
-    if core and min(core) >= _RANK["Testing"]:
-        return "Testing"
-    if core and min(core) >= _RANK["Review"]:
-        return "Review"
-    if core and max(core) >= _RANK["In Progress"]:
-        return "In Progress"
+
+    def upper():
+        if min(ranked) >= _RANK["Done"]:
+            return "Done"
+        if core and min(core) >= _RANK["Testing"]:
+            return "Testing"
+        if core and min(core) >= _RANK["Review"]:
+            return "Review"
+        if core and max(core) >= _RANK["In Progress"]:
+            return "In Progress"
+        return None
+    if analysis:
+        if min(analysis) < _RANK["Done"]:
+            return "Analysis" if max(analysis) >= _RANK["In Progress"] else "Planning"
+        if not delivery:
+            return "Open"
+        return upper() or "Open"
+    if (u := upper()):
+        return u
     if breakdown_done:
         return "Open"
-    if any(r >= _RANK["In Progress"] for r in analysis) or _RANK["Analysis"] in delivery:
+    if _RANK["Analysis"] in delivery:
         return "Analysis"
     if _RANK["Open"] in delivery:
         return "Open"

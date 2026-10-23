@@ -84,14 +84,28 @@ def test_started_test_task_alone_is_not_in_progress():
     assert "imply Open" in f["detail"]
 
 
-def test_closed_analysis_task_keeps_epic_in_analysis():
-    # the analysis task is preparation: it never lifts the Epic past Analysis
+def test_done_analysis_task_opens_the_epic():
+    # the gate is open: the Done analysis task hands over to the children,
+    # which are at most Open
     epic = _epic(status="In Progress",
                  subIssues=[{"number": 2, "state": "CLOSED", "state_reason": "COMPLETED",
                              "status": "Done", "issueType": "Task",
                              "title": "Analysis, breakdown, estimations", "labels": []},
                             {"number": 3, "state": "OPEN", "status": "Open",
                              "issueType": "Feature", "labels": ["qa", "documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply Open" in f["detail"]
+
+
+def test_undone_analysis_task_gates_the_epic():
+    # closed but left in Testing by the automation, development running:
+    # the gate holds the Epic in Analysis
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "CLOSED", "state_reason": "COMPLETED",
+                             "status": "Testing", "issueType": "Task",
+                             "title": "Analysis, breakdown, estimations", "labels": []},
+                            {"number": 3, "state": "OPEN", "status": "In Progress",
+                             "issueType": "Feature", "labels": []}])
     f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
     assert "imply Analysis" in f["detail"]
 

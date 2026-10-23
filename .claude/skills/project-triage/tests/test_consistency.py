@@ -127,12 +127,24 @@ def test_expected_analysis_task_not_started_is_planning():
         [analysis("Planning"), kid("Planning")], NBD) == "Planning"
 
 
-def test_expected_closed_analysis_task_never_lifts_past_analysis():
-    # the analysis task is preparation: closed, it still is not development
+def test_expected_analysis_task_done_opens_the_epic():
+    # the gate is open: a Done analysis task + children at most Open = Open,
+    # whatever the breakdown fields say
     assert expected_epic_status(
-        [analysis("Done", "CLOSED"), kid("Open")], NBD) == "Analysis"
-    # closed, awaiting QA, and nothing else scoped yet
+        [analysis("Done", "CLOSED"), kid("Open")], NBD) == "Open"
+    assert expected_epic_status([analysis("Done", "CLOSED")], NBD) == "Open"
+
+
+def test_expected_analysis_task_gates_the_epic():
+    # closed but left in Testing (the automation's move) — still Analysis
     assert expected_epic_status([analysis("Testing", "CLOSED")], NBD) == "Analysis"
+    # in Review without a PR: the Tech Lead's feedback — still Analysis
+    assert expected_epic_status([analysis("Review"), kid("Open")], BD) == "Analysis"
+    # development already running does not lift the gate
+    assert expected_epic_status(
+        [analysis("In Progress"), kid("In Progress")], BD) == "Analysis"
+    assert expected_epic_status(
+        [analysis("Planning"), kid("In Progress")], BD) == "Planning"
 
 
 def test_expected_breakdown_done_is_open_until_development_starts():
@@ -143,11 +155,14 @@ def test_expected_breakdown_done_is_open_until_development_starts():
 
 
 def test_expected_analysis_task_holds_done():
-    # Done needs every child Done, the analysis task included
+    # Done needs every child Done, the analysis task included; before that
+    # the gate holds the Epic in Analysis even with development finished
     assert expected_epic_status(
-        [analysis("In Progress"), kid("Done", "CLOSED")], BD) == "Testing"
+        [analysis("In Progress"), kid("Done", "CLOSED")], BD) == "Analysis"
     assert expected_epic_status(
         [analysis("Done", "CLOSED"), kid("Done", "CLOSED")], BD) == "Done"
+    assert expected_epic_status(
+        [analysis("Done", "CLOSED"), kid("Testing", "CLOSED")], BD) == "Testing"
 
 
 def test_expected_triples_still_accepted():
