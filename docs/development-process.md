@@ -111,6 +111,8 @@ Release 2.18.0
 ├── Epic [ilm]: Bugs 2.18.0
 │   ├── Bug [core]: Revocation reason not persisted
 │   └── Bug [fe-administrator]: Filter resets when paging
+├── Epic [ilm]: Documentation 2.18.0
+│   └── Task+documentation [documentation]: Release notes 2.18.0
 ├── Bug [fe-administrator]: Standalone bug
 └── Task [helm-charts]: Standalone task
 ```
@@ -130,6 +132,10 @@ Release 2.18.0
   placeholder until the scope is known. The `Doc:` task follows its Epic (it moves with it between releases and is
   renamed with it); a continuation Epic gets its own. The release dashboard's Health tab flags a product Epic without a
   documentation task.
+- **Documentation cycles.** Each release also carries a `Documentation x.y.z` Epic in `ilm` (label `tech-epic`),
+  parented under that Release — the home of documentation work that belongs to the release but to no particular
+  Epic (release notes, cross-cutting guides, housekeeping). An Epic's own documentation stays under the Epic; the
+  `Doc:` tasks are never collected here.
 - Epics contain Features, Bugs, Tasks (including QA- and Documentation-labeled Tasks)
 - Features can contain Tasks and Bugs as implementation details (small sub-work discovered during development). **A Feature must NOT contain sub-Features** — this signals the Epic is too large and should be split.
 - Sub-issues receive Version and Module from parent at creation time (automation copies if child's fields are empty; does not update if parent changes later — see Section 6, Rule #2)
@@ -358,7 +364,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
 
 **Release flow:**
 
-1. PM creates Release issue in Planning together with its `Bugs x.y.z` Epic, assigns Epics, sets Version, and makes sure every product Epic has its `Doc: <Epic title>` task and its analysis task (§1, Issue Hierarchy — the epic-scaffold automation creates both when the Epic is opened)
+1. PM creates Release issue in Planning together with its `Bugs x.y.z` and `Documentation x.y.z` Epics, assigns Epics, sets Version, and makes sure every product Epic has its `Doc: <Epic title>` task and its analysis task under it (§1, Issue Hierarchy — the epic-scaffold automation creates both when the Epic is opened)
 2. Development progresses, tracked via Release Planning and Roadmap views
 3. All child issues reach Done (code merged, individually QA-tested)
 4. PM verifies all child issues are Done (via Release Planning view / Sub-issues progress)
