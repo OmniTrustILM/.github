@@ -4,6 +4,7 @@ name: Issue Automation
 # OmniTrustILM/.github. Kept in sync by the repo-template-sync workflow.
 #
 # opened:   add issue to Project #5 → set form fields → propagate from parent
+#           → scaffold a product Epic's standard tasks (analysis, documentation)
 # reopened: post audit comment, clear Reopen Reason field
 #
 # Step-failure semantics: each `opened`-path step is wrapped with
@@ -46,9 +47,10 @@ jobs:
           owner: OmniTrustILM
           repositories: ${{ github.event.repository.name }}
 
-      # Broad token — spans all installation repos. Only needed for
+      # Broad token — spans all installation repos. Needed by
       # version-propagation, which reads the PARENT issue (may live in
-      # a different repo than the child).
+      # a different repo than the child), and by epic-scaffold, which
+      # creates the documentation task in the documentation repo.
       - name: Generate App token (broad, for version-propagation)
         if: github.event.action == 'opened'
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
@@ -73,6 +75,12 @@ jobs:
       - name: Propagate fields from parent
         if: ${{ !cancelled() && github.event.action == 'opened' }}
         uses: OmniTrustILM/.github/.github/actions/version-propagation@issue-automation-v1
+        with:
+          github-token: ${{ steps.token-broad.outputs.token }}
+
+      - name: Scaffold a product Epic's standard tasks
+        if: ${{ !cancelled() && github.event.action == 'opened' }}
+        uses: OmniTrustILM/.github/.github/actions/epic-scaffold@issue-automation-v1
         with:
           github-token: ${{ steps.token-broad.outputs.token }}
 
