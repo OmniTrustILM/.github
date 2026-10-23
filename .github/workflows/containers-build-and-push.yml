@@ -213,8 +213,8 @@ jobs:
         env:
           REPOSITORIES: ${{ inputs.read-token-repositories }}
         run: |
-          if [ -z "$(printf '%s' "$REPOSITORIES" | tr -d ',[:space:]')" ]; then
-            echo "::error::read-token-repositories lists no repository"
+          if [[ "$REPOSITORIES" =~ [^A-Za-z0-9._/,[:space:]-] || ! "$REPOSITORIES" =~ [A-Za-z0-9._/-] ]]; then
+            echo "::error::read-token-repositories must list repository names, separated by commas or newlines"
             exit 1
           fi
 
