@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from consistency import (  # noqa: E402
     epic_status_findings, expected_epic_status,
     closed_but_not_done_finding, within_window,
-    version_reference, tree_has_qa, is_analysis_task,
+    version_reference, tree_has_qa, tree_has_documentation, is_analysis_task,
 )
 
 _NOW = datetime(2026, 6, 21, tzinfo=timezone.utc)
@@ -326,6 +326,22 @@ def test_tree_has_qa_ignores_bugs():
 
 def test_tree_has_qa_none():
     assert not tree_has_qa(EPIC, _children(TREE_PARENT), {}, TREE_TYPE)
+
+
+# ---- tree_has_documentation: the Epic's Doc: task counts at any depth ----
+
+def test_tree_has_documentation_nested_task():
+    labels = {LEAF: {"documentation"}}
+    assert tree_has_documentation(EPIC, _children(TREE_PARENT), labels, TREE_TYPE)
+
+
+def test_tree_has_documentation_ignores_bugs():
+    types = {**TREE_TYPE, LEAF: "Bug"}
+    assert not tree_has_documentation(EPIC, _children(TREE_PARENT), {LEAF: {"documentation"}}, types)
+
+
+def test_tree_has_documentation_none():
+    assert not tree_has_documentation(EPIC, _children(TREE_PARENT), {LEAF: {"qa"}}, TREE_TYPE)
 
 if __name__ == "__main__":
     import traceback

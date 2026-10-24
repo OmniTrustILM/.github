@@ -207,6 +207,16 @@ and stop unless confirmed.
    ```
    **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
    (else §7.2 flags the Epic and docs/testing get forgotten).
+   **Scaffolded tasks (RM 2026-10-23):** a product Epic already carries two
+   sub-issues from the day it was opened, created by the `epic-scaffold`
+   automation — the **"Analysis, breakdown, estimations"** task and the
+   **`Doc: <Epic title>`** task (repo `documentation`, label `documentation`).
+   Neither is a child to propose: the analysis task *is* this breakdown (the
+   Epic Owner moves it to Done when the analysis is complete — it gates the
+   Epic's Status, §2.2), and the `Doc:` task is the Documentation stream's
+   placeholder — fill in its scope in the preview and nest any further
+   documentation tasks **under it**, never propose a second top-level
+   documentation child. Treat both as `(existing — skipping)` below.
    **De-duplicate:** before proposing a new child, check the Epic's existing
    sub-issues and search for matching standalone issues. Mark an already-present
    sub-issue `(existing — skipping)`; for a strong match that exists *unlinked*,

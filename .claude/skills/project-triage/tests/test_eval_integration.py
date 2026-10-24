@@ -153,6 +153,13 @@ def _run_ladder_eval():
     return _eval_dir(d)
 
 
+def test_eval_product_epic_without_documentation_task_is_flagged():
+    # Epic 400 holds the analysis task, a Feature and a Bug — no documentation
+    findings = _run_ladder_eval()
+    d = [f for f in findings if f["rule"] == "epic_without_docs_sub_issue" and f["number"] == 400]
+    assert len(d) == 1 and "documentation" in d[0]["msg"], findings
+
+
 def test_eval_epic_ladder_skips_analysis_task_and_bugs():
     findings = _run_ladder_eval()
     mm = [f for f in findings if f["rule"] == "epic_status_mismatch" and f["number"] == 400]

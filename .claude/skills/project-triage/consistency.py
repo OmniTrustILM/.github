@@ -222,17 +222,29 @@ def version_reference(key, parent_of, type_of):
     return parent
 
 
-def tree_has_qa(root, children_of, labels_of, type_of):
-    """True when any non-Bug issue below `root`, at any depth, carries the
-    `qa` label — QA tasks count wherever they sit in the Epic's tree (the
-    layout is not a rule; same as PM_reporting's test coverage)."""
+def tree_has_label(root, children_of, labels_of, type_of, label):
+    """True when any non-Bug issue below `root`, at any depth, carries
+    `label` — the task counts wherever it sits in the Epic's tree (the
+    layout is not a rule; same as PM_reporting's coverage checks)."""
     stack, seen = list(children_of.get(root, ())), {root}
     while stack:
         cur = stack.pop()
         if cur in seen:
             continue
         seen.add(cur)
-        if type_of.get(cur) != "Bug" and "qa" in labels_of.get(cur, ()):
+        if type_of.get(cur) != "Bug" and label in labels_of.get(cur, ()):
             return True
         stack.extend(children_of.get(cur, ()))
     return False
+
+
+def tree_has_qa(root, children_of, labels_of, type_of):
+    """A `qa`-labelled non-Bug issue anywhere below `root`."""
+    return tree_has_label(root, children_of, labels_of, type_of, "qa")
+
+
+def tree_has_documentation(root, children_of, labels_of, type_of):
+    """A `documentation`-labelled non-Bug issue anywhere below `root` — the
+    Epic's own documentation task (RM 2026-10-23: it sits under the Epic,
+    typically "Doc: <Epic title>", created with the Epic)."""
+    return tree_has_label(root, children_of, labels_of, type_of, "documentation")
