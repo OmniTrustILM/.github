@@ -43,6 +43,7 @@ consistency_rules:
   reopened_without_reason: true
   release_epic_by_non_org_member: true
   epic_without_qa_sub_issue: true      # Warning: no non-Bug qa-labelled issue anywhere in the Epic's tree
+  epic_without_docs_sub_issue: true    # Warning: product Epic (no tech-epic label) has no non-Bug documentation-labelled issue anywhere in its tree — its "Doc: <Epic title>" task (RM 2026-10-23)
   epic_status_mismatch: true           # Warning: Epic Status differs from the children-derived value (RM §5.1)
   epic_done_with_open_children: true   # Error: Epic Status=Done but a child is still open
 

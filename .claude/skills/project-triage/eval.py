@@ -25,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from consistency import (  # noqa: E402
     epic_status_findings, closed_but_not_done_finding, within_window,
-    version_reference, tree_has_qa, is_analysis_task,
+    version_reference, tree_has_qa, tree_has_documentation, is_analysis_task,
 )
 
 BASE = Path(os.environ.get('TRIAGE_DIR', '.triage')).resolve()
@@ -298,6 +298,24 @@ for it in target:
             if not has_qa:
                 add(it, 'Warning', 'epic_without_qa_sub_issue', 'Epic has no sub-issue with `qa` label')
 
+    # §7.2 — a product Epic needs its own documentation task (RM 2026-10-23:
+    # it sits under the Epic, typically "Doc: <Epic title>"); tech epics and
+    # the bug collectors (label tech-epic) hold other issues' work and are
+    # not checked. Mirrors the release dashboard's epic_without_doc_task.
+    if rules['consistency_rules'].get('epic_without_docs_sub_issue') and t == 'Epic' \
+            and 'tech-epic' not in labels_of.get((c['repository']['name'], c['number']), ()):
+        if c['subIssues']['totalCount'] > 0:
+            subs = load_sub_issues(c['repository']['name'], c['number'])
+            has_docs = any(
+                'documentation' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
+                and (s.get('type') or {}).get('name') != 'Bug'
+                for s in subs
+            ) or tree_has_documentation((c['repository']['name'], c['number']),
+                                        children_of, labels_of, type_of)
+            if not has_docs:
+                add(it, 'Warning', 'epic_without_docs_sub_issue',
+                    'Epic has no sub-issue with `documentation` label (its `Doc: <Epic title>` task)')
+
     # §7.2 Epic-status consistency (logic mirrored from epic-breakdown/reconcile.py).
     # Child project Status comes from the `lookup` table; open/closed from sub_issues.
     _epic_status_rules = ('epic_done_with_open_children', 'epic_status_mismatch')
@@ -345,7 +363,8 @@ if rules['consistency_rules'].get('closed_but_not_done'):
             add(it, res[0], res[1], res[2])
 
 # ---- rule precedence (§7.3) ----
-CROSS_ISSUE = {'version_mismatch', 'orphaned_sub_issues', 'epic_without_qa_sub_issue'}
+CROSS_ISSUE = {'version_mismatch', 'orphaned_sub_issues', 'epic_without_qa_sub_issue',
+               'epic_without_docs_sub_issue'}
 by_issue = {}
 for f in findings:
     by_issue.setdefault((f['repo'], f['number']), []).append(f)
