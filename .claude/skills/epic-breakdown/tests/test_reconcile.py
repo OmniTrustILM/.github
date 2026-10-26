@@ -50,18 +50,87 @@ def test_done_with_open_children_is_error():
 
 def test_done_open_children_suppresses_status_and_orphan_warnings():
     # §7.3: the error outranks Epic-level warnings about the same situation.
-    epic = _epic(status="Done", state="CLOSED", children_status=["Planning"],
-                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["qa", "documentation"]}])
+    epic = _epic(status="Done", state="CLOSED",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Planning",
+                             "labels": ["qa", "documentation"]}])
     rules = {f["rule"] for f in diff(epic)}
     assert "epic_done_with_open_children" in rules
-    assert "epic_status_ahead_of_children" not in rules
+    assert "epic_status_mismatch" not in rules
     assert "orphaned_sub_issues" not in rules
 
 
-def test_status_lags_children_warns():
-    epic = _epic(status="Open", children_status=["In Progress"],
-                 subIssues=[{"number": 2, "labels": ["qa"]}, {"number": 3, "labels": ["documentation"]}])
-    assert any(f["rule"] == "epic_status_lags_children" for f in diff(epic))
+def test_status_mismatch_warns_when_child_started():
+    # Open Epic with a started development child: RM §5.1 derives In Progress.
+    epic = _epic(status="Open",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Open", "labels": ["qa"]},
+                            {"number": 3, "state": "OPEN", "status": "In Progress", "labels": ["documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "In Progress" in f["detail"]
+
+
+def test_status_matching_derivation_no_mismatch():
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Planning", "labels": ["qa"]},
+                            {"number": 3, "state": "OPEN", "status": "In Progress", "labels": ["documentation"]}])
+    assert not any(f["rule"] == "epic_status_mismatch" for f in diff(epic))
+
+
+def test_started_test_task_alone_is_not_in_progress():
+    # In Progress = a development child started (RM §5.1, 2026-10-11)
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "In Progress", "labels": ["qa"]},
+                            {"number": 3, "state": "OPEN", "status": "Open", "labels": ["documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply Open" in f["detail"]
+
+
+def test_done_analysis_task_opens_the_epic():
+    # the gate is open: the Done analysis task hands over to the children,
+    # which are at most Open
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "CLOSED", "state_reason": "COMPLETED",
+                             "status": "Done", "issueType": "Task",
+                             "title": "Analysis, breakdown, estimations", "labels": []},
+                            {"number": 3, "state": "OPEN", "status": "Open",
+                             "issueType": "Feature", "labels": ["qa", "documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply Open" in f["detail"]
+
+
+def test_undone_analysis_task_gates_the_epic():
+    # the analysis task still in Review (the Tech Lead's feedback), development
+    # running: the gate holds the Epic in Analysis
+    epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Review",
+                             "issueType": "Task",
+                             "title": "Analysis, breakdown, estimations", "labels": []},
+                            {"number": 3, "state": "OPEN", "status": "In Progress",
+                             "issueType": "Feature", "labels": []}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply Analysis" in f["detail"]
+
+
+def test_closed_analysis_task_opens_the_gate():
+    # closed but left in Testing by the automation (Jiří 2026-10-26): the
+    # gate is open, the running development makes the Epic In Progress
+    epic = _epic(status="Analysis",
+                 subIssues=[{"number": 2, "state": "CLOSED", "state_reason": "COMPLETED",
+                             "status": "Testing", "issueType": "Task",
+                             "title": "Analysis, breakdown, estimations", "labels": []},
+                            {"number": 3, "state": "OPEN", "status": "In Progress",
+                             "issueType": "Feature", "labels": []}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply In Progress" in f["detail"]
+
+
+def test_status_open_expected_when_breakdown_done():
+    # Children not started + breakdown fields set on the Epic → Open expected.
+    epic = _epic(status="Planning", complexity="Medium", estimate=8,
+                 start_date="2026-08-01", end_date="2026-09-01",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Planning",
+                             "labels": ["qa", "documentation"]}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "Open" in f["detail"]
 
 
 def test_orphaned_when_epic_closed_child_open():
@@ -93,7 +162,8 @@ def test_normalize_extracts_epic_and_child_project_fields():
         "projectItems": {"nodes": [{"project": {"number": 5}, "fieldValues": {"nodes": [
             ss("Status", "Planning"), ss("Version", "2.18.0")]}}]},
         "subIssues": {"nodes": [{
-            "number": 2, "state": "OPEN", "issueType": {"name": "Task"},
+            "number": 2, "title": "Analysis, breakdown, estimations",
+            "state": "OPEN", "issueType": {"name": "Task"},
             "labels": {"nodes": [{"name": "qa"}]},
             "projectItems": {"nodes": [{"project": {"number": 5}, "fieldValues": {"nodes": [
                 ss("Status", "In Progress"), ss("Version", "2.17.0")]}}]}}]},
@@ -102,6 +172,7 @@ def test_normalize_extracts_epic_and_child_project_fields():
     assert n["status"] == "Planning" and n["version"] == "2.18.0"
     assert n["children_status"] == ["In Progress"]
     assert n["subIssues"][0]["labels"] == ["qa"]
+    assert n["subIssues"][0]["title"] == "Analysis, breakdown, estimations"
     assert n["subIssues"][0]["version"] == "2.17.0"
     # And the normalised dict drives diff(): version mismatch should surface.
     assert any(f["rule"] == "version_mismatch" for f in diff(n))

@@ -1,20 +1,46 @@
 """Pure §7.2 consistency checks for project-triage that need more than a single
-field lookup: the Epic-status rules and closed-but-not-done.
+field lookup: the Epic-status rules, closed-but-not-done, and the tree walks
+behind version_mismatch and epic_without_qa_sub_issue.
 
 These are kept side-effect-free and importable so they can be unit-tested
 without a live project cache (eval.py itself reads cache files at import). Rule
 names match epic-breakdown/reconcile.py so the two skills share one vocabulary.
 
-§7.3 precedence note: epic_done_with_open_children is an Error and the three
-Epic-status rules are mutually exclusive by the Epic's Status (Done / Open /
-In Progress), so at most one fires per Epic; eval.py's existing has_error
-suppression handles any co-occurring warnings on the same issue.
+The Epic's expected Status is derived from its children per Release
+Management §5.1 (the same ladder as PM_reporting's health check):
+Done = all children have Status Done — closing an issue only ends
+development and hands it to QA (the automation moves it to Testing), so a
+closed child ranks by its Status field, floored at Testing; only children
+cancelled as not planned / duplicate (or closed with no project Status)
+count as Done outright. Testing / Review = all *development* children at
+that stage or beyond, In Progress = a development child started — Bugs
+and qa/testing tasks are testing-phase work (bugs come out of testing,
+test tasks are the testing itself; Jiří 2026-10-03, In Progress since
+2026-10-11), so they hold the Epic below Done only, never below Testing;
+an Epic holding nothing but such work ranks it as its development. The
+Epic's analysis task ("Analysis, breakdown, estimations") is the gate
+(Jiří 2026-10-23, revised 2026-10-26): until it is closed it alone
+decides — Planning while it is Planning / Analysis / Open, Analysis while
+it is In Progress or Review (the Tech Lead's feedback, without a PR) —
+whatever the other children do; once it is closed (Status Testing or
+Done — a closed child ranks Testing at least) the other children decide:
+Open while they are at most Open, else the rungs above. An Epic without an analysis task derives from its children alone:
+below In Progress it is Open once the breakdown is complete (Complexity,
+Estimate, Start/End Date set on the Epic — §3.2), else Analysis while a
+child is still being scoped, else Open when a child is Open, else
+Planning.
+
+§7.3 precedence note: epic_done_with_open_children is an Error and outranks
+the epic_status_mismatch Warning — when it fires, the mismatch is not
+emitted for the same Epic; eval.py's existing has_error suppression handles
+any co-occurring warnings on the same issue.
 """
 
 from datetime import datetime
 
-ADVANCED_STATUSES = {"In Progress", "Review", "Testing"}
-EARLY_STATUSES = {"Open", "Planning"}
+STATUS_ORDER = ("Planning", "Analysis", "Open", "In Progress", "Review", "Testing", "Done")
+_RANK = {s: i for i, s in enumerate(STATUS_ORDER)}
+ANALYSIS_TITLE_WORDS = ("analys", "breakdown", "estimat")
 
 
 def within_window(closed_at_iso, now, days):
@@ -30,35 +56,183 @@ def within_window(closed_at_iso, now, days):
     return 0 <= (now - dt).days <= days
 
 
-def epic_status_findings(status, child_statuses, open_children_count):
+def _child_rank(status, state, state_reason):
+    """Ladder rank of one child, or None when nothing is derivable. Closing
+    an issue only ends development and hands it to QA (the automation moves
+    it to Testing), so a CLOSED child ranks by its Status field, floored at
+    Testing — Done comes only from QA setting Status Done. Children
+    cancelled as not planned / duplicate (and closed ones with no project
+    Status) count as Done outright: cancelled work must not hold the Epic
+    open."""
+    rank = _RANK.get(status)
+    if (state or "").upper() != "CLOSED":
+        return rank
+    if (state_reason or "").upper() in ("NOT_PLANNED", "DUPLICATE") or rank is None:
+        return _RANK["Done"]
+    return max(rank, _RANK["Testing"])
+
+
+def is_analysis_task(issue_type, title):
+    """The Epic's breakdown task ("Analysis, breakdown, estimations" and the
+    like), created together with the Epic: preparation, not the Epic's
+    delivery. No label marks it, so the title decides (the same test as
+    PM_reporting's work_units.is_analysis_task)."""
+    t = (title or "").lower()
+    return issue_type == "Task" and any(w in t for w in ANALYSIS_TITLE_WORDS)
+
+
+def _flag(child, i):
+    return len(child) > i and bool(child[i])
+
+
+def _ladder(children):
+    """(all ranks, development ranks, delivery ranks, analysis ranks) of the
+    rankable children. All ranks decide Done; the development ranks decide
+    In Progress / Review / Testing; the delivery ranks (everything but the
+    analysis task) decide Analysis / Open below them. A bug collector
+    (nothing but testing-phase work) ranks that work as its development."""
+    pairs = [(c, r) for c in children if (r := _child_rank(*c[:3])) is not None]
+    delivery = [(c, r) for c, r in pairs if not _flag(c, 4)]
+    core = ([r for c, r in delivery if not _flag(c, 3)]
+            or [r for _, r in delivery])
+    return ([r for _, r in pairs], core, [r for _, r in delivery],
+            [r for c, r in pairs if _flag(c, 4)])
+
+
+def _upper_rung(ranked, core):
+    """Done / Testing / Review / In Progress; None while the development
+    has not started."""
+    if min(ranked) >= _RANK["Done"]:
+        return "Done"
+    if not core:
+        return None
+    if min(core) >= _RANK["Testing"]:
+        return "Testing"
+    if min(core) >= _RANK["Review"]:
+        return "Review"
+    if max(core) >= _RANK["In Progress"]:
+        return "In Progress"
+    return None
+
+
+def expected_epic_status(children, breakdown_done):
+    """The Status an Epic should have, derived from its children — the
+    Release Management §5.1 ladder (most advanced rule wins).
+
+    children       — list of (project_status, github_state, state_reason)
+                     triples, one per child, ranked by _child_rank above;
+                     an optional fourth element marks testing-phase work
+                     (a Bug, or a task labelled qa / testing), which decides
+                     Done only unless the Epic holds nothing else, and an
+                     optional fifth marks the analysis
+                     task (is_analysis_task), the gate: until it is closed
+                     (Testing or Done) it alone decides Planning / Analysis.
+    breakdown_done — True when Complexity, Estimate, Start Date and End Date
+                     are all set on the Epic (§3.2); decides Open only for
+                     an Epic without an analysis task.
+
+    Returns None when nothing can be derived (no child has a usable state).
+    """
+    ranked, core, delivery, analysis = _ladder(children)
+    if not ranked:
+        return None
+    if analysis:
+        # the analysis task gates the epic (Jiří 2026-10-23): until it is
+        # closed it alone decides; once closed (Status Testing or Done —
+        # revised 2026-10-26) the other children decide Open and above
+        if min(analysis) < _RANK["Testing"]:
+            if max(analysis) >= _RANK["In Progress"]:
+                return "Analysis"
+            return "Planning"
+        if not delivery:
+            return "Open"
+        return _upper_rung(ranked, core) or "Open"
+    # no analysis task (bug collectors, tech epics): the children alone
+    upper = _upper_rung(ranked, core)
+    if upper:
+        return upper
+    if breakdown_done:
+        return "Open"
+    if _RANK["Analysis"] in delivery:
+        return "Analysis"
+    if _RANK["Open"] in delivery:
+        return "Open"
+    return "Planning"
+
+
+def epic_status_findings(status, children, breakdown_done):
     """Return a list of (level, rule, msg) for the §7.2 Epic-status rules.
 
-    status               — the Epic's project Status field value.
-    child_statuses       — list of children's project Status values (those known).
-    open_children_count  — number of children in GitHub OPEN state.
+    status         — the Epic's project Status field value.
+    children       — per-child tuples, see expected_epic_status().
+    breakdown_done — see expected_epic_status().
     """
-    out = []
-    if status == "Done" and open_children_count > 0:
-        out.append(("Error", "epic_done_with_open_children",
-                    f"Epic Status=Done but {open_children_count} child issue(s) still open"))
-    elif status == "Open" and any(cs in ADVANCED_STATUSES for cs in child_statuses):
-        out.append(("Warning", "epic_status_lags_children",
-                    "Epic in Open but a child is In Progress/Review/Testing"))
-    elif status == "In Progress" and child_statuses and all(cs in EARLY_STATUSES for cs in child_statuses):
-        out.append(("Warning", "epic_status_ahead_of_children",
-                    "Epic In Progress but all children are still Open/Planning"))
-    return out
+    open_count = sum(1 for c in children if (c[1] or "").upper() == "OPEN")
+    if status == "Done" and open_count > 0:
+        # §7.3 rule 5: this Error outranks (and replaces) the mismatch Warning
+        return [("Error", "epic_done_with_open_children",
+                 f"Epic Status=Done but {open_count} child issue(s) still open")]
+    expected = expected_epic_status(children, breakdown_done)
+    if status and expected and status != expected:
+        return [("Warning", "epic_status_mismatch",
+                 f"Epic Status is `{status}` but its children imply `{expected}` (RM §5.1)")]
+    return []
 
 
 def closed_but_not_done_finding(state, state_reason, status):
     """Return (level, rule, msg) or None.
 
-    Fires when an issue is CLOSED as COMPLETED but its Status never reached Done.
-    Closes marked NOT_PLANNED / DUPLICATE are legitimate terminal states and are
-    excluded (§7.3 rule 2)."""
+    Fires when an issue is CLOSED as COMPLETED but its Status is neither
+    Testing nor Done. Closing hands the issue to QA and the automation moves
+    it to Testing, so closed-with-Testing is the normal QA queue and Done is
+    the QA-approved end state — anything lower means the automation was
+    bypassed. Closes marked NOT_PLANNED / DUPLICATE are legitimate terminal
+    states and are excluded (§7.3 rule 2)."""
     if (state or "").upper() == "CLOSED" \
             and (state_reason or "").upper() == "COMPLETED" \
-            and status != "Done":
+            and status not in ("Testing", "Done"):
         return ("Warning", "closed_but_not_done",
-                "Closed as completed but Status never reached Done")
+                "Closed as completed but Status never reached Testing/Done")
     return None
+
+
+def version_reference(key, parent_of, type_of):
+    """The item whose Version `key` must carry, or None without a parent.
+
+    The parent's Version wins, transitively (the same rule as PM_reporting's
+    health check): every issue of an Epic's tree, at any depth, must carry
+    the Epic's Version — a sub-issue is compared with the Epic, never with a
+    container issue that may itself be off. Epics (and Releases) compare
+    with their immediate parent; an issue with no Epic above it in the
+    project falls back to its immediate parent.
+
+    key        — (repo, number) of the evaluated item.
+    parent_of  — {key: parent key} for the project's items.
+    type_of    — {key: issue type name} for the project's items.
+    """
+    parent = parent_of.get(key)
+    if parent is None or type_of.get(key) in ("Epic", "Release"):
+        return parent
+    seen, cur = {key}, parent
+    while cur is not None and cur not in seen:
+        if type_of.get(cur) == "Epic":
+            return cur
+        seen.add(cur)
+        cur = parent_of.get(cur)
+    return parent
+
+
+def tree_has_qa(root, children_of, labels_of, type_of):
+    """True when any non-Bug issue below `root`, at any depth, carries the
+    `qa` label — QA tasks count wherever they sit in the Epic's tree (the
+    layout is not a rule; same as PM_reporting's test coverage)."""
+    stack, seen = list(children_of.get(root, ())), {root}
+    while stack:
+        cur = stack.pop()
+        if cur in seen:
+            continue
+        seen.add(cur)
+        if type_of.get(cur) != "Bug" and "qa" in labels_of.get(cur, ()):
+            return True
+        stack.extend(children_of.get(cur, ()))
+    return False
