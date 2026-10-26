@@ -311,7 +311,7 @@ for it in target:
             srepo = ru.rstrip('/').split('/')[-1] if ru else (s.get('repository') or {}).get('name')
             sit = lookup.get((srepo, s.get('number')))
             # testing-phase work (a Bug, or a qa / testing task) decides Done
-            # only, the analysis task Done and Analysis only — see
+            # only, the analysis task Planning and Analysis only — see
             # consistency.expected_epic_status
             slabels = [l.get('name', '').lower() for l in (s.get('labels') or [])]
             stype = type_of.get((srepo, s.get('number'))) or (s.get('type') or {}).get('name')

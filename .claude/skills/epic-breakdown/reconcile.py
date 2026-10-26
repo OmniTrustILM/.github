@@ -120,10 +120,10 @@ def _expected_epic_status(children, breakdown_done):
     Bug, or a task labelled qa / testing (Jiří 2026-10-03, In Progress
     since 2026-10-11) — which decides Done only; an Epic holding nothing
     but such work ranks it as its development. analysis_task marks the
-    Epic's analysis task, the gate (Jiří 2026-10-23): until it is Done it
-    alone decides — Planning (not started), Analysis (In Progress, Review or
-    Testing) — whatever the other children; once Done the other children
-    decide Open and above. breakdown_done = Complexity, Estimate, Start/End
+    Epic's analysis task, the gate (Jiří 2026-10-23, revised 2026-10-26):
+    until it is closed it alone decides — Planning (not started), Analysis
+    (In Progress or Review) — whatever the other children; once closed
+    (Status Testing or Done) the other children decide Open and above. breakdown_done = Complexity, Estimate, Start/End
     Date all set on the Epic (§3.2) — decides Open only for an Epic without
     an analysis task."""
     def rank(status, state, reason):
@@ -156,7 +156,7 @@ def _expected_epic_status(children, breakdown_done):
             return "In Progress"
         return None
     if analysis:
-        if min(analysis) < _RANK["Done"]:
+        if min(analysis) < _RANK["Testing"]:
             return "Analysis" if max(analysis) >= _RANK["In Progress"] else "Planning"
         if not delivery:
             return "Open"

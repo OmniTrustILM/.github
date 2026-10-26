@@ -135,9 +135,18 @@ def test_expected_analysis_task_done_opens_the_epic():
     assert expected_epic_status([analysis("Done", "CLOSED")], NBD) == "Open"
 
 
+def test_expected_closed_analysis_task_opens_the_epic():
+    # closing the task opens the gate (Jiří 2026-10-26): a closed task left
+    # in Testing (the automation's move) lets the children decide …
+    assert expected_epic_status([analysis("Testing", "CLOSED")], NBD) == "Open"
+    assert expected_epic_status(
+        [analysis("Testing", "CLOSED"), kid("In Progress")], BD) == "In Progress"
+    # … but, like any child below Done, holds the Epic below Done
+    assert expected_epic_status(
+        [analysis("Testing", "CLOSED"), kid("Done", "CLOSED")], BD) == "Testing"
+
+
 def test_expected_analysis_task_gates_the_epic():
-    # closed but left in Testing (the automation's move) — still Analysis
-    assert expected_epic_status([analysis("Testing", "CLOSED")], NBD) == "Analysis"
     # in Review without a PR: the Tech Lead's feedback — still Analysis
     assert expected_epic_status([analysis("Review"), kid("Open")], BD) == "Analysis"
     # development already running does not lift the gate

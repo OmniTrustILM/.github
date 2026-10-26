@@ -98,16 +98,29 @@ def test_done_analysis_task_opens_the_epic():
 
 
 def test_undone_analysis_task_gates_the_epic():
-    # closed but left in Testing by the automation, development running:
-    # the gate holds the Epic in Analysis
+    # the analysis task still in Review (the Tech Lead's feedback), development
+    # running: the gate holds the Epic in Analysis
     epic = _epic(status="In Progress",
+                 subIssues=[{"number": 2, "state": "OPEN", "status": "Review",
+                             "issueType": "Task",
+                             "title": "Analysis, breakdown, estimations", "labels": []},
+                            {"number": 3, "state": "OPEN", "status": "In Progress",
+                             "issueType": "Feature", "labels": []}])
+    f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
+    assert "imply Analysis" in f["detail"]
+
+
+def test_closed_analysis_task_opens_the_gate():
+    # closed but left in Testing by the automation (Jiří 2026-10-26): the
+    # gate is open, the running development makes the Epic In Progress
+    epic = _epic(status="Analysis",
                  subIssues=[{"number": 2, "state": "CLOSED", "state_reason": "COMPLETED",
                              "status": "Testing", "issueType": "Task",
                              "title": "Analysis, breakdown, estimations", "labels": []},
                             {"number": 3, "state": "OPEN", "status": "In Progress",
                              "issueType": "Feature", "labels": []}])
     f = next(x for x in diff(epic) if x["rule"] == "epic_status_mismatch")
-    assert "imply Analysis" in f["detail"]
+    assert "imply In Progress" in f["detail"]
 
 
 def test_status_open_expected_when_breakdown_done():

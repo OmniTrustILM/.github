@@ -19,12 +19,12 @@ test tasks are the testing itself; Jiří 2026-10-03, In Progress since
 2026-10-11), so they hold the Epic below Done only, never below Testing;
 an Epic holding nothing but such work ranks it as its development. The
 Epic's analysis task ("Analysis, breakdown, estimations") is the gate
-(Jiří 2026-10-23): until it is Done it alone decides — Planning while it
-is Planning / Analysis / Open, Analysis while it is In Progress, Review
-(the Tech Lead's feedback, without a PR) or Testing (closed but not yet
-moved to Done) — whatever the other children do; once it is Done the
-other children decide: Open while they are at most Open, else the rungs
-above. An Epic without an analysis task derives from its children alone:
+(Jiří 2026-10-23, revised 2026-10-26): until it is closed it alone
+decides — Planning while it is Planning / Analysis / Open, Analysis while
+it is In Progress or Review (the Tech Lead's feedback, without a PR) —
+whatever the other children do; once it is closed (Status Testing or
+Done — a closed child ranks Testing at least) the other children decide:
+Open while they are at most Open, else the rungs above. An Epic without an analysis task derives from its children alone:
 below In Progress it is Open once the breakdown is complete (Complexity,
 Estimate, Start/End Date set on the Epic — §3.2), else Analysis while a
 child is still being scoped, else Open when a child is Open, else
@@ -125,8 +125,8 @@ def expected_epic_status(children, breakdown_done):
                      (a Bug, or a task labelled qa / testing), which decides
                      Done only unless the Epic holds nothing else, and an
                      optional fifth marks the analysis
-                     task (is_analysis_task), the gate: until it is Done
-                     it alone decides Planning / Analysis.
+                     task (is_analysis_task), the gate: until it is closed
+                     (Testing or Done) it alone decides Planning / Analysis.
     breakdown_done — True when Complexity, Estimate, Start Date and End Date
                      are all set on the Epic (§3.2); decides Open only for
                      an Epic without an analysis task.
@@ -138,9 +138,9 @@ def expected_epic_status(children, breakdown_done):
         return None
     if analysis:
         # the analysis task gates the epic (Jiří 2026-10-23): until it is
-        # Done it alone decides — a closed one left in Testing still means
-        # Analysis; once Done the other children decide Open and above
-        if min(analysis) < _RANK["Done"]:
+        # closed it alone decides; once closed (Status Testing or Done —
+        # revised 2026-10-26) the other children decide Open and above
+        if min(analysis) < _RANK["Testing"]:
             if max(analysis) >= _RANK["In Progress"]:
                 return "Analysis"
             return "Planning"
