@@ -1,0 +1,42 @@
+name: Epic Scaffold
+description: |
+  Creates the two standard sub-issues of a newly opened product Epic —
+  the "Analysis, breakdown, estimations" task and the "Doc: <Epic title>"
+  documentation task — so that neither is forgotten (RM rule 2026-10-23).
+
+inputs:
+  github-token:
+    description: |
+      GitHub App token that can WRITE issues in the Epic's repository and
+      in the documentation repository. Pass an org-wide token (generated
+      without `repositories:` narrowing) — the documentation task lives in
+      a different repository than the Epic.
+    required: true
+  documentation-repo:
+    description: Repository (owner/name) that holds the documentation tasks.
+    required: false
+    default: OmniTrustILM/documentation
+  analysis-title:
+    description: Title of the analysis task created under the Epic.
+    required: false
+    default: Analysis, breakdown, estimations
+
+runs:
+  using: composite
+  steps:
+    - name: Scaffold the Epic's standard tasks
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        ISSUE_URL: ${{ github.event.issue.html_url }}
+        ISSUE_NODE_ID: ${{ github.event.issue.node_id }}
+        ISSUE_NUMBER: ${{ github.event.issue.number }}
+        ISSUE_TITLE: ${{ github.event.issue.title }}
+        # `|| ''` guards against repos without Issue Types configured.
+        ISSUE_TYPE: ${{ github.event.issue.issue_type.name || '' }}
+        ISSUE_LABELS: ${{ toJSON(github.event.issue.labels.*.name) }}
+        ISSUE_ASSIGNEE_IDS: ${{ toJSON(github.event.issue.assignees.*.node_id) }}
+        ISSUE_REPO: ${{ github.repository }}
+        DOC_REPO: ${{ inputs.documentation-repo }}
+        ANALYSIS_TITLE: ${{ inputs.analysis-title }}
+      run: bash "$GITHUB_ACTION_PATH/scaffold.sh"
