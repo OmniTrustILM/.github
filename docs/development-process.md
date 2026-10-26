@@ -1,7 +1,7 @@
 # ILM Development Management Methodics
 
-**Version:** 1.1
-**Date:** 2026-08-16
+**Version:** 1.2
+**Date:** 2026-10-04
 **Organization:** OmniTrustILM (https://github.com/OmniTrustILM)
 **Project:** https://github.com/orgs/OmniTrustILM/projects/5
 
@@ -16,21 +16,26 @@ You've opened this doc. Jump to the section for your role:
 ### Developer
 1. Pick an issue from the **Sprint Board** (view filtered to `Sprint: current`, `Assignees: @me`). Status **Open** = ready to work.
 2. Move to **In Progress**, commit, open a PR that references the issue (e.g., `Closes #123`).
-3. PR linked → Status moves to **Review** automatically. Address review feedback in the same PR.
-4. Code review approved → Status moves to **Testing** automatically. Wait for QA.
-5. QA approves → merge the PR. Status moves to **Done**, issue auto-closes.
-6. **Never** close code issues manually. If QA rejects, they move Status back to **In Progress** — fix and push again.
-7. Post-merge reopen (regression discovered later): fix in a new PR, full cycle repeats.
+3. PR linked → Status moves to **Review** automatically. Address review feedback in the same PR. A task with no PR (configuration, docs) you **close yourself** when finished — closing moves it to **Testing**.
+4. The reviewer approves, **merges the PR and closes the issue** → Status moves to **Testing** automatically. Closing ends development, not the lifecycle — *closed ≠ done*. Pick up the next issue.
+5. Testing happens per **Epic**, on its testing tasks (§1 Epic anatomy). A **developer testing task** (label `testing`, assigned to you) you test yourself: move it to **In Progress**, test, close it. A defect in your issue → **reopen** it (Status → In Progress), fix in a new PR, cycle repeats.
+6. Once the Epic is tested, move your development issues (and your `testing` tasks) from **Testing** to **Done**. Only Done ends the cycle.
+7. A **QA testing task** (`testing` + `qa`, assigned to a QA member) — instead of yours or alongside it — is tested by QA, who moves it to Done; QA findings become new Bugs under the Epic.
 
 ### PM / Tech Lead
 1. Triage new issues daily: scope Bugs (already in **Analysis**), move future work from **Planning → Analysis**, set Priority/Version/Module/Sprint during planning.
 2. Assign Module and Version during planning (see Section 3 for options). Epic: also set Complexity/Estimate/Start Date/End Date during breakdown (Analysis) — required before the Epic moves to Open.
 3. Run `/project-triage` weekly to surface stale items and missing required fields.
 
+### Epic Owner
+1. **P1 Planning:** the RM puts the Epic into a release (Version) and appoints you as Epic Owner (the Epic's Assignee). Take it over: Epic Status → **Analysis**.
+2. **P2 Breakdown:** switch the Epic's task "Analysis, breakdown, estimations" to **In Progress** (create it if it is missing), break the Epic down per §1 Epic anatomy — development issues, documentation, **at least one testing task** (`/epic-breakdown` helps) — and fill in Complexity, Estimate, Start Date, End Date.
+3. Move the ready sub-issues to **Open**, close the analysis task (it is the gate: the Epic can be Open only once the task is closed — the automation moves it to Testing, QA or you move it to Done) and move the Epic to **Open**. Carry the Epic through development, the demo and handover to QA (Release Management §6).
+
 ### QA
-1. Watch the **QA Board** — issues in **Testing** status are ready for you to verify (PR branch is merge-ready, awaiting QA sign-off before merge).
-2. Approve → developer merges. Reject → move Status back to **In Progress** and comment with findings.
-3. Post-merge regression → open a new issue OR reopen the original; set **Reopen Reason** to Regression.
+1. An Epic's **QA testing task** carries the labels `testing` + `qa` and a QA member as Assignee — it is planned in the breakdown, on its own or alongside a developer testing task. You start on it once the Epic is handed over with a demo (Release Management §6). Watch the **QA Board** — testing tasks with `qa` are yours.
+2. Test the Epic end-to-end on the integrated main branch: move the task to **In Progress**, test, close it (→ Testing). Defects → file **new Bugs under the Epic**; fixing them is part of the Epic's testing phase (the Epic stays in Testing).
+3. Epic verified → move the `testing` + `qa` task to **Done**. Post-release regression → reopen the original issue and set **Reopen Reason** to Regression.
 
 ### AI Agent
 1. Autonomous: read issues, generate reports, suggest breakdowns, validate triage, auto-detect Module from description.
@@ -44,10 +49,12 @@ You've opened this doc. Jump to the section for your role:
 | What's the difference between Epic and Feature? | §1 |
 | When does an issue automatically change status? | §2.1, §6 |
 | Who sets which field? | §2.3, §3.1 |
-| What do I do if QA rejects after merge? | §2.7 |
+| What happens when testing finds a defect? | §2.7 |
 | How are Bug, Vulnerability, QA work, Documentation distinguished? | §1 |
-| What triggers auto-close? | §2.4, §6 |
+| What does closing an issue mean? | §2.4, §6 |
 | Can I create a Feature inside a Feature? | §1 (no — split the Epic) |
+| Which issues belong under an Epic, and who tests it? | §1 Epic anatomy |
+| How is an Epic prepared before development? | §2.5 Epic preparation |
 | How is Module picked for a new issue? | §3.1 Module row |
 
 ---
@@ -58,10 +65,10 @@ Conceptual terms only. For field types and values (Module, Version, Sprint, Prio
 
 | Term | Definition |
 |---|---|
-| **Issue state** | GitHub's native `open` or `closed`. Controlled by automation when Status = Done, or manually as "not planned" / "duplicate". Distinct from Status below. |
-| **Status** | Our **custom Project #5 field** — the 7-stage workflow (Planning → Analysis → Open → In Progress → Review → Testing → Done). Status drives state: when Status = Done, automation closes the issue. |
-| **Status regression** | Moving an issue's Status *backwards* (e.g., Testing → In Progress when QA rejects pre-merge). The issue stays open — NOT a reopen event. See §2.7. |
-| **Reopen** | GitHub `issues.reopened` event — a closed issue being re-opened after merge (e.g., regression found after release). Triggers the reopen-tracking automation (§6 Rule #2). |
+| **Issue state** | GitHub's native `open` or `closed`. Closing is a **manual** act that ends development — the reviewer closes a PR-linked issue on merge, the developer closes a no-PR task — and automation then moves Status → Testing. Also closed manually as "not planned" / "duplicate". Distinct from Status below. |
+| **Status** | Our **custom Project #5 field** — the 7-stage workflow (Planning → Analysis → Open → In Progress → Review → Testing → Done). State drives Status at the handover: closing an issue moves it to Testing; Done is set manually once the Epic is tested — *closed ≠ done*. |
+| **Status regression** | Moving an *open* issue's Status *backwards* (e.g., Review → In Progress when a linked PR needs major rework). NOT a reopen event. Defects found in testing are **reopens**, because the issue is already closed — see §2.7. |
+| **Reopen** | GitHub `issues.reopened` event — a closed issue being re-opened: a defect found while testing the Epic, or a regression found after release. Triggers the reopen-tracking automation (§6 Rule #2). |
 | **Epic** | Issue type — a large deliverable with a User Story and Use Cases, decomposed into Features / Tasks / Bugs as sub-issues. Cannot contain sub-Features (that signals the Epic is too large — split it). |
 | **Release** | Issue type — a cross-repo milestone (e.g., "Release 2.18.0"). Parent of Epics and standalone work targeted at that version. |
 | **Project #5** | The single org-wide GitHub Project V2 at https://github.com/orgs/OmniTrustILM/projects/5. All ILM work lives here — every open issue across the 60+ org repos is added automatically. |
@@ -101,6 +108,7 @@ Release 2.18.0
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
 │   ├── Task+documentation [documentation]: Revocation user guide
+│   ├── Task+testing [ilm]: Test revocation end to end
 │   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
@@ -117,13 +125,36 @@ Release 2.18.0
   the cycle are its sub-issues. It is an ordinary Epic in an ordinary place in the hierarchy — no separate rules apply to
   it. Bugs found during the cycle go here rather than directly under the Release, which keeps the Release's own children
   down to Epics. The `/create-issue` skill links a new bug under the active cycle automatically (§2.5).
-- Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks)
+- Epics contain Features, Bugs, Tasks (including QA and Documentation-labeled Tasks) — the kinds and what each is for are in **Epic anatomy** below
 - Features can contain Tasks and Bugs as implementation details (small sub-work discovered during development). **A Feature must NOT contain sub-Features** — this signals the Epic is too large and should be split.
 - Sub-issues receive Version and Module from parent at creation time (automation copies if child's fields are empty; does not update if parent changes later — see Section 6, Rule #2)
 - An issue can have only one parent
 - **Breakdown guideline:** If a Feature under an Epic needs its own sub-issues, this is a signal that the Epic may be too large. Consider breaking it into separate Epics, each with a focused scope. A well-sized Epic has Features/Tasks that are directly implementable without further decomposition.
 - **Cross-repo work:** Changes that touch 2+ repositories should be structured as an Epic for proper dependency tracking via sub-issues and blocked-by relationships. **Exception:** Trivial cross-repo changes (config updates, version bumps, dependency alignment) can use linked standalone issues without an Epic — use `blocked-by` links between them for ordering.
 - **Dependencies:** Use GitHub's native issue dependency feature (`blocked-by` / `blocks`) to express ordering between issues. The `/epic-breakdown` skill sets these automatically when creating sub-issues. The consistency rule "Blocked but In Progress" (§7.2) flags issues being worked on while their blockers are still open.
+
+### Epic Anatomy
+
+The kinds of issues under an Epic. The kind follows from the issue type and its labels; it decides who typically owns the issue, which release capacity it draws on (release planning — the dashboard's Health → Release Scope, PM_reporting `docs/release-delivery.md`) and how it feeds the derived Epic status (§2.2).
+
+| Kind | Type and labels | Typically assigned to | Capacity in release planning | For the Epic status | How many |
+|---|---|---|---|---|---|
+| **Epic** | Epic | Epic Owner | none itself — its Estimate (overall delivery estimate) stands in while there is no breakdown | derived from the children | 1 |
+| **Development issue** | Feature / Task without `testing`, `qa` | developer | Development | development work | 1 or more |
+| **Documentation** | Task + `documentation` | developer | Development | development work | as needed |
+| **Analysis task** | Task "Analysis, breakdown, estimations" | Epic Owner | Development | the gate — until it is closed the Epic is Planning or Analysis; closing it (Status Testing or Done) lets the Epic be Open and move on | usually 1, at the start |
+| **Developer testing task** | Task + `testing` | developer | Testing after freeze | testing phase | at least one testing task per Epic — a developer one, a QA one, or both side by side; a complex Epic may have more |
+| **QA testing task** | Task + `testing` + `qa` (manual or automated, e.g. ATF regression suites) | QA member | QA | testing phase | ↑ |
+| **QA work** | Task + `qa` (automation, framework, QA infrastructure) | QA member | QA | testing phase | as needed |
+| **Bug** | Bug, filed under the Epic from testing | developer (the fix) | not planned — it takes from the time the window after the freeze leaves for bugs | testing phase | arises from testing |
+| **Sub-epic** | Feature / Task with sub-issues | — | none itself — its leaves carry the work at any depth; `testing`, `qa` and `documentation` are inherited by the whole subtree | by its leaves | in a large Epic |
+
+The three capacities: **Development** = the team's developers from the release Start Date to the Feature freeze (primary — the release is filled by it); **Testing after freeze** = the same developers from the freeze to the End Date (developer testing tasks and bug fixes); **QA** = the QA members over the whole release.
+
+- **A standard Epic** has at least one development issue and **at least one testing task**: a developer testing task, a QA testing task, or both side by side; a complex Epic may have more. The consistency rule "Epic without testing task" (§7.2) flags an Epic with none.
+- **Whose work it is:** the **Developer** field (the permanent record of who built the issue), else the issue's Assignee, else the Epic Owner. The `qa` label, or an assignment to a QA member, puts the work on the QA capacity. The Assignee stays the developer through the lifecycle; the tester of a testing task is its Assignee.
+- **Planning gaps:** a leaf without an Estimate counts as 1 MD; an Epic without a developer testing task gets 1 MD of testing, and an Epic without any QA work 1 MD of QA, per started 10 MD of its development — always on top of the development estimate. An Epic without a breakdown weighs its own Estimate, else the average Epic of the previous release.
+- The **`Bugs x.y.z`** cycle Epic holds only bugs, has no testing task and stays out of release planning.
 
 ---
 
@@ -143,20 +174,21 @@ stateDiagram-v2
     Open --> InProgress : Developer picks up
     InProgress --> Review : PR linked (auto)
     Review --> InProgress : PR withdrawn / major rework
-    Review --> Testing : Code review approved (auto)
-    Testing --> Done : QA approves, PR merged
-    Testing --> InProgress : QA rejects (status regression)
-    Done --> [*] : Auto-close
-    [*] --> InProgress : Issue reopened (§2.7)
+    Review --> Testing : PR approved + merged, issue closed (auto)
+    InProgress --> Testing : No-PR task closed by developer (auto)
+    Testing --> InProgress : Defect found, issue reopened (auto)
+    Testing --> Done : Epic tested (manual)
+    Done --> [*]
 
     state "In Progress" as InProgress
 ```
 
 **Legend:**
 - `(auto)` — automation moves the status (built-in project workflows or composite actions, see §6)
-- `(status regression)` — a human moves the status backwards; issue stays **open**
-- `Issue reopened` — GitHub `issues.reopened` event on a previously-closed issue; see §2.7 for the full flow
-- `PR withdrawn / major rework` — if a linked PR turns out to be a draft or needs substantial changes, the developer manually moves Review → In Progress
+- `(manual)` — a human moves the status; Done is set by the developer (development issues, `testing` tasks) or QA (`testing` + `qa` tasks) once the Epic is tested
+- `issue closed` — **closing ends development, not the lifecycle**: the issue is handed over to Epic-level testing with Status Testing; *closed ≠ done*
+- `issue reopened` — GitHub `issues.reopened` event on a closed issue (a defect found in testing, or a regression later); the built-in workflow moves it to In Progress — see §2.7
+- `PR withdrawn / major rework` — if a linked PR turns out to be a draft or needs substantial changes, the developer manually moves Review → In Progress (a *status regression*; the issue stays open)
 
 | Status | Definition |
 |---|---|
@@ -165,14 +197,14 @@ stateDiagram-v2
 | **Open** | Fully specified, ready for a developer to pick up. |
 | **In Progress** | Developer actively working. Includes addressing code review feedback. |
 | **Review** | PR submitted and linked. Code review in progress (includes back-and-forth until approval). **Note:** Draft PRs should not be linked until ready for review — linking triggers the status transition. |
-| **Testing** | Code review approved. QA testing the PR branch — locally or via `preview` label environment. PR is **NOT yet merged**. Main branch stays stable. |
-| **Done** | QA approved, PR merged to main, issue auto-closed. |
+| **Testing** | Development finished: the PR is merged and the issue **closed** (or a no-PR task closed). Waiting for, or under, **Epic-level testing** on the Epic's testing task (§2.8). *Closed ≠ done.* |
+| **Done** | The Epic's testing passed — set **manually** by the developer (development issues, `testing` tasks) or QA (`testing` + `qa` tasks). End of the lifecycle. |
 
 > **Pre-development status philosophy:** Planning is the backlog (long-lived, 90-day threshold). Analysis is the active triage/scoping workspace (short-lived, 14-day threshold). Open is the developer-ready queue (21-day threshold). Not all types use all three — the convention table below shows the default path.
 
 > **Analysis is not exclusively PM work.** For Bugs, QA may triage and move to Open. For technically complex issues, the Tech Lead or assigned developer may perform the analysis (root cause identification, correct repo, impact assessment). The PM retains authority over business prioritization (Priority, Version, Sprint) regardless of who performs the technical analysis. For simple items (obvious fix, trivial scope), the person triaging may move from Analysis to Open immediately — Analysis is a triage inbox, not a mandatory waiting period.
 
-> **Key change:** QA testing happens BEFORE merge, not after. The Testing status means "QA is verifying the PR branch." Only after QA approves does the PR get merged and the issue moves to Done. This keeps the main branch stable.
+> **Testing model:** code is merged after code review; the reviewer closes the issue on merge and automation moves it to **Testing**. Testing is done per **Epic** on its testing tasks (a developer testing task `testing` — by the developer; a QA testing task `testing` + `qa` — by QA once the Epic is handed over, Release Management §6; one or both), not per PR. Defects reopen the affected issue or become new Bugs under the Epic; Done is set manually once the Epic is tested.
 
 ### 2.2 Convention by Issue Type
 
@@ -180,13 +212,16 @@ stateDiagram-v2
 |---|---|---|
 | **Feature** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Full 7-stage |
 | **Bug** | Analysis → Open → In Progress → Review → Testing → Done | Skips Planning — bugs are reactive |
+| **Task** (non-code) | Planning → Open → In Progress → Testing → Done | No PR: the developer **closes** the task when finished → Testing (auto); Done once the Epic is tested |
+| **Task** (code / testing) | Planning → Open → In Progress → Review → Testing → Done | With a PR: Review on PR link, Testing when the reviewer merges and closes. Testing tasks (`testing`, `testing` + `qa`) have no PR: In Progress while testing, closed → Testing, Done by their tester |
+| **Task** (documentation) | Planning → Open → In Progress → (Review →) Testing → Done | Review only when the docs go through a PR; otherwise closed by the developer → Testing |
+| **Epic** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Status is **derived from the children** (full rules: [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md)). The Epic's **analysis task** ("Analysis, breakdown, estimations", created with the Epic) is the gate: **Planning** while the task has not started (Planning, Analysis, Open); **Analysis** while it is In Progress or Review (the Tech Lead's feedback, without a PR) — whatever the other children do; **Open** once the task is closed (Status Testing or Done) and the other children are at most Open. Only then do the children decide: **In Progress** when a *development* child starts, **Review** / **Testing** when *all development* children reached that stage or beyond — Bugs and `qa` / `testing` tasks are testing-phase work (bugs come out of testing, test tasks are the testing itself): they never make the Epic In Progress, an Epic whose development is done while only they are worked on is in Testing, and they hold it below Done only. **Done** when all children have Status **Done**, the analysis task included — closing an issue only ends development and hands it to QA (the automation moves it to Testing), so a closed child still ranks by its Status, never below Testing; only children closed as *not planned* / *duplicate* count as complete outright. An Epic without an analysis task (tech Epics, bug collectors) derives from its children alone: Open once the breakdown fields are set (**Complexity, Estimate, Start Date, End Date** — §3.2), Analysis while a child is still being scoped. All transitions manual (RM / Epic Owner); the release dashboard's Health tab flags Epics whose Status disagrees with the derivation. |
 | **Task** (non-code) | Planning → Open → In Progress → Done | No Review/Testing needed |
 | **Task** (code / QA) | Planning → Open → In Progress → Review → Testing → Done | Fuller lifecycle; QA-labeled Tasks follow this path |
 | **Task** (documentation) | Planning → Open → In Progress → Done | No Review/Testing unless docs require PR review |
-| **Epic** | Planning → Analysis → Open → In Progress → Review → Testing → Done | Status is **derived from the children** (full rules: [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md)). The Epic's **analysis task** ("Analysis, breakdown, estimations", created with the Epic) is the gate: **Planning** while the task has not started (Planning, Analysis, Open); **Analysis** while it is In Progress or Review (the Tech Lead's feedback, without a PR) — whatever the other children do; **Open** once the task is closed (Status Testing or Done) and the other children are at most Open. Only then do the children decide: **In Progress** when a *development* child starts, **Review** / **Testing** when *all development* children reached that stage or beyond — Bugs and `qa` / `testing` tasks are testing-phase work (bugs come out of testing, test tasks are the testing itself): they never make the Epic In Progress, an Epic whose development is done while only they are worked on is in Testing, and they hold it below Done only. **Done** when all children have Status **Done**, the analysis task included — closing an issue only ends development and hands it to QA (the automation moves it to Testing), so a closed child still ranks by its Status, never below Testing; only children closed as *not planned* / *duplicate* count as complete outright. An Epic without an analysis task (tech Epics, bug collectors) derives from its children alone: Open once the breakdown fields are set (**Complexity, Estimate, Start Date, End Date** — §3.2), Analysis while a child is still being scoped. All transitions manual (RM / Epic Owner); the release dashboard's Health tab flags Epics whose Status disagrees with the derivation. |
 | **Release** | Planning → In Progress → Done | PM sets **Start Date** and **End Date** before moving past Planning (required by §3.2). PM moves to In Progress when development begins. PM moves to Done after QA sign-off (see Section 2.9). All transitions manual. |
 
-**These are conventions, not hard enforcement.** The full pipeline is available for all types. For Tasks specifically: if a PR is linked, automation moves the Task through Review and Testing naturally. If no PR is involved (documentation, configuration via UI), the developer moves it directly to Done after completion.
+**These are conventions, not hard enforcement.** The full pipeline is available for all types. For Tasks specifically: if a PR is linked, automation moves the Task to Review and the reviewer's merge-and-close moves it to Testing. If no PR is involved (documentation, configuration via UI), the developer closes the Task after completion — automation moves it to Testing like any other closed issue; Done follows once the Epic is tested.
 
 ### 2.3 Who Moves What (status transitions at a glance)
 
@@ -195,21 +230,22 @@ This table shows **status transitions only**. For full role responsibilities (fi
 | Actor | Transitions |
 |---|---|
 | **PM / Tech Lead** | Planning → Analysis → Open (all types); also Open → Planning when deferring (see §2.5 Triage step 2) |
-| **Developer** | Open → In Progress (self-assign); Analysis → Open (after technical analysis); Review → In Progress (when a linked PR turns out to be a draft or needs major rework) |
-| **QA** | Testing → Done (approves) or Testing → In Progress (rejects pre-merge); Analysis → Open (for Bugs, after reproduction check) |
-| **Automation** | Added-to-project → Planning (default) or Analysis (Bugs); In Progress → Review (PR linked); Review → Testing (code review approved); Done → Close (auto-close); Reopened → In Progress (built-in project workflow) |
+| **Epic Owner** | Epic: Planning → Analysis (takes the Epic over), Analysis → Open (analysis task closed, breakdown complete); the analysis task "Analysis, breakdown, estimations": Open → In Progress, (Review for the Tech Lead's feedback,) → closed when the analysis is complete (the automation moves it to Testing; Done afterwards) — the gate of the Epic's Status (§2.2); moves the sub-issues ready for development to Open (§2.5 Epic preparation) |
+| **Developer** | Open → In Progress (self-assign); Analysis → Open (after technical analysis); Review → In Progress (linked PR is a draft / needs major rework); closes no-PR tasks (→ Testing by automation); reopens own issues on defects found in testing (→ In Progress by automation); Testing → Done on development issues and `testing` tasks once the Epic is tested |
+| **QA** | Testing → Done on `testing` + `qa` tasks (Epic verified); files Bugs under the Epic for defects; Analysis → Open (for Bugs, after reproduction check) |
+| **Automation** | Added-to-project → Planning (default) or Analysis (Bugs); In Progress → Review (PR linked); **issue closed → Testing** (whatever the Status); Reopened → In Progress (built-in project workflow) |
 
-> **Product Owner and Code Reviewer** have no direct status transition rights — their outputs (acceptance criteria, review approval) flow into automation or into the transitions above.
+> **Product Owner** has no direct status transition rights. The **Code Reviewer** moves no Status field either — approving, merging and **closing** the issue is what hands it to Testing (automation).
 
 ### 2.4 Issue State (Open/Closed)
 
 | State | When | Who |
 |---|---|---|
 | **Open** | Default for all active work | — |
-| **Closed (completed)** | Status = Done (QA approved, PR merged) | Automation |
+| **Closed (completed)** | Development finished: PR merged and issue closed by the reviewer, or a no-PR task closed by the developer. Automation moves Status → Testing — **closed ≠ done** | Reviewer / Developer |
 | **Closed (not planned)** | Won't fix / out of scope / not reproducible | PM or QA (for Bugs) |
 | **Closed (duplicate)** | Duplicate found, linked | Anyone |
-| **Reopened** | QA rejects or regression found | QA / Developer |
+| **Reopened** | Defect found while testing the Epic, or a regression found later | Developer / QA |
 
 ### 2.5 Process Flow
 
@@ -227,6 +263,24 @@ Both paths: issue auto-added to Project #5, status set to Planning (or Analysis 
 4. Set Priority, Module, Version, Sprint
 5. Move to Open when fully scoped
 
+#### Epic Preparation (P1 Planning, P2 Breakdown)
+
+Before development, an Epic goes through two preparation steps. Development (§2.5 Development) starts once the Epic is **Open**.
+
+**P1 — Planning** (Epic: Planning → Analysis)
+
+1. A new Epic is added to Project #5 with Status **Planning** (automation). The task **"Analysis, breakdown, estimations"** is created together with the Epic as its sub-issue.
+2. The **RM** puts the Epic into a release — fills in **Version** — and appoints the **Epic Owner** (the Epic's Assignee). The RM checks that the Epic has its **User story**, **Use cases** and **Acceptance criteria** (required fields of the Epic template).
+3. The **Epic Owner** takes the Epic over and starts the analysis: Epic Status → **Analysis**.
+
+**P2 — Breakdown, analysis, estimates** (Epic: Analysis → Open)
+
+1. The **Epic Owner** switches the analysis task to **In Progress**; if the Epic has none, they create it first.
+2. They break the Epic down into sub-issues per §1 Epic anatomy: development issues, documentation and **at least one testing task** (developer, QA or both). The `/epic-breakdown` skill can propose the breakdown (§2.6). New sub-issues are added to Project #5 with Status Planning and inherit the empty Version and Module from the Epic (automation).
+3. The **developers** estimate the issues they will work on — **Estimate** in quarter days (§3.5); the Estimate is the baseline the measured development interval is compared with.
+4. The Epic Owner fills in the Epic's **Complexity**, **Estimate**, **Start Date** and **End Date** (§3.2), moves the sub-issues ready for development to **Open**, closes the analysis task and moves the Epic to **Open**. Unsure of the result, the Epic Owner first switches the analysis task to **Review** (without a PR) and asks the Tech Lead for feedback.
+5. The analysis task is the **gate of the Epic's Status** (§2.2, Release Management §5.1): until it is closed the Epic is Planning (task not started) or Analysis (task In Progress or Review), whatever its other children do; closing the task opens the gate (revised 2026-10-26) — the automation moves the closed task to Testing and, like any child below Done, it then only holds the Epic below Done until it is moved to Done. Its work is evidenced like any no-PR task (In Progress → close) and credited to the Epic Owner.
+
 #### External / Community Contributions
 
 When a PR is submitted by an external contributor without a linked issue:
@@ -238,23 +292,23 @@ When a PR is submitted by an external contributor without a linked issue:
 #### Development
 
 1. Developer self-assigns from Sprint Board (Open), moves to In Progress
-2. Opens PR, links to issue → automation moves to **Review**
-3. Code review cycle: changes requested → developer fixes → re-review → approval
-4. Code review approved → automation moves to **Testing**
+2. Opens PR, links to issue (`Closes #123`) → automation moves to **Review**; the developer can pick up the next issue
+3. The reviewer assigns themselves in the PR's **Reviewers** field; code review cycle: changes requested → developer fixes → re-review → approval
+4. Reviewer **merges the PR and closes the issue** → automation moves to **Testing** (closing ends development)
+5. A task with no PR: the developer **closes** it when finished → automation moves to **Testing**
 
-#### Testing (QA before merge)
+#### Testing (per Epic, after merge)
 
-Once code review is approved, QA tests the PR branch before it is merged:
+Testing is not done per PR. Every Epic has **at least one testing task** (label `testing`; sub-issues of the Epic, or of one of its Features/Tasks) that covers the Epic end-to-end: a **developer testing task** (`testing`, assigned to a developer), a **QA testing task** (`testing` + `qa`, assigned to a QA member), or both side by side; a complex Epic may have more (§1 Epic anatomy).
 
-1. QA picks up the issue from the QA Board (Status: Testing)
-2. QA tests the PR branch — either locally or by adding the `preview` label to create a testing environment for the PR
-3. Automated smoke tests run on the PR branch (see `docs/testing.md`)
-4. **Pass:** QA approves the PR → developer merges → automation moves to **Done** → issue auto-closed
-5. **Fail:** QA rejects the PR (requests changes) → QA moves status back to **In Progress** → developer fixes, cycle repeats from step 2 of Development
+1. The **developer** tests a developer testing task: moves it to **In Progress**, tests, **closes** it → automation moves it to **Testing**
+2. **QA** tests a QA testing task the same way, once the Epic is handed over with a demo (Release Management §6)
+3. **Defect in an existing issue:** the tester **reopens** that issue → automation moves it to **In Progress**; the developer fixes it in a new PR and the cycle repeats from step 2 of Development. QA findings are filed as **new Bugs under the Epic** instead
+4. **Epic verified:** the developer moves the development issues and the developer testing tasks from **Testing** to **Done**; QA moves the QA testing tasks to Done. Only now the cycle ends — *closed ≠ done*
 
-> **Note on terminology:** In the pre-merge testing model, QA rejection is a **status regression** (Testing → In Progress), not a GitHub issue reopen — the issue was never closed. The Reopen Process (Section 2.7) applies when a previously closed/Done issue needs to be reopened (e.g., regression found after release). For pre-merge QA rejection, QA moves the status backward and the Reopen Reason field is not set — it's a normal review cycle, not a quality metric event.
+> **Bugs and testing tasks are the Epic's testing phase.** They never make the Epic In Progress: once its development is done, an open Bug or testing task keeps it in Testing (Epic ladder, §2.2). The Epic is Done when every child — development issues, testing tasks and Bugs — is Done.
 
-> **Main stays stable.** Code is only merged after both code review and QA approval. Regression tests run daily as a complement to pre-merge QA testing (see Section 2.8).
+> **Automated tests** (smoke in CI on every PR, daily regression on main) complement, not replace, the Epic-level testing (§2.8).
 
 ### 2.6 Epic Breakdown
 
@@ -269,7 +323,7 @@ Three-phase process with PM and QA review:
 **Phase 3 — Review and approval (collaborative):**
 1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
 2. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
-3. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
+3. **QA reviews** the testing tasks specifically (label `testing`, plus `qa` where QA will own the testing — coverage, test strategy, whether manual or automated testing is needed)
 4. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
 
 ```mermaid
@@ -286,26 +340,23 @@ flowchart TB
     G -->|Approve| H[Issues created with parents + dependencies]
 ```
 
-### 2.7 QA Rejection vs Reopen — Two Different Processes
+### 2.7 Defects Found in Testing — Reopen vs New Bug
 
-**Pre-merge QA rejection (status regression):**
-When QA rejects a PR during the Testing status (before merge), this is a **status regression**, not a GitHub reopen — the issue was never closed.
-1. QA requests changes on the PR
-2. QA moves status from Testing back to **In Progress**
-3. **Reopen Reason field is NOT set** — this is a normal review cycle, not a quality metric event
-4. Developer fixes, opens updated PR, cycle repeats from Review
+Because an issue is **closed** when it reaches Testing, a defect found while testing the Epic is handled in one of two ways:
 
-**Post-merge reopen (true reopen):**
-When a previously closed/Done issue needs to be reopened — e.g., regression found after release, or a problem discovered in production after the issue was completed.
-
-1. QA or developer reopens the issue (GitHub state: Closed → Open)
+**Reopen (defect in an existing issue):**
+1. The tester reopens the issue (GitHub state: Closed → Open)
 2. Automation posts an audit comment (timestamp, previous assignees, who reopened) and **clears** the Reopen Reason field so the reopener fills it fresh
 3. Built-in project workflow moves Status → **In Progress**
 4. **The reopener sets Reopen Reason** (Regression / Incomplete Implementation / Edge Case / Other) — this is the single source of truth for reopen-tracking metrics
 5. If the original assignee is unavailable, PM reassigns
-6. The developer (assignee) opens a **new PR** that references the same issue (`Closes #123` or `Fixes #123` in the PR body). Do NOT reuse the old merged PR; do NOT create a new issue for the same defect — the existing issue is the canonical home for the regression.
-7. Full lifecycle cycle repeats on the new PR: In Progress → Review → Testing → Done → Close.
+6. The developer (assignee) opens a **new PR** that references the same issue (`Closes #123` or `Fixes #123` in the PR body). Do NOT reuse the old merged PR; do NOT create a new issue for the same defect — the existing issue is the canonical home for the defect.
+7. The cycle repeats on the new PR: In Progress → Review → (merge + close) → Testing → Done.
 8. Reopen Reason remains set on the issue after it closes again — it is the metric, not a working state.
+
+**New Bug under the Epic (QA findings, defects outside one issue's scope):** QA files a **Bug** as a sub-issue of the Epic; it follows the Bug lifecycle (Analysis → … → Done). Fixing it is part of the Epic's testing phase — the Epic stays in Testing until the Bug is Done.
+
+**Status regression** (Review → In Progress when a linked PR needs major rework) is the only backwards move of an *open* issue; it is not a reopen and sets no Reopen Reason.
 
 | Reason | Signal |
 |---|---|
@@ -314,26 +365,25 @@ When a previously closed/Done issue needs to be reopened — e.g., regression fo
 | Edge Case | Untested scenario found in production |
 | Other | Doesn't fit above |
 
-**Reopen tracking is a quality metric, not a punishment.** Metrics (reopen rate per developer/Module/Version, reason distribution, trends) are derived from the Reopen Reason field + timeline API. Pre-merge QA rejections are NOT tracked via Reopen Reason — they are a normal part of the review cycle.
+**Reopen tracking is a quality metric, not a punishment.** Metrics (reopen rate per developer/Module/Version, reason distribution, trends) are derived from the Reopen Reason field + timeline API. Status regressions (Review → In Progress) are NOT tracked via Reopen Reason — they are a normal part of the review cycle.
 
-**Multiple PRs for one issue:** the default expectation is one PR per issue. When a post-merge reopen requires a fix PR, a second PR on the same issue is legitimate and does not require splitting into sub-issues. Status automation fires on the most recently linked PR.
+**Multiple PRs for one issue:** the default expectation is one PR per issue. When a reopen requires a fix PR, a second PR on the same issue is legitimate and does not require splitting into sub-issues. Status automation fires on the most recently linked PR.
 
 ### 2.8 Testing Strategy
 
-This section provides a brief overview. For full details, see `docs/testing.md`.
+This section provides a brief overview; the Epic handover to QA is described in Release Management §6 (PM_reporting `docs/arch/release-management.md`).
 
-**Pre-merge testing (per PR):**
-- Automated smoke tests run on the PR branch as part of CI
-- QA manually tests the PR branch (locally or via `preview` environment)
-- QA must approve the PR before it can be merged
+**Automated testing (per PR and daily):**
+- Smoke tests run on the PR branch as part of CI; the `preview` label can stage a PR environment for the reviewer
+- Daily scheduled regression test suite runs against main
+- Results are reviewed by the QA team; regressions found trigger new Bug issues following the standard lifecycle
 
-**Post-merge testing (complement):**
-- Daily scheduled regression test suite runs against main branch
-- Results are reviewed by QA team
-- Regressions found trigger new Bug issues following the standard lifecycle
+**Epic-level testing (the manual testing of record):**
+- Every Epic has **at least one testing task** labelled `testing` (sub-issues of the Epic, or of its Features/Tasks); testing runs after merge, on the integrated main branch
+- A **developer testing task** (`testing`) is tested by its developer; a **QA testing task** (`testing` + `qa`, QA Assignee) by **QA** once the Epic is handed over with a demo. An Epic may carry either or both
+- Defects reopen the affected issue or become new Bugs under the Epic (§2.7); the Epic stays in Testing until all of them are Done
 
-**Epic-level testing:**
-Every Epic includes a Testing Scope section (filled by PM and enriched by `/epic-breakdown` skill):
+**Testing Scope:** every Epic includes a Testing Scope section (filled by PM and enriched by `/epic-breakdown` skill) that the testing tasks cover:
 - Manual testing required? (yes/no)
 - E2E automation required? (yes/no)
 - Existing tests need updating? (yes/no)
@@ -347,7 +397,7 @@ This section provides a brief overview. For full details, see `docs/release-proc
 
 1. PM creates Release issue in Planning, assigns Epics, sets Version
 2. Development progresses, tracked via Release Planning and Roadmap views
-3. All child issues reach Done (code merged, individually QA-tested)
+3. All child issues reach Done (code merged, Epics tested per §2.8)
 4. PM verifies all child issues are Done (via Release Planning view / Sub-issues progress)
 5. **QA sign-off process:**
    - Smoke tests pass on integrated build
@@ -375,13 +425,13 @@ If a release has known open bugs that are accepted (not blocking release):
 | Field | Type | Description |
 |---|---|---|
 | **Title** | Text | Issue title — see naming conventions in Section 10 |
-| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: delivery owner. |
+| **Assignees** | Users | Single assignee = primary developer responsible. For Epics: delivery owner (Epic Owner). For testing tasks: the tester — a developer on a `testing` task, a QA member on a `testing` + `qa` task. The Assignee does not rotate through the lifecycle. |
 | **Status** | Single-select | Workflow stage: Planning, Analysis, Open, In Progress, Review, Testing, Done |
 | **Labels** | Labels | Cross-cutting concerns and release notes categorization (see Section 4) |
 | **Linked PRs** | Pull requests | PRs linked to the issue — triggers status automation |
 | **Milestone** | Milestone | GitHub's per-repo milestones are not used. Cross-repo milestones are represented by the Release issue type (parent) + Version custom field. |
 | **Repository** | Repository | Which repo the issue belongs to |
-| **Reviewers** | Users | PR reviewers (populated via linked PRs) |
+| **Reviewers** | Users | PR reviewers (populated via linked PRs). The reviewer assigns themselves here when starting the review — the start of the review record. |
 | **Parent issue** | Issue | Parent in the hierarchy (Release → Epic → sub-issues) |
 | **Sub-issues progress** | Progress | Completion percentage of child issues |
 
@@ -397,6 +447,7 @@ If a release has known open bugs that are accepted (not blocking release):
 | **Complexity** | Single-select | Low, Medium, High | Technical difficulty indicator based on repos affected, API changes, migrations | Epic breakdown skill (auto); manually overridable |
 | **Reopen Reason** | Single-select | Regression, Incomplete Implementation, Edge Case, Other | Why an issue was reopened — single source of truth for reopen tracking | QA/Developer when reopening |
 | **Estimate** | Number | Mandays in quarter-day steps — positive multiples of 0.25 (0.25, 0.5, 0.75, 1, 1.25 …) | Time estimate including buffer for review. For Epics: overall delivery estimate set by PM (not sum of children). For sub-issues: developer's estimate, seeded by the Epic breakdown skill from the approved breakdown (§3.5). Basis is agent-executed unless the Epic declares developer-built (§3.5). | Developer; PM for Epics; breakdown skill seeds children |
+| **Developer** | Single-select | Developer names | Who develops the issue — a stable attribution that survives Assignee changes; the release dashboard uses it for capacity and delivery statistics. Set when development starts; a daily automation filling it from the Assignee / PR author is proposed. | Developer or PM |
 | **Start Date** | Date | — | Planned start date for Roadmap view | PM (Epics/Releases) |
 | **End Date** | Date | — | Planned end date for Roadmap view | PM (Epics/Releases) |
 
@@ -405,7 +456,6 @@ If a release has known open bugs that are accepted (not blocking release):
 | Field | Type | Reason |
 |---|---|---|
 | **Component** | Single-select (renamed from "Epic") | Replaced by Module field. 38 values were a mix of platform areas, work types, and provider types. Delete when old views are removed. |
-| **Developer** | Single-select | Replaced by built-in Assignees. Delete when old views are removed. |
 
 > **¹ Module values** — aligned with the platform's `Module` enum (defined in `Module.java` and `LogRecord-1.1.json` in the `core` repo, and the platform logging documentation):
 >
@@ -740,9 +790,9 @@ Automation is split across three categories (see the design spec Section 7 for t
 | 1 | `issues.opened` | target repo's `issue-automation.yml` | Calls 3 composite actions in sequence (guarded so failures don't cascade): **auto-add-to-project** (add to Project #5, Status → Planning or Analysis for Bugs), **auto-set-fields-from-form** (parse body for whichever form fields are present — typically Severity/Module on Bug, Module on Feature/Task, vulnerability defaults), **version-propagation** (copy Version/Module from parent if child empty). Version-propagation uses a separate org-wide App token because the parent issue may live in a different repo than the child. |
 | 2 | `issues.reopened` | target repo's `issue-automation.yml` | Calls **reopen-tracking** composite action: post audit comment (timestamp, actor, previous assignees), clear Reopen Reason field so the reopener fills it fresh (automation clears; the human who reopens sets per Section 2.7). Status → In Progress by built-in project workflow. |
 | 3 | PR linked to issue | built-in | Status → **Review** |
-| 4 | Code review approved | built-in | Status → **Testing**. QA picks up for pre-merge testing. |
-| 5 | PR merged | built-in | Status → **Done**. Fires after QA approves and developer merges. |
-| 6 | Status → Done | built-in | Auto-close issue. Non-code Tasks may move to Done directly. |
+| 4 | Issue closed (any Status) | built-in | Status → **Testing**. Closing ends development and hands the issue to Epic-level testing — the reviewer closes a PR-linked issue on merge, the developer closes a no-PR task. Issues closed as *not planned* / *duplicate* are treated as complete by the health checks, not by this rule. |
+| 5 | Code review approved / PR merged | — | **No Status change.** The merge closes the issue through its `Closes #` reference, which fires rule 4. |
+| 6 | Status → Done | built-in | Auto-close — a no-op in practice, since Done is set on issues that are already closed; kept so a Done set on an open issue still closes it. |
 | 7 | `release.published` (stable only) | target repo's `release-automation.yml` | Calls **post-release-stamping** composite action: stamp Version on closed Done issues in the **releasing repo** that were closed after the previous release's `published_at` and don't yet have a Version. Prereleases are skipped. **Limitation:** only issues in the releasing repo are stamped; sub-issues living in other repos (common in cross-repo Epics) will not be stamped. Primary mechanism for Version is PM assignment during sprint planning (§2.9) — this automation is a safety net, not a substitute. |
 | 8 | Weekly cron (Mon 05:00 UTC) or manual | `.github` repo's `project-health-report.yml` | Health report as GHA artifact. Evaluates triage rules from `config/project-triage-rules.yml`. Report-only. |
 | 9 | Push to `templates/labels.yml` on main | `.github` repo's `label-sync.yml` | Sync standard labels to all non-archived org repos (additive — does not delete). |
@@ -780,12 +830,13 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 | Version mismatch | Error | Sub-issue Version ≠ its Epic's Version, at any depth — the parent's Version wins transitively, so an issue nested under a container issue is compared with the Epic, not with the container (which may itself be off). Epics compare with their Release; an issue with no Epic above it with its immediate parent. Also checked daily by the release dashboard's Health tab. |
 | Orphaned sub-issue | Warning | Parent closed, child still open |
 | Blocked but In Progress | Warning | Issue In Progress with open `blocked-by` issues |
-| Done but Open state | Error | Status=Done but issue not closed (automation failure) |
-| Closed but not Done | Warning | Closed as completed with Status below Testing — closing hands the issue to QA and the automation moves it to Testing, so Testing (the QA queue) and Done are the two legitimate statuses of a closed issue (excludes issues closed as "not planned" or "duplicate" — those are legitimate terminal states) |
+| Done but Open state | Error | Status = Done but the issue is still open — Done is set on closed issues only (a no-PR task never closed, or the auto-close failed) |
+| Closed but not Done | Warning | Closed as completed but Status never reached Testing or Done — the close-to-Testing automation was bypassed (excludes issues closed as "not planned" or "duplicate" — those are legitimate) |
 | Reopened without reason | Warning | Reopen Reason empty after reopen |
 | Release/Epic by non-org-member | Warning | Created by someone outside OmniTrustILM org |
-| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten. The `qa`-labelled issue counts at any depth of the Epic's tree (Bugs excluded) — where the QA task sits is not a rule. |
+| Epic without testing task | Warning | Epic has no sub-issue labelled `testing` at any depth — testing may be forgotten |
 | Epic status mismatch | Warning | Epic's Status differs from the value derived from its children per [Release Management §5.1](https://github.com/OmniTrustILM/pm-reporting/blob/main/docs/arch/release-management.md) (see §2.2 Epic row): the analysis task (a Task titled like "Analysis, breakdown, estimations") is the gate — Planning while it has not started, Analysis while it is In Progress / Review, whatever the other children do; once it is closed (Status Testing or Done): Done = all children have Status Done (a closed child ranks by its Status, never below Testing — only *not planned* / *duplicate* closes count as complete outright); Testing / Review = all *development* children at that stage or beyond; In Progress = a *development* child started (Bugs and `qa` / `testing` tasks are testing-phase work: they hold the Epic below Done only, never below Testing, and never make it In Progress; an Epic holding nothing but such work ranks it as its development); else Open. An Epic without an analysis task: Open once the breakdown is complete (Complexity, Estimate, Start/End Date set — §3.2), Analysis while a child is still being scoped, Open when a child is Open, else Planning. Also checked daily by the release dashboard's Health tab. |
+| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten. The `qa`-labelled issue counts at any depth of the Epic's tree (Bugs excluded) — where the QA task sits is not a rule. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
 
 ### 7.3 Rule precedence
@@ -795,7 +846,7 @@ When multiple rules fire on the same issue, resolve conflicts in this order:
 1. **Errors always win over Warnings.** An issue flagged by both an Error and a Warning shows only the Error in the triage report (the Warning is suppressed to avoid noise).
 2. **Legitimate close reasons override "Closed but not Done".** An issue closed as `not planned` or `duplicate` is a valid terminal state — the "Closed but not Done" Warning does NOT fire for these closures.
 3. **"Done but Open state" takes precedence over "Closed but not Done".** If the Status says Done and the issue is still open, that's an automation failure — fix it before evaluating any other close-related rule.
-4. **Status transitions driven by automation always win over human-set status.** If a human sets Status = Done but the PR hasn't merged, the automation will re-enter the correct Status on the next relevant event. Don't manually force Status.
+4. **Status transitions driven by automation always win over human-set status.** If a human sets Status = Done on an issue that is still open, closing it later re-enters Testing. Set Done only after the Epic is tested; don't manually force Status.
 5. **"Epic Done with open children" takes precedence over "Epic status mismatch".** If the Epic is Done with open children, the Error is shown and the mismatch Warning is suppressed.
 
 If two Warnings fire on the same issue, the triage report shows both — no suppression; the operator resolves in any order.
@@ -858,6 +909,13 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - Approves Epic breakdowns (business scope)
 - Validates that delivered features match requirements
 
+### Epic Owner
+
+- Appointed by the RM when the Epic is put into a release; the Epic's Assignee and delivery owner (Release Management §5)
+- Takes the Epic over (Planning → Analysis) and runs the preparation (§2.5 Epic preparation): works the analysis task "Analysis, breakdown, estimations", breaks the Epic down per §1 Epic anatomy (including at least one testing task), fills in Complexity, Estimate, Start Date and End Date, closes the analysis task and moves the Epic to Open
+- Carries the Epic through development to the demo and handover to QA (Release Management §6)
+- Closes the analysis task once the analysis is complete — it is the gate of the Epic's Status (§2.2) — and moves it to Done afterwards
+
 ### Developer (Assignee)
 
 - Self-assigns Open issues — single assignee = primary developer responsible
@@ -866,24 +924,24 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - May perform technical analysis on assigned issues (root cause, impact assessment, correct repo identification) and move from Analysis → Open when analysis is complete
 - Reviews Epic breakdowns for technical accuracy (correct repos, complexity, dependencies)
 - Addresses code review feedback
-- Merges PR **only after QA approval**
-- **Never closes code issues manually** — closure flows through Testing → Done → auto-close
-- May close non-code Tasks after completion
+- Closes **no-PR tasks** when finished (→ Testing by automation); PR-linked issues are closed by the reviewer on merge
+- Tests the Epic's developer testing tasks (`testing`); reopens an issue when a defect is found in it
+- Moves own development issues and developer testing tasks from Testing to **Done** once the Epic is tested
 
 ### QA Team
 
-- **Testing:** Tests PR branches before merge (locally or via `preview` environment). Approves or rejects PRs.
-- **Status control:** Testing → Done (approve) or → In Progress (reject/reopen). Sets Reopen Reason on rejection.
+- **Testing:** Tests the Epic's QA testing tasks (`testing` + `qa`, QA member as Assignee) once the Epic is handed over with a demo (Release Management §6), after merge on the integrated main branch.
+- **Status control:** moves the QA testing tasks to **Done** when the Epic is verified. Defects → new Bugs under the Epic, or a reopen of the affected issue with Reopen Reason set.
 - **Bug triage:** Can move Bugs from Analysis → Open after verifying reproduction and assessing impact. Can close Bugs as "not planned" (not reproducible, expected behavior). Can set Priority for Bugs.
-- **Epic review:** Reviews Task+qa sub-issues proposed by `/epic-breakdown` for testing coverage adequacy.
+- **Epic review:** Reviews the testing tasks (`testing`, `qa` where QA-owned) proposed by `/epic-breakdown` for testing coverage adequacy.
 - **Release sign-off:** Lead QA confirms smoke + regression tests pass and no open Blockers before release.
 - **Regression:** Reviews daily regression test results. Creates Bug issues for regressions found.
 
 ### Code Reviewer
 
-- Reviews PRs for code quality, correctness, and security
-- Approves or requests changes
-- Approval triggers status transition to Testing (QA picks up)
+- Assigns themselves in the PR's **Reviewers** field when starting the review
+- Reviews PRs for code quality, correctness, and security; approves or requests changes
+- **Merges the approved PR and closes the issue** — closing ends development and hands the issue to Epic-level testing (Status → Testing by automation)
 
 ### AI Agent
 
