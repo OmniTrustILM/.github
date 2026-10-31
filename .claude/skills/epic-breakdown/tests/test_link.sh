@@ -22,4 +22,18 @@ if bash "$LINK" --parent-node-id P --dry-run >/dev/null 2>&1; then
   echo "FAIL: incomplete sub-issue pair accepted"; exit 1
 fi
 
+# 5) A child that already has a different parent is refused, not silently skipped.
+STUB_DIR=$(mktemp -d)
+trap 'rm -rf "$STUB_DIR"' EXIT
+cat > "$STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+[ "${1:-}" = "api" ] && echo "I_OTHER_PARENT"
+exit 0
+STUB
+chmod +x "$STUB_DIR/gh"
+if out=$(PATH="$STUB_DIR:$PATH" bash "$LINK" --parent-node-id I_PARENT --child-node-id I_CHILD 2>&1); then
+  echo "FAIL: child under a different parent reported success"; exit 1
+fi
+echo "$out" | grep -q "different parent (I_OTHER_PARENT)" || { echo "FAIL: conflict not named"; echo "$out"; exit 1; }
+
 echo "PASS"

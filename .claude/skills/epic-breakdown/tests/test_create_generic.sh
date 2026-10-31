@@ -42,6 +42,23 @@ out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
   --repo "$REPO" --type bug --title "B" --body-file - --severity Major --dry-run 2>&1)
 echo "$out" | grep -qi "Severity=Major" || { echo "FAIL: severity not planned"; exit 1; }
 
+# 5a) Testing task with an approved assignee: dry-run plans the label and the assignee.
+out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
+  --repo "$REPO" --type task --title "T" --body-file - --label testing --assignee octocat --dry-run 2>&1)
+echo "$out" | grep -q -- "--label testing" || { echo "FAIL: testing label not planned"; exit 1; }
+echo "$out" | grep -q -- "--assignee octocat" || { echo "FAIL: assignee not planned"; exit 1; }
+
+# 5b) A wholly new Feature gets new-feature INSTEAD of the template's enhancement.
+out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
+  --repo "$REPO" --type feature --title "F" --body-file - --dry-run 2>&1)
+echo "$out" | grep -q -- "--label enhancement" || { echo "FAIL: Feature lost its template label"; exit 1; }
+out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
+  --repo "$REPO" --type feature --title "F" --body-file - --label new-feature --dry-run 2>&1)
+echo "$out" | grep -q -- "--label new-feature" || { echo "FAIL: new-feature not planned"; exit 1; }
+if echo "$out" | grep -q -- "--label enhancement"; then
+  echo "FAIL: enhancement kept alongside new-feature"; exit 1
+fi
+
 # 6) Regression: label-less Task, NON-dry-run, executed with /bin/bash.
 # Bash 3.2 (macOS /bin/bash) under `set -u` treats an empty-array expansion as an
 # unbound variable, so an unguarded "${LABEL_FLAGS[@]}" crashed the real

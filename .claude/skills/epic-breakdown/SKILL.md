@@ -1,6 +1,6 @@
 ---
 name: epic-breakdown
-version: 1.0.0
+version: 1.1.0
 description: >
   Use when turning a requirement or user story into a planned OmniTrustILM
   Epic with sub-issues, enriching an existing Epic, or syncing an Epic with
@@ -47,7 +47,7 @@ permissions:
   - github:org:read
   - github:contents:read
 created_at: 2026-06-21
-updated_at: 2026-06-21
+updated_at: 2026-10-31
 ---
 
 # Skill: Epic Breakdown
@@ -92,7 +92,7 @@ reference."
 
 ## Phase 1 — Ensure cache
 
-If `--refresh`, or any of `cache/{project-fields,repos,issue-types,labels}.json`
+If `--refresh`, or any of `cache/{project-fields,repos,issue-types,labels,templates}.json`
 or `cache/development-process.md` is missing, run `bash $SKILL_DIR/fetch.sh` and
 check the exit status. On non-zero exit, surface the error verbatim and stop
 (`fetch.sh` rejects a partial cache). If `fetch.sh` reports a missing scope,
@@ -145,16 +145,19 @@ The job is analysis and honest blockers, not a plan.
    not pick one unless the input already decided it.
 5. **Return blocking questions + prerequisites.** Create nothing. Explicitly
    refuse to emit Complexity, Estimate, or a target Version while the design is
-   undecided — this enforces the methodics' release-honesty principle (§3.2).
+   undecided — Complexity and Estimate are what let an Epic leave Planning
+   (§3.2), so a number for an undecided design gets planned against as if it
+   were real.
 
 ---
 
 ## Mode B — Breakdown
 
-**Precondition — the Epic must be in Planning.** Breakdown happens during
-Planning (§2.2, §2.6). After resolving the Epic, if its Status is not Planning
-(Open/In Progress/Done), warn — "This Epic is in <Status>; breakdown is for
-Planning-stage Epics (§2.6). Creating sub-issues now may duplicate
+**Precondition — the Epic must be in Planning or Analysis.** Breakdown happens
+before the Epic is Open (§2.2 places it in Planning, §2.5 in Analysis). After
+resolving the Epic, if its Status is past Analysis (Open/In Progress/Review/
+Testing/Done), warn — "This Epic is in <Status>; breakdown is for Epics in
+Planning or Analysis (§2.2, §2.5). Creating sub-issues now may duplicate
 already-implemented work — consider reconcile mode. Proceed anyway? [yes/no]" —
 and stop unless confirmed.
 
@@ -173,11 +176,15 @@ and stop unless confirmed.
    Testing, Documentation, Deployment (§2.6). For each child: type
    (Feature/Task/Bug — **never a sub-Feature under a Feature**, §1), target repo,
    §9-conformant title, description, acceptance criteria **including the Sonar +
-   ≥80% coverage quality gate**, Module, Complexity, a *suggested* Estimate
+   ≥80% coverage quality gate** (children that produce a PR — not the testing
+   task), Module, Complexity, a *suggested* Estimate
    (agent-executed basis per §3.5 by default — derive it from the developer-built
    Complexity scale; use the developer-built basis only when the Epic declares
    it, and **never repeat estimates inside a child body**), blocked-by
-   dependencies, and a suggested assignee.
+   dependencies, and a suggested assignee. A Bug child also needs a Severity
+   (§3.2 requires it at creation); a Feature child is labelled `new-feature`
+   when the functionality is wholly new, else it keeps the template's
+   `enhancement` (§4).
    **Estimate granularity — quarter days, nothing finer.** Every estimate is a
    positive multiple of **0.25** mandays: `0.25`, `0.5`, `0.75`, `1`, `1.25`, …
    0.25 is both the minimum and the increment; `0`, `0.1`, `0.333` and `1.4` are
@@ -205,12 +212,13 @@ and stop unless confirmed.
    Single Flyway migration; applying it in halves would leave the schema
    inconsistent between steps, so it cannot be split across sub-issues.
    ```
-   **Mandatory:** at least one **Task+qa** and one **Task+documentation** child
-   (else §7.2 flags the Epic and docs/testing get forgotten).
+   **Mandatory:** at least one **testing task** (see [Testing task](#testing-task))
+   and one **Task+documentation** child (else §7.2 flags the Epic and
+   docs/testing get forgotten).
    **De-duplicate:** before proposing a new child, check the Epic's existing
    sub-issues and search for matching standalone issues. Mark an already-present
    sub-issue `(existing — skipping)`; for a strong match that exists *unlinked*,
-   propose **linking** it (Phase 7 uses `link.sh`) instead of creating a
+   propose **linking** it (step 7 uses `link.sh`) instead of creating a
    duplicate. This makes re-running breakdown safe.
 5. **Compute Epic-level Complexity & Estimate** per the §3.5 heuristics (the Epic
    Estimate is the overall delivery estimate, not the sum of children).
@@ -221,7 +229,7 @@ and stop unless confirmed.
    child body WITHOUT `### Module` / `### Severity` / `### Version Number`
    sections** (the skill sets those fields itself; this avoids racing the
    `auto-set-fields-from-form` automation):
-   1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M>` (add `--severity <S>` for Bug children) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
+   1. `create-issue-generic.sh --type <t> --repo <r> --title … --body-file - --module <M> [--assignee <login>]` (add `--severity <S>` for Bug children and `--label new-feature` for a wholly new Feature, which drops `enhancement`; the testing task is `--type task --label testing`; pass `--assignee` only for an assignee the preview showed and the user approved) → capture `node_id`, `item_id`, `number`, `url`. The body must NOT contain `### Module`/`### Severity`/`### Version Number` sections — the script rejects them; fields are set via these flags.
    2. `link.sh --parent-node-id <epic> --child-node-id <child>` to attach the child.
    3. `link.sh --issue-node-id <child> --blocked-by-node-id <blocker>` for each dependency.
    4. `set-epic-fields.sh --item-id <child item> --scope child --basis <agent-executed|developer-built> --complexity <C> --estimate <E>` (`--basis` matches the Epic's declared basis; omit it to default to agent-executed).
@@ -232,6 +240,70 @@ and stop unless confirmed.
 8. **Confirm to the user** every created URL, what was set, and what remains:
    **PM** — Version, Sprint, Priority, Start/End Date, moving Status to Open;
    **Developer** — reviewing the written child Estimates; an override is final (§3.5).
+
+### Testing task
+
+The Epic's testing of record: a team member — usually one of the Epic's
+developers — runs written scenarios end to end, on a checked-out branch before
+merge or on main after it, and closes the issue with a testing report. Its
+scenarios are also what QA later automates or adds to the regression suite, so
+the skill proposes no test-automation issue itself.
+
+- **Type and label:** Task with label `testing` only. `qa` marks QA-owned work,
+  which QA files itself; the testing task never lives in
+  `automated-testing-framework`.
+- **Repo:** the Epic's own repo (usually `ilm`). The task produces no PR, so it
+  sits next to the Epic rather than in an implementation repo.
+- **Title (§9):** an action, e.g. "Test certificate revocation redesign end to end".
+- **No blocked-by links** to the development children: testing may start on
+  their branches before merge, and a blocked-by link would flag that as Blocked
+  but In Progress (§7.2). **Assignee (suggested):** a developer of the Epic —
+  the tester is the Assignee.
+- **Estimate:** human testing time; verification on a dev stack gets no agent
+  compression (§3.5).
+- **Count:** one per Epic; a large Epic gets one per independently testable area.
+- **Scenarios** come from the Epic's Use Cases, Acceptance Criteria and Testing
+  Scope; each names the criterion it proves, and is concrete enough for someone
+  who did not build the Epic. Show them in full in the preview — QA reviews them
+  there (§2.6 Phase 3).
+
+Body (ASCII-safe, per `lessons.md`):
+
+```markdown
+### Description
+
+End-to-end testing of <Epic title> (#<epic number>), on the development
+sub-issues' branches before merge or on main after it. Covers the Epic's
+Testing Scope.
+
+### Test Scope
+
+- In scope: <features, deployment variants, roles>
+- Not covered: <what, and why>
+
+### Test Scenarios
+
+1. <precondition> - <action> -> <expected result> (AC <n>)
+2. ...
+- Negative and edge cases: ...
+- Regression risk: <existing behaviour that might break>
+
+### Definition of Done
+
+- [ ] Every scenario run against the Epic's complete changes (branches or main), or marked not run with the reason
+- [ ] Testing report posted as a comment, then the issue closed
+- [ ] Every defect found is a reopened issue or a new Bug under the Epic, linked from the report
+
+### Testing Report
+
+Post as a comment before closing:
+
+- Environment: <deployment; branches or commits tested>
+- Results: <scenario -> pass / fail / not run, and how it was tested>
+- Bugs found: <links, or none>
+- Not tested: <what, and why>
+- Automation candidates: <scenarios worth automating or adding to regression>
+```
 
 ---
 
@@ -245,7 +317,7 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
 2. **Re-derive** the expected decomposition from the current Epic content + repo
    state + any new related issues; annotate each child with its work stream.
 3. **Present findings** (from `reconcile.py`, which mirrors the §7.2 rules):
-   missing QA/docs child, missing work streams, orphaned children,
+   missing testing/docs child, missing work streams, orphaned children,
    Epic-status-lags/ahead-of-children, Epic-Done-with-open-children, version
    mismatch, plus proposed new children or estimate/complexity adjustments.
 4. **Per-change confirm** (like `/project-triage`, not one bulk confirm). Before
@@ -262,7 +334,7 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
 
 **Rule coverage.** `reconcile.py` checks the Epic-and-children consistency rules
 (using the same rule names as `project-triage`'s `eval.py`): `empty_epic_no_sub_issues`,
-`epic_without_qa_sub_issue`, `epic_without_docs_sub_issue` (this skill's
+`epic_without_qa_sub_issue` (a direct child labelled `testing`), `epic_without_docs_sub_issue` (this skill's
 completeness extension), `epic_done_with_open_children`, `epic_status_lags_children`,
 `epic_status_ahead_of_children`, `orphaned_sub_issues`, `version_mismatch`, plus a
 `missing_workstream` hint. §7.3 precedence is applied (the Done-with-open-children
@@ -276,7 +348,8 @@ staleness, `blocked_but_in_progress`, `done_but_open_state`, `closed_but_not_don
 
 - **Propose freely; require explicit human approval before ANY create/mutation.**
 - **Writes (on approval):** Epic Complexity, Epic Estimate, child Complexity,
-  child Estimate, child Module, Epic body, sub-issue links, blocked-by deps,
+  child Estimate, child Module, child Severity, child labels, child Assignee
+  (the previewed suggestion), Epic body, sub-issue links, blocked-by deps,
   sub-issue creation.
   Child Estimate is written as the *suggested* value the preview showed; the
   Developer owns the field and an override is final. Rationale and the
@@ -314,13 +387,14 @@ it only after you approve.
 | Missing `repo`/`read:org`/`project` scope | relay `fetch.sh`'s exact `gh auth refresh -s …` command |
 | `project`/`read:project` scope missing for project writes | `gh auth refresh -s project` (creating/linking/field-setting needs it; preflight is read-only) |
 | `fetch.sh` fails on any sub-step | surface verbatim; stop (partial cache rejected) |
-| Stale option ID (Module/Complexity not found) | scripts warn + hint `--refresh`; re-run `fetch.sh` |
+| Stale option ID (Module/Complexity not found) | scripts warn + hint `--refresh` and carry on — the issue exists without that field; re-run `fetch.sh` and set it again, or list it as not set in the final report |
+| `link.sh` refuses: child already has a different parent | nothing was linked; report it as a failed step and ask whether to unlink it from that parent first — never reparent silently |
 | `addSubIssue`/`addBlockedBy` fails | child exists but is unlinked/undepended; `link.sh` prints the manual fix and logs to `cache/orphans.log` |
 | `addProjectV2ItemById` fails | issue exists but not in Project #5; logged to `orphans.log`; print manual `gh project item-add` |
 | Mid-sequence mutation failure | stop; print completed / failing / not-started lists |
 | Reconcile sees state changed since fetch | skip that mutation with a warning |
 | Preflight on a non-Epic / undecided design | return analysis + blocking questions; create nothing |
-| Epic Status ≠ Planning in breakdown | warn + confirm before proceeding |
+| Epic Status past Analysis in breakdown | warn + confirm before proceeding |
 
 ---
 

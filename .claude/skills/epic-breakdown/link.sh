@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Link a sub-issue to its parent Epic (addSubIssue) or set a blocked-by
 # dependency (addBlockedBy). For sub-issue linking it re-checks the child's
-# current parent first, so reconcile re-runs are idempotent. On failure it
+# current parent first, so reconcile re-runs are idempotent; a child under a
+# different parent is refused (non-zero exit), never reparented. On failure it
 # prints a copy-paste manual fix and appends to cache/orphans.log.
 #
 # Usage (exactly one mode):
@@ -47,7 +48,9 @@ if [ "$MODE" = "subissue" ]; then
   CUR_PARENT=$(gh api graphql -f query="$(gql_op IssueParent)" -f id="$CHILD" \
     --jq '.data.node.parent.id // ""' 2>/dev/null || echo "")
   if [ "$CUR_PARENT" = "$PARENT" ]; then log "already linked to this parent — skipping"; exit 0; fi
-  if [ -n "$CUR_PARENT" ]; then log "warn: child already has a different parent ($CUR_PARENT); addSubIssue will reparent only if replaceParent is set — skipping to be safe"; exit 0; fi
+  # Not linked is not success: the caller planned this link, so it must stop and
+  # surface the conflict rather than report the child as attached.
+  if [ -n "$CUR_PARENT" ]; then fail "child $CHILD already has a different parent ($CUR_PARENT); not reparenting. Unlink it from that parent first, or leave it there."; fi
   if ! gh api graphql -f query="$(gql_op AddSubIssue)" -f issueId="$PARENT" -f subIssueId="$CHILD" >/dev/null 2>&1; then
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CHILD" "addSubIssue->$PARENT failed" >> "$CACHE_DIR/orphans.log"
     log "manual fix: gh api graphql -f query='mutation{addSubIssue(input:{issueId:\"$PARENT\",subIssueId:\"$CHILD\"}){issue{number}}}'"

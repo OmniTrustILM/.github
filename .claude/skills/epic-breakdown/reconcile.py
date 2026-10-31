@@ -103,11 +103,12 @@ def diff(epic, rules=None):
         findings.append({"rule": "empty_epic_no_sub_issues", "level": "error",
                          "detail": "Epic has no sub-issues (§3.2 blocks moving it to Open)."})
 
-    # §7.2 — Epic without a Task+qa sub-issue (testing may be forgotten).
-    if subs and not any("qa" in _labels(s) for s in subs):
+    # §7.2 — Epic without a testing task. The rule keeps its triage name; the
+    # task it looks for is labelled `testing` (with `qa` only when QA owns it).
+    if subs and not any("testing" in _labels(s) for s in subs):
         findings.append({"rule": "epic_without_qa_sub_issue", "level": "warning",
-                         "detail": "Epic has no sub-issue with the `qa` label; testing may be forgotten."})
-    # Completeness extension (paired with the QA rule in §2.6) — not in the triage YAML.
+                         "detail": "Epic has no sub-issue with the `testing` label; testing may be forgotten."})
+    # Completeness extension (paired with the testing rule in §2.6) — not in the triage YAML.
     if subs and not any("documentation" in _labels(s) for s in subs):
         findings.append({"rule": "epic_without_docs_sub_issue", "level": "warning",
                          "detail": "Epic has no sub-issue with the `documentation` label."})

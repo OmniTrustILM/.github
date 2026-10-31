@@ -11,7 +11,9 @@
 #   --body-file PATH    (required) form-shaped body; "-" reads stdin
 #   --module NAME       (optional) one of the 17 Module values
 #   --severity NAME     (optional, Bug children) Minor|Major|Critical|Blocker
-#   --label NAME        (optional, repeatable) extra labels beyond template defaults
+#   --label NAME        (optional, repeatable) extra labels beyond template defaults;
+#                       new-feature replaces the Feature template's enhancement
+#   --assignee LOGIN    (optional, repeatable) the approved suggested assignee
 #   --dry-run           print planned gh/GraphQL calls; create nothing
 #
 # Output (stdout, key=value): url= number= item_id= node_id=
@@ -29,7 +31,7 @@ for f in project-fields.json repos.json templates.json issue-types.json; do
 done
 
 REPO="" TYPE="" TITLE="" BODY_FILE="" MODULE="" SEVERITY="" DRY_RUN=0
-LABELS=()
+LABELS=() ASSIGNEES=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo)      REPO="${2:-}"; shift 2 ;;
@@ -39,6 +41,7 @@ while [ $# -gt 0 ]; do
     --module)    MODULE="${2:-}"; shift 2 ;;
     --severity)  SEVERITY="${2:-}"; shift 2 ;;
     --label)     LABELS+=("${2:-}"); shift 2 ;;
+    --assignee)  ASSIGNEES+=("${2:-}"); shift 2 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     *)           fail "unknown arg: $1" ;;
   esac
@@ -80,16 +83,27 @@ TEMPLATE_TYPE=$(jq -r --arg t "$TYPE" \
   "$CACHE_DIR/templates.json")
 [ -n "$TEMPLATE_TYPE" ] || fail "no template matches type '$TYPE' (expected: epic, feature, task, bug, qa, documentation)"
 
+# Methodics §4: a wholly new Feature carries new-feature instead of the
+# template's enhancement, never both (they route to different release-note sections).
+NEW_FEATURE=0
+for l in "${LABELS[@]:-}"; do [ "$l" = "new-feature" ] && NEW_FEATURE=1; done
+
 LABEL_FLAGS=()
-while IFS= read -r l; do [ -n "$l" ] && LABEL_FLAGS+=(--label "$l"); done <<<"$TEMPLATE_LABELS"
+while IFS= read -r l; do
+  [ -n "$l" ] || continue
+  [ "$NEW_FEATURE" -eq 1 ] && [ "$l" = "enhancement" ] && continue
+  LABEL_FLAGS+=(--label "$l")
+done <<<"$TEMPLATE_LABELS"
 for l in "${LABELS[@]:-}"; do [ -n "$l" ] && LABEL_FLAGS+=(--label "$l"); done
+ASSIGNEE_FLAGS=()
+for a in "${ASSIGNEES[@]:-}"; do [ -n "$a" ] && ASSIGNEE_FLAGS+=(--assignee "$a"); done
 
 PROJECT_ID=$(jq -r '.project_id' "$CACHE_DIR/project-fields.json")
 ITYPE_ID=$(jq -r --arg t "$TEMPLATE_TYPE" '.[$t] // ""' "$CACHE_DIR/issue-types.json")
 
 if [ "$DRY_RUN" -eq 1 ]; then
   log "DRY-RUN — no mutations will run"
-  log "would: gh issue create --repo $ORG/$REPO --title \"$TITLE\" --body-file <body> ${LABEL_FLAGS[*]:-(no labels)}"
+  log "would: gh issue create --repo $ORG/$REPO --title \"$TITLE\" --body-file <body> ${LABEL_FLAGS[*]:-(no labels)} ${ASSIGNEE_FLAGS[*]:-(no assignee)}"
   log "would: addProjectV2ItemById projectId=$PROJECT_ID contentId=<new node id>"
   log "would: updateIssueIssueType issueTypeId=${ITYPE_ID:-(unknown)} (type $TEMPLATE_TYPE)"
   [ -n "$MODULE" ]   && log "would: set Module=$MODULE"
@@ -102,7 +116,8 @@ require_project_scope
 
 # --- Create the issue ---
 log "creating $TEMPLATE_TYPE in $ORG/$REPO"
-ISSUE_URL=$(gh issue create --repo "$ORG/$REPO" --title "$TITLE" --body-file "$BODY_FILE" ${LABEL_FLAGS[@]:+"${LABEL_FLAGS[@]}"}) \
+ISSUE_URL=$(gh issue create --repo "$ORG/$REPO" --title "$TITLE" --body-file "$BODY_FILE" \
+    ${LABEL_FLAGS[@]:+"${LABEL_FLAGS[@]}"} ${ASSIGNEE_FLAGS[@]:+"${ASSIGNEE_FLAGS[@]}"}) \
   || fail "gh issue create failed (see stderr above)"
 ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 [ -n "$ISSUE_NUMBER" ] || fail "could not extract issue number from URL: $ISSUE_URL"
