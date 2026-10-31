@@ -103,8 +103,8 @@ def diff(epic, rules=None):
         findings.append({"rule": "empty_epic_no_sub_issues", "level": "error",
                          "detail": "Epic has no sub-issues (§3.2 blocks moving it to Open)."})
 
-    # §7.2 — Epic without a testing task. The rule keeps its triage name; the
-    # task it looks for is labelled `testing` (with `qa` only when QA owns it).
+    # §7.2 — Epic without a testing task (a sub-issue labelled `testing`, §4).
+    # The `_qa_` id is project-triage's config key, shared on purpose.
     if subs and not any("testing" in _labels(s) for s in subs):
         findings.append({"rule": "epic_without_qa_sub_issue", "level": "warning",
                          "detail": "Epic has no sub-issue with the `testing` label; testing may be forgotten."})

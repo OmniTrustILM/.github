@@ -100,7 +100,7 @@ Release 2.18.0
 │   │   └── Bug: Fix serialization edge case
 │   ├── Feature [core]: Revocation service
 │   ├── Feature [fe-administrator]: Revocation UI
-│   ├── Task+testing+qa [automated-testing-framework]: E2E revocation tests
+│   ├── Task+testing [ilm]: Test revocation end to end
 │   └── Bug [core]: Legacy revocation edge case
 ├── Epic: CBOM Enhancements
 │   └── ...
@@ -282,7 +282,7 @@ Three-phase process with PM and QA review:
 **Phase 3 — Review and approval (collaborative):**
 1. **PM/PO reviews** all proposed sub-issues (business scope, prioritization, completeness)
 2. **Tech Lead / assigned developer reviews** technical accuracy (correct repos targeted, complexity assessment, dependencies, missed changes)
-3. **QA reviews** Task+qa sub-issues specifically (testing coverage, test strategy, whether manual or automated testing is needed)
+3. **QA reviews** the testing tasks specifically (label `testing`, plus `qa` where QA will own the testing — coverage, test strategy, whether manual or automated testing is needed)
 4. All reviewers approve before sub-issues are created. This can be a single review meeting or async review.
 
 ```mermaid
@@ -796,7 +796,7 @@ Thresholds live in `config/project-triage-rules.yml` in the `.github` repo and c
 | Closed but not Done | Warning | Manually closed without reaching Done (excludes issues closed as "not planned" or "duplicate" — those are legitimate) |
 | Reopened without reason | Warning | Reopen Reason empty after reopen |
 | Release/Epic by non-org-member | Warning | Created by someone outside OmniTrustILM org |
-| Epic without Task+qa sub-issue | Warning | Epic has no QA/testing sub-issue — testing may be forgotten |
+| Epic without testing task | Warning | Epic has no sub-issue labelled `testing` — testing may be forgotten |
 | Epic status lags children | Warning | Epic is in Open but at least one child issue has a more advanced status (In Progress, Review, Testing). Epic should be moved to In Progress. |
 | Epic status ahead of children | Warning | Epic is in In Progress but all child issues are still in Open or Planning. Epic may have been moved prematurely. |
 | Epic Done with open children | Error | Epic Status = Done but at least one child issue is still open. All children must reach Done before the Epic can be marked Done. |
@@ -888,7 +888,7 @@ Ad-hoc Module filtering replaces dedicated per-area views.
 - **Testing:** Tests PR branches before merge (locally or via `preview` environment). Approves or rejects PRs.
 - **Status control:** Testing → Done (approve) or → In Progress (reject/reopen). Sets Reopen Reason on rejection.
 - **Bug triage:** Can move Bugs from Analysis → Open after verifying reproduction and assessing impact. Can close Bugs as "not planned" (not reproducible, expected behavior). Can set Priority for Bugs.
-- **Epic review:** Reviews Task+qa sub-issues proposed by `/epic-breakdown` for testing coverage adequacy.
+- **Epic review:** Reviews the testing tasks (`testing`, `qa` where QA-owned) proposed by `/epic-breakdown` for testing coverage adequacy.
 - **Release sign-off:** Lead QA confirms smoke + regression tests pass and no open Blockers before release.
 - **Regression:** Reviews daily regression test results. Creates Bug issues for regressions found.
 

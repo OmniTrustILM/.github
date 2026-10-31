@@ -155,8 +155,8 @@ The job is analysis and honest blockers, not a plan.
 
 **Precondition — the Epic must be in Planning or Analysis.** Breakdown happens
 before the Epic is Open (§2.2 places it in Planning, §2.5 in Analysis). After
-resolving the Epic, if its Status is past Analysis (Open/In Progress/Review/
-Testing/Done), warn — "This Epic is in <Status>; breakdown is for Epics in
+resolving the Epic, if its Status is past Analysis, warn — "This Epic is in
+<Status>; breakdown is for Epics in
 Planning or Analysis (§2.2, §2.5). Creating sub-issues now may duplicate
 already-implemented work — consider reconcile mode. Proceed anyway? [yes/no]" —
 and stop unless confirmed.
@@ -249,16 +249,17 @@ merge or on main after it, and closes the issue with a testing report. Its
 scenarios are also what QA later automates or adds to the regression suite, so
 the skill proposes no test-automation issue itself.
 
-- **Type and label:** Task with label `testing` only. `qa` marks QA-owned work,
-  which QA files itself; the testing task never lives in
-  `automated-testing-framework`.
+- **Type and label:** Task with label `testing` only, never in
+  `automated-testing-framework`. This skill proposes the developer testing task
+  only; a QA testing task (`testing` + `qa`) is added in review when QA will own
+  the testing.
 - **Repo:** the Epic's own repo (usually `ilm`). The task produces no PR, so it
   sits next to the Epic rather than in an implementation repo.
 - **Title (§9):** an action, e.g. "Test certificate revocation redesign end to end".
 - **No blocked-by links** to the development children: testing may start on
   their branches before merge, and a blocked-by link would flag that as Blocked
-  but In Progress (§7.2). **Assignee (suggested):** a developer of the Epic —
-  the tester is the Assignee.
+  but In Progress (§7.2).
+- **Assignee (suggested):** a developer of the Epic; the Assignee is the tester.
 - **Estimate:** human testing time; verification on a dev stack gets no agent
   compression (§3.5).
 - **Count:** one per Epic; a large Epic gets one per independently testable area.
@@ -291,8 +292,8 @@ Testing Scope.
 ### Definition of Done
 
 - [ ] Every scenario run against the Epic's complete changes (branches or main), or marked not run with the reason
-- [ ] Testing report posted as a comment, then the issue closed
-- [ ] Every defect found is a reopened issue or a new Bug under the Epic, linked from the report
+- [ ] Testing report posted as a comment before the task is closed
+- [ ] Every defect found is a reopened issue or a new Bug, linked from the report
 
 ### Testing Report
 
@@ -320,6 +321,9 @@ hygiene belongs to `/project-triage` — do not duplicate it here.)
    missing testing/docs child, missing work streams, orphaned children,
    Epic-status-lags/ahead-of-children, Epic-Done-with-open-children, version
    mismatch, plus proposed new children or estimate/complexity adjustments.
+   When the missing testing child is really a testing Task labelled only `qa`
+   (the `Task+qa` child this skill used to create), propose adding `testing` to
+   that issue for its assignee to apply, not a second testing task.
 4. **Per-change confirm** (like `/project-triage`, not one bulk confirm). Before
    each mutation, re-check current state and skip with a warning if it changed.
    **Never overwrite a non-empty, human-set Complexity/Estimate/Module without
@@ -387,8 +391,9 @@ it only after you approve.
 | Missing `repo`/`read:org`/`project` scope | relay `fetch.sh`'s exact `gh auth refresh -s …` command |
 | `project`/`read:project` scope missing for project writes | `gh auth refresh -s project` (creating/linking/field-setting needs it; preflight is read-only) |
 | `fetch.sh` fails on any sub-step | surface verbatim; stop (partial cache rejected) |
-| Stale option ID (Module/Complexity not found) | scripts warn + hint `--refresh` and carry on — the issue exists without that field; re-run `fetch.sh` and set it again, or list it as not set in the final report |
-| `link.sh` refuses: child already has a different parent | nothing was linked; report it as a failed step and ask whether to unlink it from that parent first — never reparent silently |
+| Stale Module/Severity option at creation | `create-issue-generic.sh` warns, hints `--refresh` and carries on — the issue exists without that field; re-run `fetch.sh` and set it again, or list it as not set in the final report |
+| Stale Complexity option | `set-epic-fields.sh` exits non-zero — a mid-sequence failure; re-run `fetch.sh` before resuming |
+| `link.sh` refuses: child already has a different parent | nothing was linked — a mid-sequence failure; name the other parent from the message. The user unlinks it by hand or leaves it there, then re-runs; the skill never unlinks or reparents |
 | `addSubIssue`/`addBlockedBy` fails | child exists but is unlinked/undepended; `link.sh` prints the manual fix and logs to `cache/orphans.log` |
 | `addProjectV2ItemById` fails | issue exists but not in Project #5; logged to `orphans.log`; print manual `gh project item-add` |
 | Mid-sequence mutation failure | stop; print completed / failing / not-started lists |

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests link.sh argument handling + dry-run. No network.
+# Tests link.sh argument handling, dry-run, and the different-parent refusal
+# (against a stubbed gh). No network.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 LINK="$HERE/../link.sh"
@@ -27,13 +28,13 @@ STUB_DIR=$(mktemp -d)
 trap 'rm -rf "$STUB_DIR"' EXIT
 cat > "$STUB_DIR/gh" <<'STUB'
 #!/usr/bin/env bash
-[ "${1:-}" = "api" ] && echo "I_OTHER_PARENT"
+[ "${1:-}" = "api" ] && echo "I_OTHER_PARENT ilm#409"
 exit 0
 STUB
 chmod +x "$STUB_DIR/gh"
 if out=$(PATH="$STUB_DIR:$PATH" bash "$LINK" --parent-node-id I_PARENT --child-node-id I_CHILD 2>&1); then
   echo "FAIL: child under a different parent reported success"; exit 1
 fi
-echo "$out" | grep -q "different parent (I_OTHER_PARENT)" || { echo "FAIL: conflict not named"; echo "$out"; exit 1; }
+echo "$out" | grep -q "different parent (ilm#409)" || { echo "FAIL: conflict not named"; echo "$out"; exit 1; }
 
 echo "PASS"

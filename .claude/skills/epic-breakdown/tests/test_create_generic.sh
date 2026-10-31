@@ -47,6 +47,10 @@ out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
   --repo "$REPO" --type task --title "T" --body-file - --label testing --assignee octocat --dry-run 2>&1)
 echo "$out" | grep -q -- "--label testing" || { echo "FAIL: testing label not planned"; exit 1; }
 echo "$out" | grep -q -- "--assignee octocat" || { echo "FAIL: assignee not planned"; exit 1; }
+if printf 'x' | bash "$SCRIPT" --repo "$REPO" --type task --title T --body-file - \
+     --assignee octocat --assignee hubot --dry-run >/dev/null 2>&1; then
+  echo "FAIL: a second --assignee accepted"; exit 1
+fi
 
 # 5b) A wholly new Feature gets new-feature INSTEAD of the template's enhancement.
 out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \

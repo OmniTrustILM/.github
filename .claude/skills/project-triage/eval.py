@@ -260,8 +260,8 @@ for it in target:
     if rules['consistency_rules'].get('epic_without_qa_sub_issue') and t == 'Epic':
         if c['subIssues']['totalCount'] > 0:
             subs = load_sub_issues(c['repository']['name'], c['number'])
-            # The rule keeps its name; a testing task is labelled `testing`
-            # (plus `qa` only when QA owns it), and `qa` alone is QA framework work.
+            # The id says `qa` but the check is the `testing` label (§4); the id
+            # is the config key shared with epic-breakdown/reconcile.py.
             has_testing = any(
                 'testing' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
                 for s in subs

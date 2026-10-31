@@ -45,12 +45,15 @@ fi
 
 if [ "$MODE" = "subissue" ]; then
   if [ "$DRY_RUN" -eq 1 ]; then log "DRY-RUN would: addSubIssue parent=$PARENT child=$CHILD"; exit 0; fi
-  CUR_PARENT=$(gh api graphql -f query="$(gql_op IssueParent)" -f id="$CHILD" \
-    --jq '.data.node.parent.id // ""' 2>/dev/null || echo "")
+  # "<node id> <repo>#<number>", or empty when the child has no parent.
+  PARENT_INFO=$(gh api graphql -f query="$(gql_op IssueParent)" -f id="$CHILD" \
+    --jq '.data.node.parent | if . == null then "" else "\(.id) \(.repository.name)#\(.number)" end' 2>/dev/null || echo "")
+  CUR_PARENT=${PARENT_INFO%% *}
+  CUR_PARENT_REF=${PARENT_INFO#* }
   if [ "$CUR_PARENT" = "$PARENT" ]; then log "already linked to this parent — skipping"; exit 0; fi
   # Not linked is not success: the caller planned this link, so it must stop and
   # surface the conflict rather than report the child as attached.
-  if [ -n "$CUR_PARENT" ]; then fail "child $CHILD already has a different parent ($CUR_PARENT); not reparenting. Unlink it from that parent first, or leave it there."; fi
+  if [ -n "$CUR_PARENT" ]; then fail "child $CHILD already has a different parent ($CUR_PARENT_REF); not reparenting."; fi
   if ! gh api graphql -f query="$(gql_op AddSubIssue)" -f issueId="$PARENT" -f subIssueId="$CHILD" >/dev/null 2>&1; then
     printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$CHILD" "addSubIssue->$PARENT failed" >> "$CACHE_DIR/orphans.log"
     log "manual fix: gh api graphql -f query='mutation{addSubIssue(input:{issueId:\"$PARENT\",subIssueId:\"$CHILD\"}){issue{number}}}'"

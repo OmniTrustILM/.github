@@ -13,7 +13,7 @@
 #   --severity NAME     (optional, Bug children) Minor|Major|Critical|Blocker
 #   --label NAME        (optional, repeatable) extra labels beyond template defaults;
 #                       new-feature replaces the Feature template's enhancement
-#   --assignee LOGIN    (optional, repeatable) the approved suggested assignee
+#   --assignee LOGIN    (optional, once) assign the issue to LOGIN
 #   --dry-run           print planned gh/GraphQL calls; create nothing
 #
 # Output (stdout, key=value): url= number= item_id= node_id=
@@ -30,8 +30,8 @@ for f in project-fields.json repos.json templates.json issue-types.json; do
   [ -f "$CACHE_DIR/$f" ] || fail "missing $CACHE_DIR/$f — run fetch.sh first"
 done
 
-REPO="" TYPE="" TITLE="" BODY_FILE="" MODULE="" SEVERITY="" DRY_RUN=0
-LABELS=() ASSIGNEES=()
+REPO="" TYPE="" TITLE="" BODY_FILE="" MODULE="" SEVERITY="" ASSIGNEE="" DRY_RUN=0
+LABELS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo)      REPO="${2:-}"; shift 2 ;;
@@ -41,7 +41,8 @@ while [ $# -gt 0 ]; do
     --module)    MODULE="${2:-}"; shift 2 ;;
     --severity)  SEVERITY="${2:-}"; shift 2 ;;
     --label)     LABELS+=("${2:-}"); shift 2 ;;
-    --assignee)  ASSIGNEES+=("${2:-}"); shift 2 ;;
+    --assignee)  [ -z "$ASSIGNEE" ] || fail "--assignee given twice; an issue has a single assignee (methodics §3.2)"
+                 ASSIGNEE="${2:-}"; shift 2 ;;
     --dry-run)   DRY_RUN=1; shift ;;
     *)           fail "unknown arg: $1" ;;
   esac
@@ -96,7 +97,7 @@ while IFS= read -r l; do
 done <<<"$TEMPLATE_LABELS"
 for l in "${LABELS[@]:-}"; do [ -n "$l" ] && LABEL_FLAGS+=(--label "$l"); done
 ASSIGNEE_FLAGS=()
-for a in "${ASSIGNEES[@]:-}"; do [ -n "$a" ] && ASSIGNEE_FLAGS+=(--assignee "$a"); done
+if [ -n "$ASSIGNEE" ]; then ASSIGNEE_FLAGS=(--assignee "$ASSIGNEE"); fi
 
 PROJECT_ID=$(jq -r '.project_id' "$CACHE_DIR/project-fields.json")
 ITYPE_ID=$(jq -r --arg t "$TEMPLATE_TYPE" '.[$t] // ""' "$CACHE_DIR/issue-types.json")

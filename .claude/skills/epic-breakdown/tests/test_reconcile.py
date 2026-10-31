@@ -28,7 +28,6 @@ def test_missing_testing_child_flags_when_no_testing_label():
 
 
 def test_qa_only_child_is_not_a_testing_task():
-    # `qa` alone marks QA framework/infrastructure work, not the Epic's testing.
     epic = _epic(subIssues=[{"number": 2, "labels": ["qa"], "state": "OPEN"},
                             {"number": 3, "labels": ["documentation"], "state": "OPEN"}])
     assert any(f["rule"] == "epic_without_qa_sub_issue" for f in diff(epic))

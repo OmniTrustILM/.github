@@ -44,7 +44,7 @@ def _item(number, repo, itype, status, *, state="OPEN", state_reason=None, versi
     return {"id": f"PVTI_{number}", "content": content, "fieldValues": {"nodes": fvs}}
 
 
-def _run_eval():
+def _run_eval(child_labels=()):
     import yaml
     d = tempfile.mkdtemp(prefix="triage-it-")
     epic_body = "## User Story\nAs a user...\n## Use Cases\nUC1\n## Acceptance Criteria\n- [ ] done\n"
@@ -67,7 +67,8 @@ def _run_eval():
     dump("rules.json", yaml.safe_load(open(CONFIG, encoding="utf-8")))
     dump("subs-core-100.json", [{
         "number": 101, "state": "open",
-        "repository_url": "https://api.github.com/repos/OmniTrustILM/core", "labels": []}])
+        "repository_url": "https://api.github.com/repos/OmniTrustILM/core",
+        "labels": [{"name": l} for l in child_labels]}])
     with open(os.path.join(d, "members.txt"), "w", encoding="utf-8") as fh:
         fh.write("alice\n")
 
@@ -90,6 +91,20 @@ def test_eval_emits_recent_closed_but_not_done_only():
     nums = {f["number"] for f in closed}
     assert 200 in nums, "recent closed-but-not-done should be flagged"
     assert 201 not in nums, "issue closed 400d ago must be outside the window"
+
+
+def _testing_rule_fires(child_labels):
+    return any(f["rule"] == "epic_without_qa_sub_issue" and f["number"] == 100
+               for f in _run_eval(child_labels))
+
+
+def test_eval_testing_child_satisfies_testing_rule():
+    assert not _testing_rule_fires(["testing"])
+    assert not _testing_rule_fires(["Testing", "qa"])
+
+
+def test_eval_qa_only_child_does_not_satisfy_testing_rule():
+    assert _testing_rule_fires(["qa"])
 
 
 if __name__ == "__main__":
