@@ -1,3 +1,6 @@
+- name: backported
+  color: "8b5cf6"
+  description: "Backported to a hotfix release, whose notes list it"
 - name: bug
   color: "ef4444"
   description: "Bug fix"
