@@ -2,6 +2,7 @@ changelog:
   exclude:
     labels:
       - ignore-for-release
+      - backported
   categories:
     - title: "✨ New Features"
       labels: [new-feature]
