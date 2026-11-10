@@ -33,6 +33,14 @@ def test_qa_only_child_is_not_a_testing_task():
     assert any(f["rule"] == "epic_without_qa_sub_issue" for f in diff(epic))
 
 
+def test_label_match_ignores_case():
+    epic = _epic(subIssues=[{"number": 2, "labels": [{"name": "Testing"}], "state": "OPEN"},
+                            {"number": 3, "labels": ["Documentation"], "state": "OPEN"}])
+    rules = {f["rule"] for f in diff(epic)}
+    assert "epic_without_qa_sub_issue" not in rules
+    assert "epic_without_docs_sub_issue" not in rules
+
+
 def test_missing_docs_child_flags():
     epic = _epic(subIssues=[{"number": 2, "labels": ["testing"], "state": "OPEN"}])
     assert any(f["rule"] == "epic_without_docs_sub_issue" for f in diff(epic))

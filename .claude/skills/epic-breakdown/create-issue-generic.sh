@@ -42,7 +42,9 @@ while [ $# -gt 0 ]; do
     --severity)  SEVERITY="${2:-}"; shift 2 ;;
     --label)     LABELS+=("${2:-}"); shift 2 ;;
     --assignee)  [ -z "$ASSIGNEE" ] || fail "--assignee given twice; an issue has a single assignee (methodics §3.2)"
-                 ASSIGNEE="${2:-}"; shift 2 ;;
+                 ASSIGNEE="${2:-}"; shift 2
+                 # gh splits --assignee on commas, so a list would slip past the check above.
+                 case "$ASSIGNEE" in ""|*,*) fail "--assignee takes one login, got '$ASSIGNEE'" ;; esac ;;
     --dry-run)   DRY_RUN=1; shift ;;
     *)           fail "unknown arg: $1" ;;
   esac

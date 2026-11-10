@@ -30,10 +30,11 @@ PROJECT_NUMBER = 5
 
 
 def _labels(issue):
-    """Labels as a set of names, tolerant of ['qa'] or [{'name': 'qa'}]."""
+    """Lowercased label names as a set, tolerant of ['qa'] or [{'name': 'qa'}].
+    Lowercased like project-triage's eval.py, so both skills judge an Epic alike."""
     out = set()
     for lab in issue.get("labels", []) or []:
-        out.add(lab["name"] if isinstance(lab, dict) else lab)
+        out.add((lab["name"] if isinstance(lab, dict) else lab).lower())
     return out
 
 
