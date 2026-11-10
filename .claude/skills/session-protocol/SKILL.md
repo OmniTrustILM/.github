@@ -73,21 +73,24 @@ A phase is sized to finish in one session: one coherent change that can be verif
 
 ## Stage: ship
 
-1. Run the repository quality gates on the whole branch: tests and coverage, duplication, static analysis.
-2. Run one independent review on the branch diff and fix the valid findings.
-3. Run `/pr-hygiene` on the branch.
+1. Run one independent review on the branch diff together with the uncommitted changes, and fix the valid findings.
+2. Run `/pr-hygiene` on the branch and `/pr-hygiene --worktree` on the uncommitted changes.
+3. Run the repository quality gates on the whole branch after all edits: tests and coverage, duplication, static analysis. Fix failures and re-run until they pass.
 4. Prepare the commit and the PR description.
 5. Wait for the author's approval before any push or pull request.
 
 ## Stage: feedback
 
 1. Fetch open review comments and new static-analysis issues for the PR with `gh`.
-2. Fix the valid ones as follow-up commits.
-3. List what was skipped and why. Nitpicks that only add code or reduce readability are skipped.
-4. Wait for the author's approval before pushing.
+2. Fix the valid ones.
+3. Run the repository quality gates on the changed code. Fix failures and re-run until they pass.
+4. Commit the fixes as follow-up commits.
+5. List what was skipped and why. Nitpicks that only add code or reduce readability are skipped.
+6. Wait for the author's approval before pushing.
 
 ## Constraints
 
 - One stage per session. No push and no pull request without the author's approval.
+- Code edits follow the plan the author accepted in the design stage; that acceptance is their preview. Show each commit message and wait for the author's confirmation before committing.
 - Plan files and handoff notes stay local and are never committed or referenced from code.
 - This skill sets the working order only. Quality thresholds come from the repository and the author's own rules.
