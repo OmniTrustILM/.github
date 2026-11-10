@@ -14,6 +14,7 @@ issues. All of them operate across all org repos.
 | [`project-triage`](project-triage/) | Health report on Project #5 — required-field gaps, staleness, consistency violations — with optional per-finding auto-fixes. | Read-only by default; fixes only on per-finding confirmation. |
 | [`epic-breakdown`](epic-breakdown/) | Turn a requirement into a planned Epic + sub-issues, enrich an existing Epic, or reconcile an Epic against current progress. The ILM architect "buddy". | Creates/links sub-issues and sets fields only on confirm. |
 | [`pr-hygiene`](pr-hygiene/) | Scan a PR diff, a branch diff, or the uncommitted working tree for comment and log noise over the lines it adds — planning refs, debug prints, comments that restate the code, verbose or duplicated doc prose, dead code — and propose before/after edits. | Edits the local working tree only on confirm; never commits, pushes or stages. |
+| [`session-protocol`](session-protocol/) | Scope a Claude Code session to one stage of the work — design, one plan phase, ship, or PR feedback — with verbose work delegated to subagents and a handoff note at the end, so context and usage stay bounded on long-running work. | Writes the local plan file and code in the working tree; never pushes or opens a PR without approval. |
 
 ## Shared conventions
 
@@ -56,6 +57,9 @@ clone. Deploy it (below) and run it from a clone of the reviewed repo.
 `--worktree` is the exception within that exception: it scans your uncommitted
 changes in place, so the checked-out tree *is* the target and the commit gate
 does not apply.
+
+`session-protocol` is prose only, with no scripts and no cache. Deploy it (below)
+and run it from the repo you are working in.
 
 ### Deploying for use from any repo
 
