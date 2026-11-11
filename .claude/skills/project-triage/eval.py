@@ -260,12 +260,14 @@ for it in target:
     if rules['consistency_rules'].get('epic_without_qa_sub_issue') and t == 'Epic':
         if c['subIssues']['totalCount'] > 0:
             subs = load_sub_issues(c['repository']['name'], c['number'])
-            has_qa = any(
-                'qa' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
+            # The id says `qa` but the check is the `testing` label (§4); the id
+            # is the config key shared with epic-breakdown/reconcile.py.
+            has_testing = any(
+                'testing' in [l.get('name', '').lower() for l in (s.get('labels') or [])]
                 for s in subs
             )
-            if not has_qa:
-                add(it, 'Warning', 'epic_without_qa_sub_issue', 'Epic has no sub-issue with `qa` label')
+            if not has_testing:
+                add(it, 'Warning', 'epic_without_qa_sub_issue', 'Epic has no sub-issue with `testing` label')
 
     # §7.2 Epic-status consistency (logic mirrored from epic-breakdown/reconcile.py).
     # Child project Status comes from the `lookup` table; open/closed from sub_issues.

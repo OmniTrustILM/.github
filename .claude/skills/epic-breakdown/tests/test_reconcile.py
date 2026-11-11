@@ -22,18 +22,32 @@ def test_empty_epic_is_error():
     assert f["level"] == "error"
 
 
-def test_missing_qa_child_flags_when_no_qa_label():
+def test_missing_testing_child_flags_when_no_testing_label():
     epic = _epic(subIssues=[{"number": 2, "labels": ["documentation"], "state": "OPEN"}])
     assert any(f["rule"] == "epic_without_qa_sub_issue" for f in diff(epic))
 
 
+def test_qa_only_child_is_not_a_testing_task():
+    epic = _epic(subIssues=[{"number": 2, "labels": ["qa"], "state": "OPEN"},
+                            {"number": 3, "labels": ["documentation"], "state": "OPEN"}])
+    assert any(f["rule"] == "epic_without_qa_sub_issue" for f in diff(epic))
+
+
+def test_label_match_ignores_case():
+    epic = _epic(subIssues=[{"number": 2, "labels": [{"name": "Testing"}], "state": "OPEN"},
+                            {"number": 3, "labels": ["Documentation"], "state": "OPEN"}])
+    rules = {f["rule"] for f in diff(epic)}
+    assert "epic_without_qa_sub_issue" not in rules
+    assert "epic_without_docs_sub_issue" not in rules
+
+
 def test_missing_docs_child_flags():
-    epic = _epic(subIssues=[{"number": 2, "labels": ["qa"], "state": "OPEN"}])
+    epic = _epic(subIssues=[{"number": 2, "labels": ["testing"], "state": "OPEN"}])
     assert any(f["rule"] == "epic_without_docs_sub_issue" for f in diff(epic))
 
 
 def test_no_missing_child_warnings_when_both_present():
-    epic = _epic(subIssues=[{"number": 2, "labels": ["qa"], "state": "OPEN"},
+    epic = _epic(subIssues=[{"number": 2, "labels": ["testing"], "state": "OPEN"},
                             {"number": 3, "labels": ["documentation"], "state": "OPEN"}])
     out = diff(epic)
     assert not any(f["rule"] == "epic_without_qa_sub_issue" for f in out)
@@ -42,7 +56,7 @@ def test_no_missing_child_warnings_when_both_present():
 
 def test_done_with_open_children_is_error():
     epic = _epic(status="Done",
-                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["qa"]},
+                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["testing"]},
                             {"number": 3, "state": "OPEN", "labels": ["documentation"]}])
     f = next(x for x in diff(epic) if x["rule"] == "epic_done_with_open_children")
     assert f["level"] == "error"
@@ -51,7 +65,7 @@ def test_done_with_open_children_is_error():
 def test_done_open_children_suppresses_status_and_orphan_warnings():
     # §7.3: the error outranks Epic-level warnings about the same situation.
     epic = _epic(status="Done", state="CLOSED", children_status=["Planning"],
-                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["qa", "documentation"]}])
+                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["testing", "documentation"]}])
     rules = {f["rule"] for f in diff(epic)}
     assert "epic_done_with_open_children" in rules
     assert "epic_status_ahead_of_children" not in rules
@@ -60,26 +74,26 @@ def test_done_open_children_suppresses_status_and_orphan_warnings():
 
 def test_status_lags_children_warns():
     epic = _epic(status="Open", children_status=["In Progress"],
-                 subIssues=[{"number": 2, "labels": ["qa"]}, {"number": 3, "labels": ["documentation"]}])
+                 subIssues=[{"number": 2, "labels": ["testing"]}, {"number": 3, "labels": ["documentation"]}])
     assert any(f["rule"] == "epic_status_lags_children" for f in diff(epic))
 
 
 def test_orphaned_when_epic_closed_child_open():
     epic = _epic(state="CLOSED", status="Open",
-                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["qa", "documentation"]}])
+                 subIssues=[{"number": 2, "state": "OPEN", "labels": ["testing", "documentation"]}])
     assert any(f["rule"] == "orphaned_sub_issues" for f in diff(epic))
 
 
 def test_version_mismatch_is_error():
     epic = _epic(status="Open", version="2.18.0",
-                 subIssues=[{"number": 2, "labels": ["qa"], "version": "2.17.0", "state": "OPEN"},
+                 subIssues=[{"number": 2, "labels": ["testing"], "version": "2.17.0", "state": "OPEN"},
                             {"number": 3, "labels": ["documentation"], "version": "2.18.0", "state": "OPEN"}])
     fs = [f for f in diff(epic) if f["rule"] == "version_mismatch"]
     assert len(fs) == 1 and fs[0]["level"] == "error"
 
 
 def test_missing_workstream_info_when_some_annotated():
-    epic = _epic(subIssues=[{"number": 2, "labels": ["qa"], "work_stream": "Testing"},
+    epic = _epic(subIssues=[{"number": 2, "labels": ["testing"], "work_stream": "Testing"},
                             {"number": 3, "labels": ["documentation"], "work_stream": "Documentation"}])
     f = next(x for x in diff(epic) if x["rule"] == "missing_workstream")
     assert "API" in f["detail"] and f["level"] == "info"

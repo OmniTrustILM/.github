@@ -34,8 +34,9 @@ concrete signal (a Module, a repo, an existing issue, a decision rule).
 
 ## Decomposition
 
-- Every Epic needs a **Task+qa** child and a **Task+documentation** child, or
-  §7.2 triage flags it and testing/docs get forgotten.
+- Every Epic needs a **testing task** (SKILL.md, *Testing task*) and a
+  **Task+documentation** child, or §7.2 triage flags it and testing/docs get
+  forgotten.
 - If a proposed Feature under an Epic would itself need sub-issues, the Epic is
   too large (§1) — propose splitting the Epic instead of nesting Features.
 - Split a child when its PR would exceed ~2000 LoC **and** a repo-internal
