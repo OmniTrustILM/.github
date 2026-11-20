@@ -39,6 +39,7 @@ ui:
   - saas-provisioning
 
 go:
+  - acme-connector
   - cbom-lens
   - cbom-repository
   - cert-manager-issuer
