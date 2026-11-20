@@ -95,6 +95,7 @@ Issue lifecycle (called from `issue-automation.yml` on `issues.opened`/`issues.r
 - **auto-add-to-project** — adds issue to Project #5, sets initial Status (Bug → Analysis, else → Planning).
 - **auto-set-fields-from-form** — parses structured form data (Severity, Module, Version Number) and applies project field values. Vulnerability defaults included.
 - **version-propagation** — if the new issue has a parent, copies empty Version/Module fields from parent to child. Uses an org-wide token because the parent may live in a different repo.
+- **epic-scaffold** — a newly opened product Epic (type Epic, no `tech-epic` label, not a release collector) gets its two standard sub-issues: the `Analysis, breakdown, estimations` Task in the Epic's repo and the `Doc: <Epic title>` Task (label `documentation`) in the documentation repo, both assigned to the Epic's assignees and born as sub-issues so version-propagation fills their Version/Module. Idempotent. Uses the org-wide token (the documentation repo differs from the Epic's). Has a `scaffold.test.sh` suite over its decision helpers.
 - **reopen-tracking** — posts audit comment and clears the Reopen Reason field.
 
 Release (called from `release-automation.yml` on `release.published`):
