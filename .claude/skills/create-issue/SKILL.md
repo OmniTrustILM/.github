@@ -180,7 +180,7 @@ Fields **never** auto-filled (PM-controlled, set during triage):
 - Version (target release) — never *inferred* from the description. It is still inherited from the parent after linking,
   the same copy the org-wide version-propagation action performs; see phase 9.
 - Sprint (iteration)
-- Priority (PM during triage)
+- Prioritization (PM during triage)
 - Start Date / End Date (PM for Epics/Releases)
 - Complexity / Estimate (developer or `/epic-breakdown` skill)
 
@@ -369,6 +369,6 @@ Say so in one line — "opened in your browser; drag any screenshots or logs ont
 - The skill is **stateless across invocations** — each invocation reads the cache and starts fresh. Cache is the only persistent artifact.
 - Concurrent `create.sh` invocations are safe — each creates an independent issue. Concurrent `fetch.sh` runs (e.g. two `--refresh` invocations at once) are NOT safe; the second will overwrite the first's `cache.tmp/`. Avoid running two refreshes simultaneously. Normal `create.sh` invocations that hit a warm cache do not race.
 - Rate limits — Project V2 GraphQL is ~5 points per mutation; per invocation we do at most 5 mutations (add + 2 fields + issue type + sub-issue link). Well below per-hour limits.
-- The skill must NOT touch Version, Sprint, Priority, Start Date, End Date, Complexity, or Estimate fields. Those are PM/triage controlled. `create.sh` never writes Version itself. It may still arrive: the `version-propagation` action runs on `issues.opened` and copies Version and Module from the parent when the child's own field is empty, so a bug linked under `Bugs x.y.z` will usually inherit that cycle's Version. Whether it does is timing-dependent — the action only propagates if it observes both the parent link and the project item, both of which `create.sh` writes moments after creation — so treat an inherited Version as likely but not guaranteed. Triage owns the field either way.
+- The skill must NOT touch Version, Sprint, Prioritization, Start Date, End Date, Complexity, or Estimate fields. Those are PM/triage controlled. `create.sh` never writes Version itself. It may still arrive: the `version-propagation` action runs on `issues.opened` and copies Version and Module from the parent when the child's own field is empty, so a bug linked under `Bugs x.y.z` will usually inherit that cycle's Version. Whether it does is timing-dependent — the action only propagates if it observes both the parent link and the project item, both of which `create.sh` writes moments after creation — so treat an inherited Version as likely but not guaranteed. Triage owns the field either way.
 - Cross-repo linking is allowed: GitHub requires only that parent and sub-issue share a repository owner, which every org repo does. Phase 5 covers the push access it implies.
 - Required `gh` token scope: `repo` (write access). If the active token (e.g. `GH_TOKEN` env var) only has `public_repo`, label management on internal/private repos returns 404 with a misleading "label not found" message. Run `gh auth refresh -s repo`, or unset `GH_TOKEN` to fall back to a keyring token that has `repo`.

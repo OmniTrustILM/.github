@@ -19,7 +19,8 @@ required_past_planning:
   epic: [complexity, estimate, start_date, end_date]
   release: [start_date, end_date]
 
-# Warning-level recommended fields (flagged but not blocking)
+# Warning-level recommended fields (flagged but not blocking).
+# `priority` maps to the Project #5 field "Prioritization" (renamed from Priority).
 recommended_fields:
   bug: [module, priority, version, estimate, assignee]
   feature: [module, priority, version, estimate, assignee]

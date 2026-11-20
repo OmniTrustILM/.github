@@ -1,5 +1,5 @@
 name: Auto Set Fields from Form
-description: Parses Bug/Vulnerability/Release form fields from an issue body and sets project custom fields (Severity, Module, Version, Priority).
+description: Parses Bug/Vulnerability/Release form fields from an issue body and sets project custom fields (Severity, Module, Version, Prioritization).
 
 inputs:
   github-token:
