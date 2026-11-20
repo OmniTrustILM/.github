@@ -30,10 +30,11 @@ PROJECT_NUMBER = 5
 
 
 def _labels(issue):
-    """Labels as a set of names, tolerant of ['qa'] or [{'name': 'qa'}]."""
+    """Lowercased label names as a set, tolerant of ['qa'] or [{'name': 'qa'}].
+    Lowercased like project-triage's eval.py, so both skills judge an Epic alike."""
     out = set()
     for lab in issue.get("labels", []) or []:
-        out.add(lab["name"] if isinstance(lab, dict) else lab)
+        out.add((lab["name"] if isinstance(lab, dict) else lab).lower())
     return out
 
 
@@ -103,11 +104,12 @@ def diff(epic, rules=None):
         findings.append({"rule": "empty_epic_no_sub_issues", "level": "error",
                          "detail": "Epic has no sub-issues (§3.2 blocks moving it to Open)."})
 
-    # §7.2 — Epic without a Task+qa sub-issue (testing may be forgotten).
-    if subs and not any("qa" in _labels(s) for s in subs):
+    # §7.2 — Epic without a testing task (a sub-issue labelled `testing`, §4).
+    # The `_qa_` id is project-triage's config key, shared on purpose.
+    if subs and not any("testing" in _labels(s) for s in subs):
         findings.append({"rule": "epic_without_qa_sub_issue", "level": "warning",
-                         "detail": "Epic has no sub-issue with the `qa` label; testing may be forgotten."})
-    # Completeness extension (paired with the QA rule in §2.6) — not in the triage YAML.
+                         "detail": "Epic has no sub-issue with the `testing` label; testing may be forgotten."})
+    # Completeness extension (paired with the testing rule in §2.6) — not in the triage YAML.
     if subs and not any("documentation" in _labels(s) for s in subs):
         findings.append({"rule": "epic_without_docs_sub_issue", "level": "warning",
                          "detail": "Epic has no sub-issue with the `documentation` label."})

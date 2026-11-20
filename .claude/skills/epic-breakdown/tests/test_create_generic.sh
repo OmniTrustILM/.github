@@ -14,8 +14,10 @@ fi
 # Pick a repo that exists in the cache so repo validation passes.
 REPO=$(jq -r '.[0].name' "$CACHE/repos.json")
 
+desc_body() { printf '### Description\n\nx\n'; }
+
 # 1) Dry-run for a Feature child: prints create + project add + type + module, no network.
-out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
+out=$(desc_body |bash "$SCRIPT" \
   --repo "$REPO" --type feature --title "T" --body-file - --module Certificates --dry-run 2>&1)
 echo "$out" | grep -q "gh issue create" || { echo "FAIL: no create in dry-run"; exit 1; }
 echo "$out" | grep -qi "Module=Certificates" || { echo "FAIL: module not planned"; exit 1; }
@@ -38,9 +40,36 @@ if printf 'x' | bash "$SCRIPT" --repo "$REPO" --type nonsense --title T --body-f
 fi
 
 # 5) Bug child with --severity: dry-run shows the planned Severity write.
-out=$(printf '### Description\n\nx\n' | bash "$SCRIPT" \
+out=$(desc_body |bash "$SCRIPT" \
   --repo "$REPO" --type bug --title "B" --body-file - --severity Major --dry-run 2>&1)
 echo "$out" | grep -qi "Severity=Major" || { echo "FAIL: severity not planned"; exit 1; }
+
+# 5a) Testing task with an approved assignee: dry-run plans the label and the assignee.
+out=$(desc_body |bash "$SCRIPT" \
+  --repo "$REPO" --type task --title "T" --body-file - --label testing --assignee octocat --dry-run 2>&1)
+echo "$out" | grep -q -- "--label testing" || { echo "FAIL: testing label not planned"; exit 1; }
+echo "$out" | grep -q -- "--assignee octocat" || { echo "FAIL: assignee not planned"; exit 1; }
+if printf 'x' | bash "$SCRIPT" --repo "$REPO" --type task --title T --body-file - \
+     --assignee octocat --assignee hubot --dry-run >/dev/null 2>&1; then
+  echo "FAIL: a second --assignee accepted"; exit 1
+fi
+for bad in "octocat,hubot" ""; do
+  if printf 'x' | bash "$SCRIPT" --repo "$REPO" --type task --title T --body-file - \
+       --assignee "$bad" --dry-run >/dev/null 2>&1; then
+    echo "FAIL: --assignee '$bad' accepted"; exit 1
+  fi
+done
+
+# 5b) A wholly new Feature gets new-feature INSTEAD of the template's enhancement.
+out=$(desc_body |bash "$SCRIPT" \
+  --repo "$REPO" --type feature --title "F" --body-file - --dry-run 2>&1)
+echo "$out" | grep -q -- "--label enhancement" || { echo "FAIL: Feature lost its template label"; exit 1; }
+out=$(desc_body |bash "$SCRIPT" \
+  --repo "$REPO" --type feature --title "F" --body-file - --label new-feature --dry-run 2>&1)
+echo "$out" | grep -q -- "--label new-feature" || { echo "FAIL: new-feature not planned"; exit 1; }
+if echo "$out" | grep -q -- "--label enhancement"; then
+  echo "FAIL: enhancement kept alongside new-feature"; exit 1
+fi
 
 # 6) Regression: label-less Task, NON-dry-run, executed with /bin/bash.
 # Bash 3.2 (macOS /bin/bash) under `set -u` treats an empty-array expansion as an
@@ -65,7 +94,7 @@ esac
 exit 0
 STUB
 chmod +x "$STUB_DIR/gh"
-out=$(printf '### Description\n\nx\n' | PATH="$STUB_DIR:$PATH" /bin/bash "$SCRIPT" \
+out=$(desc_body |PATH="$STUB_DIR:$PATH" /bin/bash "$SCRIPT" \
   --repo "$REPO" --type task --title "Label-less regression" --body-file - 2>&1)
 rc=$?
 [ "$rc" -eq 0 ] || { echo "FAIL: label-less non-dry-run creation exited $rc:"; echo "$out"; exit 1; }

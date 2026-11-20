@@ -59,7 +59,7 @@ mutation AddBlockedBy($issueId: ID!, $blockingIssueId: ID!) {
 
 query IssueParent($id: ID!) {
   node(id: $id) {
-    ... on Issue { number parent { id number } }
+    ... on Issue { number parent { id number repository { name } } }
   }
 }
 
