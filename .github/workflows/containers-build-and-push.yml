@@ -105,6 +105,11 @@ on:
         required: false
         type: string
         default: '21'
+      build-ai-runtime-protocol:
+        description: "Install the fixed ai-runtime/pom.xml before Maven packaging"
+        required: false
+        type: boolean
+        default: false
       trivy-config:
         description: "Path to a repo-local Trivy config that fully replaces the org default. Used ONLY when allow-trivy-config-override is true."
         required: false
@@ -242,6 +247,12 @@ jobs:
         run: |
           rm -rf data
           mkdir -p data
+
+      - name: Install AI runtime protocol
+        if: inputs.build-ai-runtime-protocol
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: mvn -f ai-runtime/pom.xml -U -B -ntp -DskipTests install
 
       - name: Maven package (skip tests; tests run on PR)
         env:
